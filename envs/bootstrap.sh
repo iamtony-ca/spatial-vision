@@ -23,10 +23,22 @@ have() { [ "$WHAT" = "all" ] || [ "$WHAT" = "$1" ]; }
 # --- uv (ws 내부) -------------------------------------------------------------
 if [ ! -x "$ROOT/envs/bin/uv" ]; then
   echo "== uv 설치 =="
-  UV_INSTALL_DIR="$ROOT/envs/bin" UV_UNMANAGED_INSTALL="$ROOT/envs/bin" \
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+  # 🔴 변수는 **파이프 건너편 `sh` 에** 걸어야 한다. `VAR=... curl ... | sh` 는 변수가 `curl` 에만
+  #    적용돼 설치 스크립트가 못 본다 → uv 가 `~/.local/bin` 으로 가고(= ~ 오염) `envs/bin/uv` 는
+  #    안 생긴다. 이 머신에 이미 uv 가 있으면 위 `if` 가 건너뛰어 **완전히 새 머신에서만 드러난다**.
+  curl -LsSf https://astral.sh/uv/install.sh \
+    | env UV_INSTALL_DIR="$ROOT/envs/bin" UV_UNMANAGED_INSTALL="$ROOT/envs/bin" \
+          INSTALLER_NO_MODIFY_PATH=1 sh
 fi
 UV="$ROOT/envs/bin/uv"
+# 조용히 넘어가지 않는다 — 여기서 안 잡으면 한참 뒤 «No such file or directory» 로 터진다.
+[ -x "$UV" ] || {
+  echo "❌ uv 설치 실패: $UV 가 없다." >&2
+  echo "   설치 스크립트가 다른 곳에 넣었을 수 있다: $(command -v uv || echo '(PATH 에도 없음)')" >&2
+  echo "   수동: curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=\"$ROOT/envs/bin\" \\" >&2
+  echo "         UV_UNMANAGED_INSTALL=\"$ROOT/envs/bin\" INSTALLER_NO_MODIFY_PATH=1 sh" >&2
+  exit 1
+}
 
 # uv 0.9+ 는 venv 가 이미 있으면 에러로 멈춘다 → 재실행 시 idempotent 하지 않다.
 # --allow-existing 로 기존 venv 를 보존하고 pip install 이 다시 맞춘다(처음부터 다시 만들려면 지우고 실행).
