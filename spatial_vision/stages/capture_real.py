@@ -64,7 +64,10 @@ def check_profile(live: dict, prof_path: str, tol_px: float, tol_mm: float) -> i
     해상도 모드를 바꾸거나 개체가 바뀌면 SAM3 참조·ISM 템플릿이 전부 무효인데,
     그건 산출물을 봐서는 안 보이고 pose 정확도로만 드러난다 — 여기서 잡는다.
     """
-    prof = json.loads(Path(prof_path).read_text())
+    # 🔴 `encoding="utf-8"` 을 반드시 준다. 안 주면 **로케일 기본 인코딩**으로 읽는데
+    #    Jetson 은 보통 `LANG` 이 안 잡혀 있어 ASCII 가 되고, 프로파일 주석의 한글에서
+    #    `UnicodeDecodeError: 'ascii' codec can't decode byte 0xeb` 로 죽는다(실측 2026-08-12).
+    prof = json.loads(Path(prof_path).read_text(encoding="utf-8"))
     bad = []
     for k in ("width", "height"):
         if int(prof[k]) != int(live[k]):
@@ -106,6 +109,17 @@ def main(argv=None) -> int:
     ap.add_argument("--gain", type=int, default=None, help="0~100 (미지정=AE)")
     ap.add_argument("--note", default=None, help="meta 에 남길 메모 (거리·조명·자세 등)")
     a = ap.parse_args(argv)
+
+    # 🔴 Jetson 은 `LANG` 이 안 잡혀 있는 일이 흔하고, 그러면 파이썬의 기본 인코딩이 ASCII 가 된다
+    #    (PEP 538 의 C 로케일 강제 변환도 항상 걸리지는 않는다). 이 파일은 한글 문자열을 찍으므로
+    #    **표준출력이 ASCII 면 `UnicodeEncodeError` 로 죽는다.** 파일 IO 는 각 호출에서
+    #    `encoding="utf-8"` 로 못박았고, 출력은 여기서 한 번 고정한다.
+    #    (환경변수로 미리 막으려면 `PYTHONUTF8=1` 또는 `LANG=C.UTF-8`.)
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
 
     import pyzed.sl as sl
     # cv2 는 **있으면 쓰고 없으면 SDK 로 저장**한다. Jetson 에 `pip install opencv-python` 을
@@ -191,7 +205,8 @@ def main(argv=None) -> int:
                 print(f"❌ 저장 실패: {p_out}", file=sys.stderr)
                 z.close()
                 return 2
-        (fd / "cam.json").write_text(json.dumps({k: live[k] for k in CAM_KEYS}, indent=2))
+        (fd / "cam.json").write_text(
+            json.dumps({k: live[k] for k in CAM_KEYS}, indent=2), encoding="utf-8")
         exp = z.get_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE)
         gn = z.get_camera_settings(sl.VIDEO_SETTINGS.GAIN)
         exp = exp[1] if isinstance(exp, (tuple, list)) else exp   # SDK 버전별 반환형 차이
@@ -220,7 +235,7 @@ def main(argv=None) -> int:
         "gt": None,
         "note_gt": "실환경에는 GT 가 없다 — eval_* 를 못 돌린다. 서열화는 GT-free 지표로 "
                    "(게이트 후퇴율 · G0↔G1 불일치율 · 좌우 투영 일관성 · 파지 성공률).",
-    }, indent=2, ensure_ascii=False))
+    }, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"{saved} 프레임 → {out}")
     print(f"  다음: stereo_onnx --in {out} --out {out}_st --scale 0.5 …")
     return 0
