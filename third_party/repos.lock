@@ -1,0 +1,8 @@
+# third_party 리포 고정 (M0, 2026-08-07). 재현: envs/bootstrap.sh 가 이 파일을 읽어 clone/checkout.
+# 형식: <dir> <github url> <commit sha> <commit date>
+# ⚠️ 여기 없는 git 고정이 하나 더 있다: pytorch3d / nvdiffrast 는 clone 이 아니라 pip git 의존이라
+#    envs/bootstrap.sh 의 pose 섹션(PYTORCH3D_SHA / NVDIFFRAST_SHA)에서 고정한다. 갱신 시 둘 다 본다.
+FoundationStereo  https://github.com/NVlabs/FoundationStereo.git   6e8806816b533e4d13ddbb95ffa907b797060a62  2025-12-18
+FoundationPose    https://github.com/NVlabs/FoundationPose.git     a1b694b83e633c2cb6115b9063d940a687759392  2026-04-29
+SAM-6D            https://github.com/JiehongLin/SAM-6D.git         1c2543b3b6faa1f1d81b3c7291f8b371d71e50c2  2024-07-09
+sam3              https://github.com/facebookresearch/sam3.git     96914d2425f90a64f45ca977c2b5165418099543  2026-07-30

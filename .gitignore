@@ -41,7 +41,12 @@ weights/**
 
 # ── 클론한 외부 리포 (3.8G) ───────────────────────────────────────────────────
 # envs/bootstrap.sh repos 가 다시 가져온다. ⚠️ 대부분 research-only 라이선스다(docs/LICENSES.md).
-third_party/
+# ⚠️ `weights/` 와 같은 함정 — `third_party/` 로 쓰면 디렉토리 자체가 제외돼
+#    **아래 `repos.lock` 재포함이 안 먹는다.** 반드시 `/**` 형태여야 한다.
+third_party/**
+# 🔴 `repos.lock` 은 **반드시 커밋한다** — `bootstrap.sh repos` 가 이 파일을 읽어 커밋 SHA 로
+#    checkout 한다. 없으면 새 머신에서 **버전 고정이 통째로 깨진다**.
+!third_party/repos.lock
 
 # ── venv · 툴체인 (12G) ───────────────────────────────────────────────────────
 # 모델마다 의존성이 실제로 충돌해서(sam3 numpy<2 / FoundationPose numpy>=2) venv 가 갈려 있다.
