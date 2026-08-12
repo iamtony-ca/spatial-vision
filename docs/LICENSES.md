@@ -70,7 +70,7 @@ NOCTIS 코드 자체는 **MIT** 지만 **논문의 SOTA 설정이 AGPL-3.0 을 �
 | 시점 | 항목 | 이유 / 라이선스 |
 |---|---|---|
 | **M4** | **BlenderProc (+ Blender ~1GB 자동 다운로드)** | SAM-6D ISM 은 CAD 를 여러 시점에서 렌더한 **템플릿**이 있어야 zero-shot 매칭을 한다. `Render/render_custom_templates.py` 가 `import blenderproc as bproc` 로 시작한다. 현재 `seg_sam6d` venv 에 없음. BlenderProc=BSD-3, Blender=GPL — **렌더 산출물에 GPL 이 전이되지 않는다**는 게 통상 해석이나 상업화 시 법무 확인 권장 |
-| **M3 (TensorRT 쓸 때만)** | NGC `deployable_v2.0` **고정 해상도** ONNX (320×736 576MB / 576×960 909MB) | 우리가 받은 **dynamic 판은 모델카드상 TRT FP16 변환 불가, ONNX Runtime 전용**이다. TensorRT 경로로 가려면 고정 해상도 판이 필요. 라이선스는 동일(NVIDIA Open Model License) |
+| ~~M3~~ ✅ **576×960 은 이미 받아 뒀다** (`weights/ngc_foundationstereo/deployable_foundationstereo_small_576x960_v2.0.onnx`, 868MiB). ⚠️ **`check_weights.sh` 의 13종에 없고 `fetch_weights.sh` 도 받지 않는다** — 새 머신으로 옮기지 않으면 조용히 사라진다(`docs/SETUP.md §0`). 320×736 은 아직 없다 | NGC `deployable_v2.0` **고정 해상도** ONNX (320×736 576MB / 576×960 909MB) | 우리가 받은 **dynamic 판은 모델카드상 TRT FP16 변환 불가, ONNX Runtime 전용**이다. TensorRT 경로로 가려면 고정 해상도 판이 필요. 라이선스는 동일(NVIDIA Open Model License) |
 
 ## 5. 데이터셋 (참고)
 
