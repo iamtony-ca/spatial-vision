@@ -1,0 +1,96 @@
+{
+  "obj_id": "foup_300_semi_spec15",
+  "units": "mm",
+  "origin": {
+    "definition": "flange 주 상면(dominant top plane) 중심, 중심축 위",
+    "offset_from_source_mm": [
+      0.0,
+      0.0,
+      344.0
+    ],
+    "rationale": "FoundationPose 의 depth-median Z 초기화가 관측 표면 근처 원점에서 정합 (CONSUMER_6DPOSE.md §2.6-1)"
+  },
+  "source": {
+    "path": "assets/cad/300mm_foup/300mm_SEMI_FOUP.step",
+    "sha256": "48c179b2eaa2c410d69343712aa63511899c2a65a554f4841d9a0a653a582423",
+    "scale_applied": 1000.0,
+    "up_axis": "y"
+  },
+  "part_split": {
+    "method": "solid(연결성분) 단위 — CAD 가 파트로 분리돼 있다",
+    "up_axis_source": "y",
+    "z_cut_mm_source_frame": null,
+    "n_solids": 28,
+    "n_wafers": 25,
+    "n_others": 2,
+    "wafers_in_full": false
+  },
+  "unit_checksum": {
+    "applied": [
+      "wafer"
+    ],
+    "tolerance_mm": 2.0
+  },
+  "standard_features_semi_e47_1_1106": {
+    "rim_radius_mm": 91.67878707749138,
+    "rim_diameter_mm": 183.35757415498276,
+    "outline_is_circular": false,
+    "outline_side_x_mm": 142.0,
+    "outline_side_y_mm": 142.0,
+    "center_hole_radius_mm": 22.500010676117295,
+    "center_hole_diameter_mm": 45.00002135223459,
+    "top_plane_z_mm": 0.0,
+    "top_plane_area_mm2": 15594.38150659701,
+    "bbox_top_z_mm": 2.000011682510376,
+    "bottom_z_mm": -29.000001907348633,
+    "height_mm": 31.00001358985901
+  },
+  "meshes": {
+    "full.ply": {
+      "faces": 33722,
+      "watertight": true,
+      "volume_cm3": 19769.759,
+      "bbox_mm": [
+        [
+          -190.0,
+          -214.0,
+          -344.0
+        ],
+        [
+          167.0,
+          214.0,
+          0.0
+        ]
+      ],
+      "use": "stage-1 coarse pose (body 포함 — 근사 대칭인 flange 단독의 90°/180° 오추정 방지)"
+    },
+    "top_flange.ply": {
+      "faces": 3634,
+      "watertight": true,
+      "volume_cm3": 172.254,
+      "bbox_mm": [
+        [
+          -71.0,
+          -71.0,
+          -29.0
+        ],
+        [
+          71.0,
+          71.0,
+          0.0
+        ]
+      ],
+      "use": "stage-2 정밀 refine (표준부만 — 제조사 불변)"
+    },
+    "body.ply": {
+      "faces": 30088,
+      "volume_cm3": 19597.505,
+      "use": "렌더용 — USD 에서 top_flange 와 겹치지 않는 별개 prim 으로 넣어 part mask 를 얻는다. body ∪ top_flange ≈ full (컷면에 내부 캡이 생기지만 외부에서 보이지 않는다)"
+    }
+  },
+  "derived_from": {
+    "source_obj": "assets/obj/foup_300_semi",
+    "tool": "spatial_vision.cad.build_semi_flange",
+    "note": "top_flange 만 SEMI E47.1 / 실물 관측에 맞춰 수정. body·wafers 는 원본 그대로."
+  }
+}

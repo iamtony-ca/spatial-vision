@@ -1,0 +1,31 @@
+{
+  "z49_plate_thickness_mm": 4.999999999999999,
+  "hole": {
+    "target_d63_mm": 35.0,
+    "before_at_underside_mm": 31.0,
+    "after_at_underside_mm": 35.04,
+    "top_opening_mm": 45.04,
+    "vertices_moved": 5098,
+    "taper_mm": 0.0,
+    "cone_end_z_mm": -13.25,
+    "not_modeled": "상판 밑면 아래의 평탄 바닥(x69=7.6±0.1)과 2차 원뿔(γ=52±1°)"
+  },
+  "rim": {
+    "mode": "top-only",
+    "profile": "smoothstep",
+    "raise_mm": 2.0,
+    "flat_mm": 1.75,
+    "round_mm": 2.5,
+    "vertices_raised": 0,
+    "plate_mm": 5.0,
+    "band_mm": 18.0,
+    "source": "실물 관측(사용자, 2026-08-10) — 규격 항목이 아니다"
+  },
+  "subdivide_mm": 1.5,
+  "dominant_top_plane": {
+    "z_mm": 0.0,
+    "area_mm2": 18037.15990968454
+  },
+  "watertight": false,
+  "warning": "자산이 바뀌었다 — build_usd → capture 부터 다시 돌린다 (횡단 정리 #40)"
+}

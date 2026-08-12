@@ -1,0 +1,39 @@
+{
+  "source_obj": "assets/obj/foup_300_semi",
+  "band_mm": 3.0,
+  "hub_r_mm": 0.0,
+  "hole_band_mm": 0.0,
+  "outline_area_mm2": 19626.00000348072,
+  "band_area_mm2": 1679.1414077930094,
+  "band_area_frac": 0.08555698601320745,
+  "faces": 5364,
+  "faces_before_subdivide": 832,
+  "vertices": 2682,
+  "subdivide_mm": 6.0,
+  "watertight": true,
+  "surface_area_mm2": 12031.057136735766,
+  "flange_surface_area_mm2": 63115.47282468743,
+  "surface_area_frac": 0.19061977354037746,
+  "volume_cm3": 12.944,
+  "bbox_mm": [
+    [
+      -71.0,
+      -71.0,
+      -8.0
+    ],
+    [
+      71.0,
+      71.0,
+      0.0
+    ]
+  ],
+  "z_range_mm": [
+    -8.000004768371582,
+    1.1682510375976562e-05
+  ],
+  "flange_z_range_mm": [
+    -29.000001907348633,
+    1.1682510375976562e-05
+  ],
+  "note": "top_flange.ply 를 테두리 밴드로 교체한 obj. full.ply 는 원본 그대로 — pose_fp --primary flange --mask-band-mm <band> 로 쓴다."
+}

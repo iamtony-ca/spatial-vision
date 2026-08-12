@@ -1,0 +1,78 @@
+{
+  "obj_id": "foup_300",
+  "units": "mm",
+  "origin": {
+    "definition": "flange 주 상면(dominant top plane) 중심, 중심축 위",
+    "offset_from_source_mm": [
+      0.0,
+      0.0,
+      175.0
+    ],
+    "rationale": "FoundationPose 의 depth-median Z 초기화가 관측 표면 근처 원점에서 정합 (CONSUMER_6DPOSE.md §2.6-1)"
+  },
+  "source": {
+    "path": "assets/cad/foup_300mm/FOUP 300.stl",
+    "sha256": "5c5f2a1ad8f9742d94b4f4b5ba15968769d1b20beaa1f7b62158e84ee0bb5200",
+    "scale_applied": 10.0,
+    "note": "STL 이 cm 단위여서 ×10. STEP(`.stp`)은 원래 mm."
+  },
+  "part_split": {
+    "method": "plane cut + connected component (중심축 포함 성분)",
+    "z_cut_mm_source_frame": 155.0,
+    "n_components": 2
+  },
+  "standard_features_semi_e47_1_1106": {
+    "rim_radius_mm": 95.00000465651331,
+    "rim_diameter_mm": 190.00000931302662,
+    "center_hole_radius_mm": 19.999999423157107,
+    "center_hole_diameter_mm": 39.99999884631421,
+    "top_plane_z_mm": 175.0,
+    "top_plane_area_mm2": 18118.061553149157,
+    "bbox_top_z_mm": 177.00000762939453,
+    "bottom_z_mm": 155.0,
+    "height_mm": 22.00000762939453
+  },
+  "meshes": {
+    "full.ply": {
+      "faces": 19548,
+      "watertight": true,
+      "volume_cm3": 5569.812,
+      "bbox_mm": [
+        [
+          -212.5,
+          -176.0,
+          -330.0
+        ],
+        [
+          212.5,
+          166.0,
+          2.0
+        ]
+      ],
+      "use": "stage-1 coarse pose (body 포함 — 근사 대칭인 flange 단독의 90°/180° 오추정 방지)"
+    },
+    "top_flange.ply": {
+      "faces": 624,
+      "watertight": true,
+      "volume_cm3": 485.037,
+      "bbox_mm": [
+        [
+          -94.9754,
+          -94.9754,
+          -20.0
+        ],
+        [
+          95.0,
+          95.0,
+          2.0
+        ]
+      ],
+      "use": "stage-2 정밀 refine (표준부만 — 제조사 불변)"
+    },
+    "body.ply": {
+      "faces": 19922,
+      "volume_cm3": 5084.775,
+      "use": "렌더용 — USD 에서 top_flange 와 겹치지 않는 별개 prim 으로 넣어 part mask 를 얻는다. body ∪ top_flange ≈ full (컷면에 내부 캡이 생기지만 외부에서 보이지 않는다)"
+    }
+  }
+}

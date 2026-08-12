@@ -1,0 +1,11 @@
+{
+  "obj-id": "foup_300_semi",
+  "source": "assets/cad/300mm_foup/300mm_SEMI_FOUP.step",
+  "split": "parts",
+  "scale": 1000.0,
+  "up-axis": "y",
+  "expect-wafer-diameter-mm": 300.0,
+  "expect-n-wafers": 25,
+  "keep-wafers": false,
+  "_note": "STEP 기하 컨텍스트는 cm(#20388 SI_UNIT(.CENTI.,.METRE.))지만 cascadio 가 미터로 정규화해 주므로 scale=1000. 소스 up axis 는 +Y(웨이퍼 25장이 Y 방향으로 적층) → Z-up 으로 회전. flange 는 별도 solid 라 평면 컷이 필요 없다. 단위 체크섬은 rim 이 아니라 웨이퍼 ø300×25 — 이 CAD 에는 구 CAD 의 ø190 rim 이 없다."
+}

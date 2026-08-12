@@ -1,0 +1,142 @@
+{
+  "mesh": "assets/obj/foup_300_semi_r2/top_flange.ply",
+  "measured": {
+    "x45_notch_nearest_mm": 66.00058818325857,
+    "notch_angled_start_mm": 4.999975350934037,
+    "notch_depth_center_mm": 4.9994118167414285,
+    "x46_half_width_mm": 71.0,
+    "x47_chamfer_start_mm": 58.000024649066,
+    "z49_plate_thickness_mm": 7.000011682510731,
+    "z49_probe": {
+      "inner_r": 39.1,
+      "outer_r": 60.4,
+      "inner": [
+        -2.8421709430404007e-13,
+        -5.000000000000355
+      ],
+      "outer": [
+        -2.8421709430404007e-13,
+        -5.000000000000355
+      ],
+      "z_bot": -5.0,
+      "z_plate_top": -0.0,
+      "z_top_max_incl_ridge": 2.0,
+      "note": "z49 = z_top_max − z_bot (E47.1-1101 p15: bottom→top of flange, ≤8 봉투)"
+    },
+    "d63_hole_at_underside_mm": 35.08,
+    "hole_top_opening_mm": 45.0,
+    "beta_cone_deg": 44.93329947190851,
+    "theta_notch_deg": 45.0,
+    "notch_depth_mm": 4.999273935307201,
+    "notches_per_edge": {
+      "+x": [
+        -30.0,
+        -0.0,
+        50.0
+      ],
+      "-x": [
+        -50.0,
+        -0.0
+      ],
+      "+y": [
+        -0.0,
+        30.0
+      ],
+      "-y": [
+        -0.0
+      ]
+    },
+    "notches_differ_per_side": true,
+    "outline_is_concave": true
+  },
+  "checks": [
+    {
+      "item": "x46_half_width_mm",
+      "spec": "71.0 ± 1.0",
+      "measured": 71.0,
+      "kind": "공차",
+      "ok": true,
+      "measurable": true
+    },
+    {
+      "item": "d63_hole_at_underside_mm",
+      "spec": "35.0 ± 0.1",
+      "measured": 35.08,
+      "kind": "공차",
+      "ok": true,
+      "measurable": true
+    },
+    {
+      "item": "x45_notch_nearest_mm",
+      "spec": "65.3 ± 1.0",
+      "measured": 66.001,
+      "kind": "공차",
+      "ok": true,
+      "measurable": true
+    },
+    {
+      "item": "theta_notch_deg",
+      "spec": "45.0 ± 0.5",
+      "measured": 45.0,
+      "kind": "공차",
+      "ok": true,
+      "measurable": true
+    },
+    {
+      "item": "beta_cone_deg",
+      "spec": "45.0 ± 1.0",
+      "measured": 44.933,
+      "kind": "공차",
+      "ok": true,
+      "measurable": true
+    },
+    {
+      "item": "notch_positions (0 / ±30±1 / ±50±1)",
+      "spec": "0, 30±1, 50±1",
+      "measured": {
+        "+x": [
+          -30.0,
+          -0.0,
+          50.0
+        ],
+        "-x": [
+          -50.0,
+          -0.0
+        ],
+        "+y": [
+          -0.0,
+          30.0
+        ],
+        "-y": [
+          -0.0
+        ]
+      },
+      "kind": "공차",
+      "ok": true
+    },
+    {
+      "item": "orientation notch differs per side",
+      "spec": "4면 모두 달라야",
+      "measured": true,
+      "kind": "규칙",
+      "ok": true
+    },
+    {
+      "item": "x47_chamfer_start_mm",
+      "spec": "≥ 58.0",
+      "measured": 58.0,
+      "kind": "봉투",
+      "ok": true,
+      "measurable": true
+    },
+    {
+      "item": "z49_plate_thickness_mm",
+      "spec": "≤ 8.0",
+      "measured": 7.0,
+      "kind": "봉투",
+      "ok": true,
+      "measurable": true
+    }
+  ],
+  "pass": true
+}

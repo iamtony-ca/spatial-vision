@@ -1,0 +1,37 @@
+{
+  "id": "zedx_s48560070_hd1200",
+  "device": "Stereolabs ZED X 2.2mm (polarizer 미확인)",
+  "serial": "48560070",
+  "fw": "2001",
+  "mode": "HD1200 @60fps (sl.RESOLUTION.HD1200)",
+  "source": "pyzed get_camera_information().camera_configuration.calibration_parameters (rectified), 2026-08-11 실측",
+
+  "width": 1920,
+  "height": 1200,
+  "fx": 727.5751343,
+  "fy": 727.5751343,
+  "cx": 960.49988,
+  "cy": 604.324219,
+  "baseline_mm": 120.201996,
+  "convention": "opencv_pixel_center (⚠️ 미확정 — ZED 문서에 명시 없음. 체커보드 + cv2.calibrateCamera 로 확정할 것. 차이 0.5px = 0.35m 에서 0.24mm)",
+  "distortion": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+
+  "note_rectified": "★ rectified 산출물이라 왜곡이 정확히 0 이다 = 우리 sim 의 핀홀 모델과 동형. **항상 rectified 만 소비한다** — raw 를 쓰면 이 값이 전부 무효다.",
+  "distortion_raw": {
+    "model": "opencv rational (k1 k2 p1 p2 k3 k4 k5 k6)",
+    "coeffs": [0.542747974, 0.132935002, 0.000296656013, -0.000293377991,
+               -0.0239220001, 0.536751986, 0.206857994, -0.0316627994],
+    "note": "참고용. 105.7° 렌즈라 배럴이 강하다(k1 0.54). 절대 raw 를 파이프라인에 넣지 말 것."
+  },
+
+  "derived": {
+    "hfov_deg_rectified": 105.7,
+    "vfov_deg_rectified": 79.0,
+    "fx_times_B": 87455,
+    "mm_per_px_at": {"350mm": 0.481, "450mm": 0.618, "550mm": 0.756, "650mm": 0.893, "1000mm": 1.374},
+    "note": "σ_Z = Z²·σ_disp/(fx·B). 데이터시트 «<0.8% @2m» 이 σ_disp≈0.35px 를 함의하고, 우리 FoundationStereo 실측 대역은 0.4~0.9px 다."
+  },
+
+  "capture_sim_args": "--width 1920 --height 1200 --fx 727.5751343 --fy 727.5751343 --cx 960.99988 --cy 604.824219 --baseline-mm 120.201996",
+  "capture_sim_note": "🔴 --cx/--cy 는 **코너 원점(USD)** 규약이다. 위 cx/cy 는 OpenCV(픽셀 중심) 가정이라 **+0.5** 해서 넣었다. 규약이 뒤집히면 이 두 값에서 0.5 를 뺀다."
+}

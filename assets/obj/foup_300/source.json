@@ -1,0 +1,7 @@
+{
+  "obj-id": "foup_300",
+  "source": "assets/cad/foup_300mm/FOUP 300.stl",
+  "scale": 10.0,
+  "z-cut-mm": 155.0,
+  "_note": "STL 은 cm 단위(bbox 42.5×34.2×33.2)라 ×10 → mm. 같은 폴더의 .stp 는 원래 mm 이므로 그걸 쓸 땐 scale=1. z-cut 155 는 flange 하면 — 이 평면 하나로 flange 와 shell 이 반경 간극 ~44mm 로 완전히 분리된다."
+}

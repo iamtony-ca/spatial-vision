@@ -1,0 +1,5 @@
+{
+  "_note": "객체 형상에 딸린 값이라 코드가 아니라 여기 둔다. runs/semi01 4프레임에서 탐색한 실측 최선 (RESULTS.md § M4-semi). 프롬프트 문구와 confidence 둘 다 결과를 크게 흔든다 — 'raised square block on top' 은 4/4 검출인데 IoU 0.080 이다(엉뚱한 곳을 자신 있게 집는다).",
+  "full":   {"prompt": "white plastic box", "confidence": 0.15},
+  "flange": {"prompt": "small square lid on top of the box", "confidence": 0.3}
+}
