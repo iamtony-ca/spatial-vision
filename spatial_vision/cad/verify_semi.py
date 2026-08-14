@@ -123,6 +123,24 @@ def hole_radius_at(mesh, z, r_max=40.0, dr=0.02):
     return float(rs[np.argmax(ins)]) if ins.any() else float("nan")
 
 
+def hole_opening_topmost(mesh, z_plate_top: float, z_top_max: float, dz: float = 0.1):
+    """**홀 둘레에 재료가 있는 가장 높은 z** 에서의 개구 지름과 그 z.
+
+    ⚠️ `z_top_max` 에서 그냥 재면 안 된다 — 그건 메쉬 전체의 최고점이라 **최외곽 융기**일 수 있고,
+    홀 융기가 없는 자산에서는 그 높이의 중심부에 재료가 없어 `nan` 이 나온다(실측: `spec15`).
+    위에서부터 내려오며 처음 잡히는 곳이 «카메라가 보는 개구» 다.
+    """
+    z = z_top_max - 0.02          # 표면 «위» 의 점은 contains 판정이 모호하다 — 살짝 안쪽에서 잰다
+    while z > z_plate_top:
+        r = hole_radius_at(mesh, z)
+        if np.isfinite(r) and r > 0:
+            return float(2 * r), float(z)
+        z -= dz
+    # 홀 융기가 없으면 **주 상면이 곧 최상면**이다 (위 스캔은 최외곽 융기 구간을 훑고 지나간다)
+    r = hole_radius_at(mesh, z_plate_top)
+    return (float(2 * r), float(z_plate_top)) if np.isfinite(r) and r > 0 else (float("nan"),) * 2
+
+
 def measure(mesh: trimesh.Trimesh) -> dict:
     poly = outline_polygon(mesh)
     ring = np.asarray(poly.exterior.coords)[:-1]
@@ -196,6 +214,7 @@ def measure(mesh: trimesh.Trimesh) -> dict:
     rr = np.array([hole_radius_at(mesh, z) for z in zz])
     ok = np.isfinite(rr) & (rr > 0)
     beta = float(np.degrees(np.arctan(abs(np.polyfit(zz[ok], rr[ok], 1)[0])))) if ok.sum() > 2 else float("nan")
+    _hole_top = hole_opening_topmost(mesh, z_plate_top, z_top_max)
 
     # ── x45 / 노치 경사면 시작 — 중심선(y=0) 노치를 변 프로파일에서 잰다 ─────────
     #    x45 = 변에서 가장 깊이 들어간 점까지의 거리(= half − depth). 규격 65.3±1.
@@ -223,7 +242,16 @@ def measure(mesh: trimesh.Trimesh) -> dict:
                       "z_top_max_incl_ridge": round(float(z_top_max), 3),
                       "note": "z49 = z_top_max − z_bot (E47.1-1101 p15: bottom→top of flange, ≤8 봉투)"},
         "d63_hole_at_underside_mm": float(d63),
-        "hole_top_opening_mm": float(2 * hole_radius_at(mesh, z_top)),
+        # 🔴 홀은 45° 원뿔이라 **높이마다 지름이 다르다.** 셋을 구분해서 낸다:
+        #   · d63          = 상판 **밑면**. SEMI 가 공차를 거는 유일한 값(ø35±0.1)
+        #   · plate_top    = **주 상면**. 융기가 없으면 이게 곧 최상면이다
+        #   · top_max      = **최상면(융기 꼭대기 포함)** ← **카메라가 보는 개구**이고
+        #                    §28·§29·§36 의 «최상면 개구» 는 전부 이것이다. 규격이 안 잡는 값이다.
+        #   ⚠️ 예전에 keypoint 가 «주 상면에서만» 홀을 찾아 융기 바깥 경계를 홀로 잡은 적이 있다
+        #      (교훈 참조). 라벨과 측정 높이가 어긋나면 같은 사고가 난다.
+        "hole_opening_at_plate_top_mm": float(2 * hole_radius_at(mesh, z_top)),
+        "hole_opening_topmost_mm": _hole_top[0],
+        "hole_opening_topmost_z": _hole_top[1],
         "beta_cone_deg": beta,
         "theta_notch_deg": float(np.median(thetas)) if thetas else float("nan"),
         "notch_depth_mm": float(np.median(depths)) if depths else float("nan"),
@@ -301,8 +329,13 @@ def main(argv: list[str] | None = None) -> int:
         #    두께·홀을 못 잰다 — 그걸 위반으로 읽으면 원인을 엉뚱한 데서 찾는다.
         mark = "✅" if r["ok"] else ("⚠️" if r.get("measurable") is False else "❌")
         print(f"  {mark} [{r['kind']:2}] {r['item']:<{w}}  규격 {r['spec']:<12} 실측 {r['measured']}")
-    print(f"  ─ 참고: 홀 상면 개구 ø{m['hole_top_opening_mm']:.2f} · 노치 깊이 {m['notch_depth_mm']:.2f}mm "
-          f"· 윤곽 오목(노치 존재) {m['outline_is_concave']}")
+    ridge = m["hole_opening_topmost_mm"] - m["hole_opening_at_plate_top_mm"]
+    print(f"  ─ 참고: 홀 개구 — 주 상면 ø{m['hole_opening_at_plate_top_mm']:.2f}"
+          f" · ★최상면 ø{m['hole_opening_topmost_mm']:.2f} (z={m['hole_opening_topmost_z']:+.2f})"
+          + (f"  ← 홀 융기 +{ridge:.2f}" if ridge > 0.1 else "  ← 홀 융기 없음"))
+    print("    ★최상면 개구가 **카메라가 보는 값**이고 규격이 안 잡는다 — 실물 캘리퍼와 비교할 대상이다.")
+    print("      개체마다 다를 수 있어 파이프라인 선택 근거로 쓰지 않는다(§36) — 배포는 `--outer-only`.")
+    print(f"  ─ 참고: 노치 깊이 {m['notch_depth_mm']:.2f}mm · 윤곽 오목(노치 존재) {m['outline_is_concave']}")
 
     if args.json_out:
         Path(args.json_out).write_text(json.dumps({"mesh": str(path), "measured": m,

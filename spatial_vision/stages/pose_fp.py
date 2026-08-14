@@ -303,7 +303,11 @@ def main(argv: list[str] | None = None) -> int:
                           [0, 0, 1]], dtype=np.float64)
 
         if mask_full is None or not (mask_full > 127).any():
-            print(f"  {f.name}: {mask_primary} 없음 — 건너뜀", file=sys.stderr)
+            # ⚠️ 둘을 구분해서 말한다 — 원인이 완전히 다르다.
+            #   «없음»    = 분할 스테이지를 안 돌렸거나 --masks 경로가 틀렸다
+            #   «비었음»  = 분할은 돌았는데 **아무것도 검출하지 못했다** (참조·프롬프트·도메인 갭)
+            why = "없음" if mask_full is None else "비었음(분할이 검출 0)"
+            print(f"  {f.name}: {md / mask_primary} {why} — 건너뜀", file=sys.stderr)
             rows.append({"frame": f.name, "ok": False})
             continue
 

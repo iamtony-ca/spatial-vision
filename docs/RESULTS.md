@@ -5008,6 +5008,8 @@ envs/pose/bin/python -m spatial_vision.stages.refine_contour --in runs/pert/r2_n
 | 75 | *"far 는 대략 pose 니 느슨한 KPI 로 충분하다"* 를 검증하려 3단계 기준을 만들었다 | **셋 다 107/120 으로 같았다.** 오차 분포가 이분법적(성공 횡 ≤4.4mm / 실패 ≥447mm, **102배 간격**)이라 임계값이 아무 역할을 안 한다. 병목은 «정밀도» 가 아니라 «다른 물체를 집음» 이었다 | **기준을 완화하기 전에 실패의 «형태» 를 본다.** 연속 분포면 완화가 듣고, 이분법이면 안 듣는다. 그리고 이분법이면 **분리가 쉽다는 뜻**이기도 하다 — 여기서는 «사전 위치 ±100mm» 가드가 13/13 을 걸러냈다 |
 | 76 | 사이클 타임 예산을 «추론 시간» 으로만 계산했다 | 실제 위험은 **콜드 스타트 40초**(ONNX 세션 31.5s + FP 7.1s)였다. 실험은 120프레임에 분산돼 안 보였고, 배포는 요청당 프로세스를 띄운다 | **성능 예산은 «정상 상태» 가 아니라 «호출 단위» 로 잰다.** 배치 실험의 프레임당 평균은 1회 호출 비용을 감춘다 — 초기화·모델 로드·I/O 를 **1회 기준으로** 다시 더한다 |
 | 77 | `capture_real.py` 를 Jetson 에서 처음 돌리자 `UnicodeDecodeError: 'ascii' codec can't decode byte 0xeb` 로 죽었다. 5090 에서는 100% 잘 돌던 코드다 | Jetson 에 `LANG` 이 안 잡혀 있어 파이썬 기본 인코딩이 **ASCII** 였다(PEP 538 의 C 로케일 강제 변환도 항상 걸리지는 않는다). `Path.read_text()`·`write_text()` 는 **로케일 기본 인코딩**을 쓴다. **이 저장소는 문서·주석·문자열이 전부 한국어라 이 함정에 구조적으로 노출돼 있다.** 게다가 세 곳이 순차적으로 터진다 — ① 프로파일 읽기 ② `ensure_ascii=False` 로 meta 쓰기(**모든 프레임을 저장한 뒤** 마지막에 죽어 캡처가 통째로 날아간다) ③ 한글 `print` (`UnicodeEncodeError`) | **다른 기계에서 도는 코드는 로케일을 가정하지 않는다.** 파일 IO 는 전부 `encoding="utf-8"` 을 명시하고, 진입점에서 `sys.stdout/stderr.reconfigure(encoding="utf-8")` 로 출력을 고정한다. ⚠️ **«내 기계에서 되니까» 가 검증이 아니다** — 대상 환경을 재현해서(`LC_ALL=C PYTHONUTF8=0`) 확인한다. 급하면 `PYTHONUTF8=1` 로 우회 가능하지만 **코드가 환경에 의존하는 상태는 남는다** |
+| 78 | 새 PC 에서 `bash envs/bootstrap.sh` 가 33행 `envs/bin/uv: No such file or directory` 로 죽었다. 바로 위에 «uv 설치» 가 성공한 것처럼 찍혀 있었다 | **환경변수가 파이프를 건너가지 않았다.** `VAR=x curl … \| sh` 는 `VAR` 을 **`curl` 에만** 걸고, 설치 스크립트(`sh`)는 못 봐서 uv 를 기본값 `~/.local/bin` 에 넣는다 — `envs/bin/uv` 는 안 생기고 **덤으로 `~` 를 오염**시킨다(우리 최우선 원칙 위반). 옛 머신에는 uv 가 이미 있어 `if [ ! -x ]` 가 통째로 건너뛰었다 → **1년간 안 드러났다** | **«한 번 성공하면 다시 안 밟는 경로» 는 새 머신에서만 드러난다 — 그래서 새 머신 세팅 자체가 검증이다.** 실제로 같은 날 잠복 버그 4건이 한꺼번에 나왔다(uv 파이프 · `repos.lock` 이 `.gitignore` 디렉토리 제외에 먹힘 · 옵션 가중치가 종료코드 1 · `verify_semi` 홀 높이). 그리고 **설치 결과는 «성공한 것처럼 보이는 로그» 가 아니라 산출물 존재로 확인한다** — `[ -x "$UV" ] \|\|` 실패-확성 가드를 넣었다 |
+| 79 | Blender 다운로드가 사내 프록시에 막혀 `HTTP 401` 이 났고, 그 바람에 **뒤의 `stereo_onnx`·`cad` venv 까지 통째로 안 만들어졌다** | `set -e` 하에서 **선택적 프리페치가 필수 단계를 죽였다.** 게다가 Blender 는 애초에 세팅에 필요 없다 — ISM **추론**은 blenderproc 을 import 조차 안 하고, 필요한 건 렌더된 템플릿(`ism_full`)이며 그건 자산 릴리스에 들어 있다. **새 CAD 로 템플릿을 다시 렌더할 때만** 필요하다 | **부트스트랩에서 «있으면 좋은 것» 과 «없으면 안 되는 것» 을 코드로 구분한다.** 전자는 `\|\| true` + 안내 메시지로 격리한다 — 안 그러면 한 항목의 네트워크 사정이 전체 세팅을 막는다. 그리고 **의존성을 넣기 전에 «어느 단계가 이걸 실제로 import 하는가» 를 확인**한다: 여기서는 생성 단계와 소비 단계가 달랐다 → `SKIP_BLENDER=1` · `docs/SETUP.md §11-2` |
 
 # 추적 중인 항목
 
@@ -5511,6 +5513,229 @@ envs/pose/bin/python -m spatial_vision.stages.refine_contour --in runs/zx_near -
   → 러너는 이제 **두 원인을 나란히 제시하고 «처방은 둘 다 홀 제외로 같다»** 고 말한다.
   ⚠️ 구분은 캘리퍼 값어치에만 영향이 있다 — **융기가 원인이면 개구를 재도 안 돌아온다.**
 
+## 35-2b. 오버레이 시트 — **GT-free 지표가 못 보는 축을 보는 유일한 수단** (2026-08-13)
+
+러너가 마지막에 `viz.overlay_pose` 를 돌려 `overlay_sheet.png` 와 `overlay/overlay_frame_*.png` 를 낸다.
+
+- **행 = 프레임 · 열 = 변형 5(A3·A1·A2a·A2b·A4)**, **행 안에서 크롭 박스를 공유**한다 —
+  변형마다 따로 크롭하면 어긋남을 눈으로 못 비교한다.
+- 그리는 것: **초록 = 예측 실루엣 윤곽** · 파랑 반투명 = 정합에 쓴 마스크(기본 α 0.22, `--mask-alpha 0` 으로 끔)
+  · **축 삼각대**(물체 원점 X/Y/Z 60mm, 글자 라벨) · 주석 `z` · **`moved`**(초기값 대비 이동량) · **`[GATED]`**.
+  GT 가 있으면(sim) 빨강으로 GT 를 덧그리고 주석이 R/t 오차로 바뀐다.
+- 🔴 **왜 필요한가 — GT-free 지표는 전부 «자기 일관성» 이다.** 후퇴율·좌우 일관성·rms 는 *"결과가
+  자기들끼리 맞는가" 만* 말하고 **«다 같이 같은 방향으로 틀린»** 경우(= §29 의 계통 편향 축, 게이트가
+  못 막는 그 축)를 **원리적으로 못 잡는다.** 사진 위에 겹쳐 보는 것만이 그 축을 본다.
+  이 프로젝트에서 기하 오류를 실제로 잡아낸 것도 지표가 아니라 눈이었다(횡단 정리 #39·#46).
+- 읽는 법: 어긋남이 **프레임마다 한 방향으로 일관** → 계통 편향(외곽 융기·윤곽 불일치) ·
+  **제각각** → 초기값 폭주(게이트가 잡는 쪽).
+- ⚠️ **`stages.refine_contour --debug` 와 색 규약이 다르다**(거기선 초록=GT · 노랑=모델 샘플).
+  두 도구 모두 **범례를 이미지에 찍는다** — 시트를 인용할 때 색을 말로 옮기지 말 것.
+
+## 35-2c. 진단 시트 — **«어디서 깨졌는가»** (2026-08-13)
+
+`viz.diag_sheet` — 프레임 하나를 **6패널**로 펼친다. 러너가 `diag/diag_sheet.png` + `diag/diag_frame_*.png`
+를 낸다. `overlay_pose` 가 *«맞는가»* 를 본다면 이쪽은 *«어디서 깨졌는가»* 를 본다.
+
+| 패널 | 내용 | 캡션 수치 |
+|---|---|---|
+| 1 원본 | `left.png` | 밝기 중앙값 · **포화율 · 암부율** ← 분할이 0 이면 여기부터 |
+| 2 `mask_full` | FOUP 전체 (초록) | 면적비 · 등가지름 · 조각 수 |
+| 3 `mask_flange` | top flange (주황) | 면적비 · **등가지름**(목표 419px, §34-9) |
+| 4 depth | TURBO, 무효=검정, flange 윤곽 흰색 | `scale[obj]` 구간 · **`flange plane rms`** |
+| 5 `valid` | 흰=유효 / **마젠타=무효** | 전체 · flange · **링** |
+| 6 pose | 초록 윤곽 + 축 삼각대 | `z` · `moved` · `[GATED]` |
+
+- 🔴 **정규화 구간을 «물체» 로 잡는다.** 전체 유효 픽셀의 p2~p98 로 잡으면 배경이 구간을 다 먹어
+  물체가 통째로 단색이 된다(실측 307~2695mm 구간에서 400mm 물체가 단색). 마스크 안에서 잡고
+  배경은 양끝으로 포화시킨다. ⚠️ **구간이 프레임마다 다르므로 색을 프레임 간에 비교하면 안 된다** —
+  그래서 구간을 캡션에 찍는다.
+- ★★ **flange depth 는 «산포» 가 아니라 «평면 적합 잔차» 로 잰다.** flange 는 평면이지만 비스듬히
+  보면 depth 범위가 수십 mm 로 벌어진다(실측 p10~p90 **70.0mm**) — 산포로 재면 **기울기와 노이즈가
+  안 갈린다**. 평면을 맞추고(3회 재가중) 남은 잔차만이 *"이 depth 로 pose 를 낼 수 있는가"* 를 말한다.
+  sim 기준선: `plane rms 0.65mm · p90 1.05mm`.
+- 🔴 **`valid` 100% 를 «뚫렸다» 로 읽으면 안 된다.** `valid` 는 `유한 && z_near ≤ d ≤ z_far` 범위 검사일
+  뿐이고(`contracts.py`) FoundationStereo 는 조밀 모델이라 **반투명 표면에서 틀린 값을 내도 100%** 다.
+  **열린 항목 #1 판정은 4번 패널**(물체 depth 가 실제 거리인가 · plane rms)로 한다.
+- 근접에서 `full` 마스크는 **ISM(CAD 템플릿)** 으로 뽑는다 — `sam3_refs_full_*` 은 원거리용밖에 없고
+  ISM 은 사진 참조가 필요 없다. 타깃 지정은 `--select exemplar --exemplar-dir <flange seg>` 로 한다
+  (`--select center` 는 배경을 집는다, 교훈 #15).
+- ⚠️ 진단 스테이지(`seg_full`·`ov`·`diag`)는 **`optional`** 이라 실패해도 본 파이프라인을 안 죽인다
+  — 진단 도구가 진단 대상과 같이 죽으면 안 된다(횡단 정리 #79 의 재적용).
+- ⚠️ **경로 폴백에 프레임 디렉토리를 넘기면 안 된다** — `find()` 가 `frame_0007/frame_0007/…` 을 보고
+  «산출물 없음» 이라고 **거짓말**했다. 폴백은 «프레임 디렉토리를 담은 루트» 여야 한다.
+
+### 35-2c-2. 프레임 추이 — **40장을 눈으로 훑지 않는다**
+
+`diag_metrics.json`(전 프레임 수치 + `median` 요약) 과 `diag_trends.png`(5단: 등가지름 · flange depth ·
+평면 잔차 · 유효율 · 이동량, **붉은 세로 띠 = 게이트 후퇴**) 를 같이 낸다. 120프레임 **10.7초**.
+
+★ **실제로 작동했다** — sim 근접 120프레임에서 추이가 **한 점만** 튀었다(`frame_0098`:
+등가지름 261 → **68px** · flange depth 401 → **1452mm** · 평면 잔차 0.287 → **28.7mm**).
+그 프레임만 열어 보니 **SAM3 가 flange 대신 배경 방해물을 집었다**(조각 `n=4`, 목표의 0.16배).
+- 🔴 **그런데 그 프레임의 pose 는 정상이다**(z 358mm, 윤곽 정확) — 그 pose 런이 이 마스크를 안 썼다.
+  **«분할이 깨졌다» 와 «pose 가 깨졌다» 는 별개**이고, 6패널을 나란히 놔야 갈린다.
+  지표만 봤으면 정상 통과했을 프레임이다.
+- sim 중앙값 기준선: `flange dia 261px · depth 401.5mm · plane rms 0.287mm · valid 100% · moved 0.354°`.
+- ⚠️ 그래프 라벨은 **영문**이다 — matplotlib 에 한글 폰트가 없다(`viz.dim_sheet` 과 같은 제약).
+
+예시: `runs/overlay_demo/diag/` (sim 근접 120프레임, GT 제거 조건, 시트는 4프레임).
+
+## 35-2d. 통계 한 벌 — **직접 분석할 수 있게** (2026-08-13)
+
+`spatial_vision.eval.group_stats --root <A그룹 out>` — 흩어진 JSON(`meta_contour` · `lr_consistency` ·
+`diag_metrics` · `pose_refined`)을 **한 표**로 합친다. 러너의 마지막 스텝(`stats`)이다.
+
+| 산출 | 무엇 |
+|---|---|
+| `stats/metrics_long.csv` | **(프레임 × 변형) 긴 형식** — `n_corr·rms_px·moved_deg·gated·ddx_px·dz_mm·t·q`. pandas 로 바로 |
+| `stats/frames.csv` | 프레임 × 촬영지표 (노출·마스크·depth·유효율) |
+| `stats/summary.md/.json` | 변형별 **중앙 / p90 / 최대** |
+| `stats/variants.png` | 후퇴율 · 이동량 분포 · 좌우 일관성 · 대응점 (**상자 + 점**) |
+| `stats/repeatability.png` | 정지 구간 반복도 |
+
+- ⚠️ **분포를 «상자 + 점» 으로 그린다** — 40장에서 꼬리는 한두 점이라 상자만으로는 안 보인다(교훈 #16·#58).
+  표에도 중앙값과 함께 **p90·최대**를 넣는다.
+- ★ **회전 평균은 쿼터니언 외적행렬의 최대 고유벡터**로 낸다. 성분별 평균은 회전이 아니다.
+  CSV 의 쿼터니언은 **`w ≥ 0` 으로 부호를 고정**했다 — 안 하면 프레임 간 비교가 무의미하다.
+- 🔴 **반복도는 «물체·카메라가 안 움직인 구간» 에서만 랜덤 오차 바닥이다.** 움직이며 찍었으면 자세
+  변화다 → **거리 산포로 자동 판정**해 `summary.md` 에 경고를 낸다(sim 120프레임 데모에서 산포 98mm →
+  «정지 구간이 아니다» 를 옳게 말했다). 로봇 없이 되는 real 전용 측정이라 우선순위가 높다(`§9.1★c`).
+- ✅ **검증 — sim 120프레임에서 §31 을 그대로 재현**: 게이트 후퇴 A2a **83.3%** / A2b 56.7% / A1 **29.2%**,
+  대응점 중앙 A2a 14,595 vs A1 1,747. 알려진 결론이 이 도구를 통해 그대로 나온다.
+
+## 35-2e. SAM3 참조 세트를 눈으로 본다 — `viz.ref_sheet` (2026-08-13)
+
+exemplar 경로에서 **분할의 성패는 참조가 거의 다 정하는데**(원거리 참조로 근접 질의 → IoU 0.044)
+참조는 자산 디렉토리 안의 PNG 라 아무도 안 본다. 박스를 그려 시트로 낸다.
+
+    envs/pose/bin/python -m spatial_vision.viz.ref_sheet \
+        --refs assets/obj/foup_300_semi_r2/sam3_refs_flange_n25 --n-refs 3 --out /tmp/refs.png
+
+**현행 자산 실사(`foup_300_semi_r2`)**:
+
+| 세트 | n | 출처 | 거리 |
+|---|---|---|---|
+| `sam3_refs_flange_n20` | 3 | `runs/zx_ref_n20` | 194 / 182 / 238mm |
+| **`sam3_refs_flange_n25`** ← 배포 | **3** | `runs/zx_ref_n25` | **238 / 223 / 298mm** |
+| `sam3_refs_flange_n30` | 3 | `runs/zx_ref_n30` | 296 / 282 / 348mm |
+| `sam3_refs_full_far_cand` | 24 | `runs/zx_ref_far` | 후보 풀 |
+| `sam3_refs_full_far_top5` | 5 | 위에서 **면적 상위 5장**(§19) | — |
+
+- **랜덤이 아니다.** `refs.json` 의 목록을 **앞에서 `--n-refs` 장** 자른다(`refs[:n]`) — 파일 순서가 곧 우선순위다.
+- 🔴 **`--refs-mode chain`(러너 기본값)에서 박스는 `ref_0` 에만 걸린다** — `add_prompt(frame_idx=0,
+  boxes_xywh=[refs[0][...]])` 이고 나머지는 추적으로 이어질 뿐이다. **ref_0 이 사실상 지배한다.**
+  `independent` 는 참조마다 독립 질의라 N장이 대등하다(§ SAM3 참조 사슬 한계).
+- 🔴 **근접 flange 세트에는 §19 의 «면적 상위» 선정이 적용돼 있지 않다** — 후보 풀 없이 3장이 그대로
+  배포 세트다. 면적 선정이 실제로 이긴 것은 **`full_far` 에서만** 확인됐다(IoU 0.888 / 오선택 0).
+  근접 flange 는 오선택이 원래 0 이라 급하지 않았지만, **real 참조로 다시 만들 때는 후보를 넉넉히
+  찍고 `cad.select_sam3_refs` 를 태우는 것이 맞다.**
+- ⚠️ 셋 다 **sim 렌더**다(배경 randomization 이 눈에 보인다: 초록 시트 / 흰 바닥 / 보라). 밝기 중앙값
+  199 / 239 / 128 로 편차가 크다. **실사진과의 차이가 exemplar 경로에 남은 마지막 도메인 갭 축**이다.
+
+예시 시트: `runs/overlay_demo/refs/refs_n{20,25,30}.png` · `refs_full_far_top5.png`.
+
+## 35-2f. **몸체 외관 3종** 참조 세트 — 실물 변이를 sim 에 넣었다 (2026-08-13)
+
+사용자 확정: 실물 FOUP 몸체는 **① flange 와 같은 검정 불투명 ② 반투명 주황 ③ 투명** 셋이 대부분이다.
+`capture_sim --body-appearance {black,orange,clear}` 를 신설해 셋을 렌더하고 참조 세트를 새로 만들었다.
+**`top_flange` 는 어느 경우에도 검정 고정**이다 — 이건 몸체만의 축이다.
+
+| 모드 | diffuse | roughness | opacity |
+|---|---|---|---|
+| `black` | 0.030 / 0.030 / 0.030 | 0.45 | **1.00** |
+| `orange` | 0.720 / 0.230 / 0.020 | 0.22 | **0.45** |
+| `clear` | 0.780 / 0.820 / 0.800 | 0.07 | **0.25** |
+
+⚠️ `clear` 는 초판 0.14 로 냈다가 **0.25 로 올렸다**(사용자 지정, 2026-08-13). 자산은 재생성했다 —
+**상수만 바꾸고 자산을 그대로 두면 코드와 자산이 조용히 어긋난다.**
+
+- 고정 외관은 **`--body-material` 없이도** 바인딩되고 **프레임마다 흔들지 않는다**(flange 와 같은 취급).
+  타깃·distractor 를 **같은 외관**으로 둔다 — 몸체 색이 타깃 식별 단서가 되면 분할 점수가 부풀려진다.
+- 🔴🔴 **반투명·투명이면 `mask_full` 과 `depth_gt` 가 무효가 된다** (실측): 같은 seed·같은 프레임에서
+  `black` 은 `full 730,310 / flange 113,273` 인데 **`orange`·`clear` 는 `full == flange == 113,273`** —
+  **몸체 픽셀이 0** 이다. depth 중앙값도 581 → 668mm 로 **몸체를 통과해 배경을 본다.**
+  OmniPBR cutout opacity 가 semantic·depth 패스에서도 프래그먼트를 버리기 때문이다.
+  → **flange 참조·flange 마스크는 정상**이라(113,273 로 `black` 과 소수점까지 동일) exemplar 생성에는
+  지장이 없지만, **이 런들의 `mask_full`/`depth_gt` 를 GT 로 쓰면 안 된다.**
+- ⚠️ cutout opacity 는 **굴절·집광이 없다**. 색·대비는 재현하지만 유리처럼 배경이 휘지 않는다 →
+  **열린 항목 #1(반투명 본체에서 수동 스테레오가 뚫리는가)의 대역물로 쓸 수 없다.** 그건 실물 측정이다.
+- ★ **`black` 이 최난이도라는 것이 수치로 나왔다.** §19 선정 과정의 후보 16장 면적 분포:
+  `black` 은 **123,078 ~ 23,077px** 로 크게 갈리는데(하위 2장이 명백한 실패),
+  `orange`·`clear` 는 **전 후보가 ~109,000px** 로 균일하다. 몸체와 flange 가 같은 색이면
+  **경계가 사라져** 참조 자체가 실패한다.
+
+**만든 자산** (전부 §19 규칙 = 후보 16 → 마스크 면적 중앙값 **상위 5장**, GT 불필요).
+🔴 **거리대를 열어 두고 5대역을 다 만들었다** (2026-08-14) — 실물에서 **0.5m 가 sim 최적점
+(0.22~0.30m)보다 좋았기 때문**이다. sim 최적점이 실물로 전이되지 않았으므로 거리를 고정하지 않는다.
+
+| 거리대 | 범위 | 세트 |
+|---|---|---|
+| `n25` | 0.22~0.30m | `_black` `_orange` `_clear` `_mixed` |
+| **`n40`** | **0.35~0.45m** | 〃 |
+| **`n50`** | **0.45~0.55m** ← 실물 양호 구간 | 〃 |
+| **`n60`** | **0.55~0.65m** | 〃 |
+| **`n70`** | **0.65~0.75m** | 〃 |
+
+각 대역마다 `_black`/`_orange`/`_clear` 는 **5장**(후보 16 → 상위 5), `_mixed` 는 **6장**
+(외관별 상위 2장, `cad.mix_sam3_refs`). seed 를 101/202 로 고정해 **거리대·외관이 달라도
+카메라 방위·고도가 같다** → A/B 가 통제된다.
+
+- 러너 프리셋: `--preset n{25,40,50,60,70}{black,orange,clear,mixed}` — 목록은 **`--list-presets`**
+  (참조 디렉토리 존재 여부까지 ✅/❌ 로 찍는다).
+- 🔴 **참조 세트가 없으면 러너가 non-zero 로 죽는다.** 없으면 SAM3 가 **검출 0 으로 조용히** 끝나서
+  «분할이 안 된다» 로 오진하게 된다 — 실제로 밟은 적이 있다.
+- 🔴 **`mixed` 는 `--refs-mode` 를 `independent` 로 자동 전환**한다(전환 사실을 출력한다).
+  `chain` 은 `add_prompt(frame_idx=0)` 라 박스가 **`ref_0` 에만** 걸려 «혼합» 이 아니라
+  «ref_0 의 외관» 세트가 된다. 혼합 순서는 **난이도 순(black 먼저)** 이라 `--n-refs` 로 잘라도
+  가장 어려운 조건이 남는다.
+- ⚠️ **`mixed` 는 `--refs-mode independent` 전제다** — `chain` 은 박스가 `ref_0` 에만 걸려 혼합의 의미가 없다.
+- ⚠️ 색·투과율은 **육안 근사**다. 실물 사진이 생기면 맞춰야 한다.
+
+시트: `runs/overlay_demo/refs/refs_n25_{black,orange,clear,mixed}.png`
+
+### 재현 (§35-2f) — 참조 자산 3종
+
+🔴 **자산은 git 에 없다**(`.gitignore: assets/obj/**`) — 릴리스 tarball 로 나간다. 그래서 **이 명령이
+자산을 되살리는 유일한 근거**다. 각 `refs.json` 에도 `body_appearance`·`capture_args` 를 박아 뒀다.
+
+```bash
+cd vision && source envs/env.sh
+OBJ=assets/obj/foup_300_semi_r2
+CAM="--width 1920 --height 1200 --fx 727.5751343 --fy 727.5751343 \
+     --cx 960.99988 --cy 604.824219 --baseline-mm 120.201996"     # ← cx/cy 는 코너 원점(+0.5)
+# 거리대: n25 0.22~0.30 · n40 0.35~0.45 · n50 0.45~0.55 · n60 0.55~0.65 · n70 0.65~0.75
+LO=0.45; HI=0.55; CM=50                                            # ← 예: n50
+SCENE="--distance-m $LO $HI --elevation-deg 35 70 --flange-color 0.03 0.03 0.03 \
+       --ground-material --hdri assets/env/hdri --dome-intensity 110 210 --light-fixtures-active 1 2"
+
+for app in black orange clear; do
+  # ① 후보 풀(16) + 프로브(8). seed 를 고정해야 A/B 가 통제된다
+  /isaac-sim/python.sh -m spatial_vision.stages.capture_sim --obj-usd $OBJ/mesh.usda \
+      --out runs/zx_ref_n${CM}_${app}_cand  --frames 16 --seed 101 $CAM $SCENE --body-appearance $app
+  /isaac-sim/python.sh -m spatial_vision.stages.capture_sim --obj-usd $OBJ/mesh.usda \
+      --out runs/zx_ref_n${CM}_${app}_probe --frames  8 --seed 202 $CAM $SCENE --body-appearance $app
+  # ② 후보 세트 (박스는 mask_flange 에서 뽑는다 — 반투명이어도 flange 마스크는 정상이다)
+  envs/seg_sam3/bin/python -m spatial_vision.cad.build_sam3_refs \
+      --from runs/zx_ref_n${CM}_${app}_cand --obj $OBJ --n 16 --target flange \
+      --out-name sam3_refs_flange_n${CM}_${app}_cand
+  # ③ 후보 전부로 프로브를 독립 질의 → 참조별 마스크 (§19 선정의 입력)
+  envs/seg_sam3/bin/python -m spatial_vision.stages.segment_sam3 \
+      --in runs/zx_ref_n${CM}_${app}_probe --out runs/zx_refsel_n${CM}_${app} --target flange \
+      --refs $OBJ/sam3_refs_flange_n${CM}_${app}_cand --n-refs 16 --refs-mode independent --save-per-ref
+  # ④ 면적 중앙값 상위 5장
+  envs/seg_sam3/bin/python -m spatial_vision.cad.select_sam3_refs \
+      --refs $OBJ/sam3_refs_flange_n${CM}_${app}_cand --probe runs/zx_refsel_n${CM}_${app} --obj $OBJ --k 5 \
+      --out-name sam3_refs_flange_n${CM}_${app}
+done
+# ⑤ 혼합 세트 (외관별 상위 2장, 난이도 순 black 먼저) — 계산 0, 파일 복사뿐이다
+envs/seg_sam3/bin/python -m spatial_vision.cad.mix_sam3_refs --obj $OBJ --band n${CM} --per-set 2
+# ⑥ 육안 확인 시트
+envs/pose/bin/python -m spatial_vision.viz.ref_sheet \
+    --refs $OBJ/sam3_refs_flange_n${CM}_black --n-refs 3 --cols 5 --out /tmp/refs_black.png
+```
+
+⚠️ **자산(`mesh.usda`)이 바뀌면 이 셋을 전부 다시 만들어야 한다**(교훈 #40).
+
 ## 35-3. 한계
 
 - ⚠️ **이건 sim 데이터로 한 스모크다.** 실물에서 처음 돌 때 무엇이 깨질지는 모른다.
@@ -5532,6 +5757,13 @@ for Z in 0 5 -5; do envs/pose/bin/python -m spatial_vision.eval.lr_consistency \
 python3 tools/make_frame_from_zed.py --left L.png --right R.png \
     --cam assets/cam/zedx_s48560070_hd1200.json --out runs/real01/frame_0000
 envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A --preset n25
+#   → runs/real01_A/report.md · overlay_sheet.png · overlay/overlay_frame_*.png
+
+# 오버레이만 다시 (마스크 끄고 실물 테두리를 그대로 보고 싶을 때)
+envs/pose/bin/python -m spatial_vision.viz.overlay_pose \
+    --capture runs/real01 --obj assets/obj/foup_300_semi_r2 \
+    --pred runs/real01_A/fp_ns2:pose_coarse.json --pred runs/real01_A/A1 \
+    --frames 4 --tile 560 --mask-alpha 0 --out runs/real01_A/overlay_a1.png
 ```
 
 # ★★★★★ 36. 실물 형상 실측 — **§29 의 두 축이 닫혔고 배포 자산이 확정됐다** (사용자 실측, 2026-08-12)
@@ -5542,7 +5774,17 @@ sim 은 이 축을 원천적으로 못 본다(렌더와 CAD 가 같은 메쉬라
 | 축 | 확인 방법 | **실측** | 현행 CAD `foup_300_semi_r2` | 판정 |
 |---|---|---|---|---|
 | ① **최외곽 테두리 융기** | 육안 | **있다 (전 둘레)** | 있다 (+2mm) | ✅ **일치** |
-| ② **최상면 중심 홀 개구** | 캘리퍼 (융기·챔퍼 제외) | **ø49.0** | ø48.92 | ✅ **0.08mm 차** |
+| ② **최상면 중심 홀 개구** | 캘리퍼 (융기·챔퍼 제외) | **ø49.0** | **ø49.00** | ✅ **일치** |
+
+⚠️ **«홀 개구» 를 말할 때는 «어느 높이인가» 를 반드시 붙인다.** 홀이 45° 원뿔이라 높이마다 다르다:
+`상판 밑면 ø35.02`(= SEMI `d63`, 공차가 걸리는 유일한 값) · `주 상면 ø45.00` · **`최상면 ø49.00`**(융기 꼭대기).
+**카메라가 보는 것은 최상면**이고 `§28`·`§29`·여기의 «최상면 개구» 는 전부 이것이다 — **규격이 안 잡는 값**이다.
+🔴 실제로 혼동이 있었다 — `verify_semi` 가 `주 상면` 값을 *"홀 상면 개구"* 라는 라벨로 내고 있었고
+(융기가 있으면 카메라가 보는 값과 4mm 차이), 초판 §36 은 keypoint 의 ø48.92 를 인용했다.
+검사기를 **세 높이를 구분해 내도록** 고쳤다(2026-08-13) — `hole_opening_at_plate_top_mm` /
+`hole_opening_topmost_mm` + 그 z. ⚠️ 최상면은 **메쉬 최고점에서 재면 안 된다** — 그건 «최외곽» 융기일 수 있어
+홀 융기가 없는 자산에서 `nan` 이 난다(`spec15`·`fv_h0r2` 에서 실제로 났다). 홀 둘레에 재료가 있는
+**가장 높은 z** 를 찾아야 한다. 대조군 검증: `fv_h2r0` ø49.00(융기 +4.00) vs `fv_h0r2` ø45.00(융기 없음).
 | ③ 홀 주변 융기 | 육안 | **이 개체는 있다. 🔴 그런데 «대부분 있고 가끔 없다»** | 있다 (+2mm) | ⚠️ **개체 변이** |
 
 🔴🔴 **③은 «맞췄다» 가 아니라 «맞출 수 없다» 로 읽어야 한다** (사용자 확정, 2026-08-12).

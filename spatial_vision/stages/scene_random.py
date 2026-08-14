@@ -47,6 +47,21 @@ _HDRI_EXTS = (".hdr", ".exr", ".png", ".jpg", ".jpeg")
 _TEX_EXTS = (".png", ".jpg", ".jpeg")
 
 
+# ★ **실물 FOUP 몸체의 3대 외관** (사용자 확정 2026-08-13). `--body-appearance` 로 고른다.
+#   top_flange 는 어느 경우에도 **검정 고정**이다 — 이건 몸체만의 축이다.
+#   🔴 `black` 이 최난이도다: 몸체와 flange 가 같은 색이라 **경계가 사라진다.**
+#      exemplar 참조를 이 조건에서 안 만들어 두면 실물에서 flange 분할이 통째로 무너질 수 있다.
+#   ⚠️ 값은 실측이 아니라 **육안 근사**다. 실물 사진이 생기면 채도·투과율을 맞춰야 한다.
+BODY_APPEARANCE = {
+    "black":  {"rgb": (0.030, 0.030, 0.030), "roughness": 0.45, "metallic": 0.0, "opacity": 1.00,
+               "desc": "flange 와 같은 검정 불투명"},
+    "orange": {"rgb": (0.720, 0.230, 0.020), "roughness": 0.22, "metallic": 0.0, "opacity": 0.45,
+               "desc": "반투명 주황 (일반적인 FOUP 본체)"},
+    "clear":  {"rgb": (0.780, 0.820, 0.800), "roughness": 0.07, "metallic": 0.0, "opacity": 0.25,
+               "desc": "투명 (거의 무색)"},
+}
+
+
 class SceneRandomizer:
     def __init__(self, args, rng, world_path: str, target_prim, obj_usd: str):
         self.a = args
@@ -155,16 +170,27 @@ class SceneRandomizer:
             self._ground_shader = _make_material("mat_ground", list(ground_prims))
 
         flange_rgb = getattr(self.a, "flange_color", None)
-        if getattr(self.a, "body_material", False) or flange_rgb:
+        # ★ 고정 외관도 body 재질 바인딩이 필요하다 — `--body-material` 없이 써도 되게 한다
+        fixed_app = getattr(self.a, "body_appearance", "random")
+        bind_body = bool(getattr(self.a, "body_material", False)) or fixed_app != "random"
+        if bind_body or flange_rgb:
             # 타깃 + distractor FOUP 전부. 타깃만 흔들면 **몸체 색이 타깃 식별 단서**가 되어
             # segmentation 점수가 부풀려진다 — distractor 도 같은 분포에서 흔들어야 한다.
             targets = [self.target] + [p for p, kind in self.distractors if kind == "foup"]
             for i, root_prim in enumerate(targets):
-                if getattr(self.a, "body_material", False):
+                if bind_body:
                     body = stage.GetPrimAtPath(f"{root_prim.GetPath()}/body")
                     if not body or not body.IsValid():
                         raise RuntimeError(f"body 서브프림을 찾을 수 없다: {root_prim.GetPath()}/body")
-                    self._body_shaders.append(_make_material(f"mat_body_{i:02d}", [body]))
+                    sh = _make_material(f"mat_body_{i:02d}", [body])
+                    if fixed_app != "random":
+                        # ★ 고정 외관은 **여기서 한 번만** 칠한다(flange 와 같은 취급).
+                        #   타깃·distractor 를 **같은 외관**으로 둔다 — 몸체 색이 타깃 식별 단서가
+                        #   되면 분할 점수가 부풀려진다(랜덤 모드가 같은 이유로 둘 다 흔든다).
+                        p = BODY_APPEARANCE[fixed_app]
+                        _set_pbr(sh, color=p["rgb"], roughness=p["roughness"],
+                                 metallic=p["metallic"], opacity=p["opacity"])
+                    self._body_shaders.append(sh)
                 fl = stage.GetPrimAtPath(f"{root_prim.GetPath()}/top_flange")
                 if flange_rgb:
                     # ★ flange 는 **고정 색**이다. 프레임마다 흔들지 않는다 —
@@ -291,7 +317,12 @@ class SceneRandomizer:
                      metallic=0.0, texture=tex,
                      texture_scale=float(ar.uniform(*self.a.ground_texture_scale)))
             mat_st["ground"] = {"texture": Path(tex).name if tex else None}
-        if self._body_shaders:
+        fixed_app = getattr(self.a, "body_appearance", "random")
+        if self._body_shaders and fixed_app != "random":
+            # 고정 외관 — setup 에서 한 번 칠했다. **난수를 뽑지 않는다**(뽑으면 랜덤 런과 씬이 어긋난다).
+            mat_st["bodies_fixed"] = {"appearance": fixed_app} | {
+                k: v for k, v in BODY_APPEARANCE[fixed_app].items() if k != "desc"}
+        elif self._body_shaders:
             bodies = []
             for sh in self._body_shaders:          # 타깃·distractor 를 **독립적으로** 흔든다
                 tex = self._body_tex[int(ar.integers(len(self._body_tex)))] if self._body_tex else None
@@ -449,8 +480,14 @@ def _shader_of(mat_prim, UsdShade):
 
 
 def _set_pbr(shader, color, roughness: float, metallic: float,
-             texture: str | None = None, texture_scale: float = 1.0):
-    """OmniPBR.mdl 입력. 이름은 /isaac-sim/kit/mdl/core/Base/OmniPBR.mdl 에서 확인한 것."""
+             texture: str | None = None, texture_scale: float = 1.0,
+             opacity: float = 1.0):
+    """OmniPBR.mdl 입력. 이름은 /isaac-sim/kit/mdl/core/Base/OmniPBR.mdl 에서 확인한 것.
+
+    ⚠️ `opacity` 는 OmniPBR 의 **cutout opacity** 다 — 알파 블렌딩이고 **굴절·집광이 없다.**
+       반투명·투명 FOUP 의 «색과 대비» 는 재현하지만 **유리처럼 배경이 휘는 것은 재현하지 않는다.**
+       exemplar 참조의 목적(= flange 주변 대비)에는 충분하지만, depth 실험의 대역물로 쓰면 안 된다.
+    """
     from pxr import Gf, Sdf
 
     shader.CreateInput("diffuse_color_constant", Sdf.ValueTypeNames.Color3f).Set(
@@ -466,6 +503,12 @@ def _set_pbr(shader, color, roughness: float, metallic: float,
         shader.CreateInput("world_or_object", Sdf.ValueTypeNames.Bool).Set(True)
         shader.CreateInput("texture_scale", Sdf.ValueTypeNames.Float2).Set(
             Gf.Vec2f(float(texture_scale), float(texture_scale)))
+    # ⚠️ 텍스처와 같은 이유로 **항상 둘 다 쓴다.** 불투명일 때 입력을 안 건드리면
+    #    이전 프레임의 반투명 설정이 남는다.
+    op = float(np.clip(opacity, 0.0, 1.0))
+    shader.CreateInput("enable_opacity", Sdf.ValueTypeNames.Bool).Set(op < 1.0)
+    shader.CreateInput("opacity_constant", Sdf.ValueTypeNames.Float).Set(op)
+    shader.CreateInput("opacity_threshold", Sdf.ValueTypeNames.Float).Set(0.0)  # 0 = 분수 알파 그대로
 
 
 def _visible(prim) -> bool:

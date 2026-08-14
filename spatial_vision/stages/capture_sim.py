@@ -120,6 +120,13 @@ def parse_args(argv=None):
                     help="몸체에도 텍스처를 입힌다(기본: 색·거칠기·금속성만). "
                          "실물 FOUP 은 무지 플라스틱이라 과한 randomization 이지만, "
                          "형상 의존을 강제하는 쪽으로는 유리하다 — 효과는 측정 대상이다")
+    ap.add_argument("--body-appearance", default="random",
+                    choices=["random", "black", "orange", "clear"],
+                    help="★ FOUP **몸체**를 실물 3종 중 하나로 **고정**한다 (사용자 확정 2026-08-13): "
+                         "black=flange 와 같은 검정 불투명 · orange=반투명 주황 · clear=투명. "
+                         "`random` 이면 기존 randomization. 고정 모드는 `--body-material` 없이도 "
+                         "재질을 바인딩하고 **프레임마다 흔들지 않는다**(flange 와 같은 취급). "
+                         "⚠️ 투명은 OmniPBR cutout opacity 라 **굴절이 없다** — 색·대비만 재현한다")
     ap.add_argument("--body-roughness", type=float, nargs=2, default=[0.05, 0.85])
     ap.add_argument("--body-metallic", type=float, nargs=2, default=[0.0, 0.35])
     ap.add_argument("--body-saturation", type=float, nargs=2, default=[0.0, 0.75])
@@ -407,7 +414,8 @@ def main() -> int:
     if args.distractors or args.occluders or args.light_fixtures \
        or args.dome_intensity[0] != args.dome_intensity[1] \
        or args.color_temperature_k[0] != args.color_temperature_k[1] \
-       or args.hdri or args.ground_material or args.body_material or args.flange_color:
+       or args.hdri or args.ground_material or args.body_material or args.flange_color \
+       or args.body_appearance != "random":
         randomizer = SceneRandomizer(args, rng, WORLD, obj_prim, str(Path(args.obj_usd).resolve()))
         randomizer.setup(dome_prim=dome_prim, ground_prims=ground_prims)
         print(f"[capture_sim] randomizer: distractor {args.distractors}"

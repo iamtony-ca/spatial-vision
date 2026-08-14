@@ -22,17 +22,29 @@ case "${1:-}" in
   *) echo "알 수 없는 옵션: $1" >&2; sed -n '3,7p' "$0"; exit 2 ;;
 esac
 
-ok=0; miss=0
+ok=0; miss=0; skip=0
 FILES=()          # 매니페스트 대상 (설명이 아니라 «경로» 만 모은다)
 
-chk() {  # chk <설명> <경로> <최소MB>
-  FILES+=("$2")
-  if [ -f "$2" ]; then
-    mb=$(( $(stat -Lc%s "$2") / 1048576 ))   # -L: 심링크는 대상 크기를 잰다
-    if [ "$mb" -ge "$3" ]; then printf '  ✅ %-34s %s (%sMB)\n' "$1" "$2" "$mb"; ok=$((ok+1))
-    else printf '  ⚠️  %-34s %s — %sMB, %sMB 이상이어야 함(다운로드 실패?)\n' "$1" "$2" "$mb" "$3"; miss=$((miss+1)); fi
-  else printf '  ❌ %-34s %s — 없음\n' "$1" "$2"; miss=$((miss+1)); fi
+# chk  <설명> <경로> <최소MB>   — 필수. 없으면 non-zero 종료
+# chko <설명> <경로> <최소MB>   — 옵션. 없어도 성공이다
+#   ⚠️ 옵션을 필수와 같이 세면 **정상 세팅이 «실패» 로 보인다** — 새 머신은 sam3.1 을
+#      안 옮기는 게 기본이라 매번 걸린다(실측 2026-08-12).
+_chk() {  # _chk <필수?> <설명> <경로> <최소MB>
+  local req="$1" desc="$2" path="$3" min="$4" mb
+  FILES+=("$path")
+  if [ -f "$path" ]; then
+    mb=$(( $(stat -Lc%s "$path") / 1048576 ))   # -L: 심링크는 대상 크기를 잰다
+    if [ "$mb" -ge "$min" ]; then printf '  ✅ %-34s %s (%sMB)\n' "$desc" "$path" "$mb"; ok=$((ok+1)); return; fi
+    printf '  ⚠️  %-34s %s — %sMB, %sMB 이상이어야 함(다운로드 실패?)\n' "$desc" "$path" "$mb" "$min"
+  elif [ "$req" = 0 ]; then
+    printf '  ⏭  %-34s %s — 없음 (옵션이라 넘어간다)\n' "$desc" "$path"; skip=$((skip+1)); return
+  else
+    printf '  ❌ %-34s %s — 없음\n' "$desc" "$path"
+  fi
+  [ "$req" = 1 ] && miss=$((miss+1)) || skip=$((skip+1))
 }
+chk()  { _chk 1 "$@"; }
+chko() { _chk 0 "$@"; }
 
 echo "=== FoundationStereo ==="
 chk "stereo ckpt (23-51-11)" third_party/FoundationStereo/pretrained_models/23-51-11/model_best_bp2.pth 300
@@ -53,13 +65,13 @@ echo "=== SAM 3 ==="
 chk "sam3 ckpt"        weights/sam3/sam3.pt 2000
 chk "sam3 config"      weights/sam3/config.json 0
 chk "sam3 tokenizer"   weights/sam3/tokenizer.json 0
-chk "sam3.1 ckpt(옵션)" weights/sam3.1/sam3.1_multiplex.pt 2000
+chko "sam3.1 ckpt(옵션)" weights/sam3.1/sam3.1_multiplex.pt 2000
 
 echo "=== NGC FoundationStereo ONNX (상업 경로) ==="
 chk "NGC dynamic onnx" weights/ngc_foundationstereo/deployable_foundation_stereo_s_dynamic_v2.0.onnx 300
 
 echo
-echo "확보 $ok / 누락·불완전 $miss"
+echo "확보 $ok / 누락·불완전 $miss$([ "$skip" -gt 0 ] && echo " / 옵션 건너뜀 $skip")"
 
 # ── 매니페스트 생성 ───────────────────────────────────────────────────────────
 if [ "$MODE" = "write" ]; then

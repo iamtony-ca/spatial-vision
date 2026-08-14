@@ -23,12 +23,17 @@
     A3  정합 off  (돌릴 게 없다 — `fp_ns2/pose_coarse.json` 이 곧 결과다)
     A4  refine on refine_contour --outer-only  (초기값 = `fp_s2/pose_refined.json`)
 
-    전부 `--gate-deg 1.5`. 그리고 다섯 결과에 **좌우 투영 일관성**(`eval.lr_consistency`)을 건다.
+    전부 `--gate-deg 1.5`. 그리고 다섯 결과에 **좌우 투영 일관성**(`eval.lr_consistency`)과
+    **오버레이 시트**(`viz.overlay_pose`)를 건다.
+
+    ov        overlay_sheet.png + overlay/overlay_frame_*.png   ← 육안 판정
 
 🔴 실환경에는 GT 가 없다 — 리포트는 **GT-free 지표만** 낸다
     ① **게이트 후퇴율**  — 폭주 여부. 홀 전략 셋을 비교하면 *"CAD 홀이 실물과 맞는가"* 가 나온다(§28-5)
     ② **좌우 투영 일관성** — 왼쪽만 보고 정합한 pose 를 오른쪽에 투영해 채점. A3 판정의 유일한 근거
     ③ **대응점 수·rms·이동량** — 신호가 실제로 있었는지
+    ④ **오버레이 시트** — ①~③ 은 전부 «자기 일관성» 이라 *«다 같이 틀린»* 경우를 못 잡는다.
+       사진 위에 투영해 눈으로 보는 것만이 그 축을 본다(교훈 #39·#46 이 그렇게 잡혔다).
     절대 오차(mm·도)는 실물에서 **잴 수 없다.** 리포트에 R/t 오차가 없는 것은 버그가 아니다.
 
 ⚠️ 프레임 레이아웃은 `<in>/frame_XXXX/` 여야 한다
@@ -55,16 +60,28 @@ VISION = Path(__file__).resolve().parents[1]
 PY = {
     "stereo_onnx": VISION / "envs/stereo_onnx/bin/python",
     "sam3": VISION / "envs/seg_sam3/bin/python",
+    "sam6d": VISION / "envs/seg_sam6d/bin/python",
     "pose": VISION / "envs/pose/bin/python",
 }
 STEREO_MODEL = "weights/ngc_foundationstereo/deployable_foundation_stereo_s_dynamic_v2.0.onnx"
 
 # 거리대 → SAM3 참조. 🔴 참조는 **거리 종속**이라 틀리면 IoU 가 조용히 무너진다(§34-6).
 REFS_BY_PRESET = {
+    # 구 세트 — 몸체를 randomize 해서 만든 것 (외관 축이 없다)
     "n20": ("sam3_refs_flange_n20", "0.18~0.24m"),
-    "n25": ("sam3_refs_flange_n25", "0.22~0.30m  ← 배포 권장"),
+    "n25": ("sam3_refs_flange_n25", "0.22~0.30m"),
     "n30": ("sam3_refs_flange_n30", "0.28~0.35m"),
 }
+# ★ 실물 FOUP **몸체 외관 3종**(사용자 확정 2026-08-13) × 거리대. `--preset n50orange` 처럼 쓴다.
+#   ⚠️ 손으로 나열하면 오타가 난다 — **표에서 생성**한다. 없는 디렉토리는 실행 시점에 걸린다.
+#   🔴 거리는 **열어 두고 접근한다** — 실물에서 0.5m 가 sim 최적점(0.22~0.30m)보다 좋았다.
+_BANDS = {"25": "0.22~0.30m", "40": "0.35~0.45m", "50": "0.45~0.55m",
+          "60": "0.55~0.65m", "70": "0.65~0.75m"}
+_APPS = {"black": "몸체 검정 불투명 (최난이도)", "orange": "몸체 반투명 주황",
+         "clear": "몸체 투명", "mixed": "3종 혼합 ⚠️ refs-mode independent 로 자동 전환"}
+for _cm, _band in _BANDS.items():
+    for _app, _d in _APPS.items():
+        REFS_BY_PRESET[f"n{_cm}{_app}"] = (f"sam3_refs_flange_n{_cm}_{_app}", f"{_band} · {_d}")
 # §34-9 — 이 거리대에서 flange 등가지름이 이 근처여야 정합 이득이 난다(0.82× ↔ 1.66× 를 가른 값)
 TARGET_FLANGE_PX = 419.0
 
@@ -82,9 +99,12 @@ class Step:
     «항상 처음부터» 가 되거나(느림) «절반만 돌고 완료» 가 된다(틀림)."""
 
     def __init__(self, sid: str, desc: str, cmd: list, out: Path, sentinel: str,
-                 per_frame: bool = False):
+                 per_frame: bool = False, optional: bool = False):
         self.sid, self.desc, self.cmd, self.out = sid, desc, cmd, out
         self.sentinel, self.per_frame = sentinel, per_frame
+        # ⚠️ **진단용 스테이지가 진단 대상을 죽이면 안 된다**(교훈 #79 — Blender 프리페치가
+        #    set -e 로 뒤의 venv 를 통째로 날렸다). optional 은 실패해도 다음으로 간다.
+        self.optional = optional
 
     def done(self, frames: list[Path]) -> bool:
         if self.per_frame:
@@ -120,6 +140,16 @@ def build_steps(a) -> list[Step]:
               "--refs", refs, "--n-refs", a.n_refs, "--refs-mode", a.refs_mode]
              + (["--prompts-file", obj / "sam3_prompts.json"] if a.use_prompts_file else []),
              seg, "meta_segment_flange.json"),
+        # 🔵 **진단 전용** — pose 에는 안 쓴다. 근접에서 `full` 을 뽑을 SAM3 참조가 없으므로
+        #    사진 참조가 필요 없는 **ISM(CAD 템플릿)** 을 쓴다. 타깃 지정은 flange 마스크로 한다
+        #    («동일 인스턴스가 여럿이면 시스템이 정해줘야 한다» — `--select center` 는 교훈 #15).
+        Step("seg_full", "segment full (ISM · 진단용)",
+             [PY["sam6d"], "-m", "spatial_vision.stages.segment_sam6d",
+              "--in", a.in_dir, "--out", o / "seg_full", "--target", "full",
+              "--templates", obj / "ism_full", "--cad", obj / "full.ply",
+              "--depth", "stereo", "--depth-dir", st,
+              "--select", "exemplar", "--exemplar-dir", seg],
+             o / "seg_full", "meta_segment_full.json", optional=True),
         Step("fp_ns2", "FoundationPose --no-stage2 (배포본 초기값)",
              [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
               "--in", a.in_dir, "--out", ns2, "--no-stage2"] + fp_common,
@@ -158,6 +188,40 @@ def build_steps(a) -> list[Step]:
                            "--obj", obj, "--outer-only",
                            "--out", Path(a.out) / "lr", "--tag", sid],
                           Path(a.out) / "lr", f"lr_consistency_{sid}.json"))
+
+    # 🔴 **육안 검사 시트 — 실환경에서 이게 유일한 «맞는가» 판정 수단이다.**
+    #    GT 가 없으니 R/t 오차를 못 낸다. 남는 것은 *"투영 실루엣이 사진의 진짜 테두리에 붙는가"* 이고
+    #    그건 겹쳐 그려야만 보인다. 변형 다섯을 **같은 크롭**으로 나란히 놓아 서로 어긋나는지도 본다.
+    ov = [f"{ns2}:pose_coarse.json"] + [str(Path(a.out) / sid) for sid, *_ in arms]
+    steps.append(Step("ov", "오버레이 시트 (육안 검사)",
+                      [PY["pose"], "-m", "spatial_vision.viz.overlay_pose",
+                       "--capture", a.in_dir, "--obj", obj, "--mesh", "top_flange.ply",
+                       "--frames", a.overlay_frames, "--tile", 380,
+                       "--mask-alpha", a.overlay_mask_alpha,
+                       "--per-frame-dir", o / "overlay",
+                       "--out", o / "overlay_sheet.png"]
+                      + sum((["--pred", p] for p in ov), []),
+                      o, "overlay_sheet.png", optional=True))
+
+    # 🔵 단계별 산출물 6패널 — «맞는가»(ov) 가 아니라 **«어디서 깨졌는가»** 를 본다.
+    #    분할 0 · depth 미관통 · 노출 이상은 여기서만 갈린다.
+    steps.append(Step("diag", "진단 시트 (원본·마스크 2종·depth·valid·pose)",
+                      [PY["pose"], "-m", "spatial_vision.viz.diag_sheet",
+                       "--in", a.in_dir, "--out", o / "diag",
+                       "--seg-full", o / "seg_full", "--seg-flange", seg,
+                       "--depth-dir", st, "--pose-dir", Path(a.out) / "A1",
+                       "--obj", obj, "--frames", a.overlay_frames, "--width", 380,
+                       "--gate-deg", a.gate_deg]
+                      + (["--all"] if a.diag_all else []),
+                      o / "diag", "diag_sheet.png", optional=True))
+
+    # 🔵 통계 — 흩어진 JSON 을 **한 표**로 합치고 분포 그래프·CSV 를 낸다.
+    #    ⚠️ 반드시 마지막이다(위 산출물을 전부 읽는다).
+    steps.append(Step("stats", "통계 표·그래프·CSV",
+                      [PY["pose"], "-m", "spatial_vision.eval.group_stats",
+                       "--root", o, "--variants", ",".join(sid for sid, *_ in arms),
+                       "--gate-deg", a.gate_deg],
+                      o / "stats", "summary.md", optional=True))
     return steps
 
 
@@ -192,6 +256,13 @@ def capture_diag(in_dir: Path, st: Path, seg: Path, ns2: Path) -> dict:
             area = int((mask > 127).sum())
             r["flange_px"] = area
             r["flange_dia_px"] = round(float(2 * np.sqrt(area / np.pi)), 1)
+        # 분할이 «무엇을» 봤는지 — 마스크가 비었을 때 원인을 가리키는 유일한 단서다
+        dj = seg / f.name / "det_flange.json"
+        if dj.exists():
+            d = json.loads(dj.read_text())
+            r["seg_score"] = d.get("score")
+            r["seg_found"] = d.get("found")
+            r["seg_instances"] = d.get("n_instances")
         pj = ns2 / f.name / "pose_coarse.json"
         if pj.exists():
             r["z_mm"] = round(float(json.loads(pj.read_text())["t_mm"][2]), 1)
@@ -215,10 +286,15 @@ def read_variant(root: Path, sid: str) -> dict:
         m = json.loads(mc.read_text())
         fr = m["frames"]
         n = len(fr)
+        # 🔴 **전단이 실패하면 여기가 빈다.** 진단 도구가 진단 대상과 같이 죽으면 안 된다 —
+        #    빈 목록에 int(median([])) 를 하면 NaN 으로 터진다(실측 2026-08-13, 실물 첫 런).
+        out["n"] = n
+        if n == 0:
+            out["failed"] = "정합할 프레임이 0 — 전단(분할·FP)에서 끊겼다"
+            return out
         out |= {
-            "n": n,
             "gated": m["n_gated"],
-            "gated_pct": round(100.0 * m["n_gated"] / max(n, 1), 1),
+            "gated_pct": round(100.0 * m["n_gated"] / n, 1),
             "n_corr": int(_med([r["n_corr"] for r in fr])),
             "rms_px": round(_med([r["rms_px"] for r in fr if r["rms_px"] is not None]), 3),
             "moved_deg_med": round(_med([r["moved_deg"] for r in fr]), 3),
@@ -237,6 +313,24 @@ def verdicts(v: dict[str, dict], diag: dict) -> list[str]:
     """측정값 → **처방**. 규칙은 전부 문서에 근거가 있고 GT 를 쓰지 않는다."""
     out = []
     med = diag.get("median", {})
+
+    # 🔴 전단이 끊겼으면 **그것만 말한다.** 뒤의 지표는 전부 무의미하고, 거리·CAD 판정을
+    #    같이 내면 엉뚱한 원인을 쫓게 된다.
+    fr = diag.get("frames", [])
+    n_found = sum(1 for r in fr if r.get("flange_px"))
+    if fr and n_found == 0:
+        sc = [r["seg_score"] for r in fr if r.get("seg_score") is not None]
+        s = f" (SAM3 score 중앙값 {np.median(sc):.3f})" if sc else ""
+        out.append(f"🔴🔴 **분할이 {len(fr)}프레임 전부에서 검출 0 이다**{s} — flange 마스크가 비어 "
+                   f"뒤 단계가 전부 건너뛰었다. **여기부터 고쳐야 하고 아래 지표는 의미가 없다.**")
+        out.append("  ① 먼저 `seg/frame_0000/mask_flange.png` 와 원본 `left.png` 를 **눈으로** 볼 것 — "
+                   "물체가 프레임에 제대로 있는지, 노출이 맞는지.")
+        out.append("  ② **가장 유력한 원인: SAM3 exemplar 참조가 sim 렌더로 만들어졌다.** 참조는 "
+                   "«배포 조건에서» 만들어야 하고(원거리 참조로 근접 질의 시 IoU 0.044 전례), "
+                   "**실사진은 마지막 남은 도메인 갭 축**이다.")
+        out.append("  ③ **대안은 ISM 이다** — CAD 렌더 템플릿을 쓰므로 사진 참조가 필요 없고, "
+                   "randomization 하에서도 유지된 전례가 있다. B1 대조군이 원래 이 비교다.")
+        return out
 
     d = med.get("flange_dia_px")
     if d:
@@ -373,11 +467,33 @@ def report(a) -> int:
     L.append("")
 
     L.append("## 눈으로 볼 것\n")
+    L.append(f"- 🔴 **진단 시트 — `{root}/diag/diag_sheet.png`** (프레임마다: `{root}/diag/diag_frame_*.png`)")
+    L.append("  - 한 줄에 6패널: 원본 · `mask_full` · `mask_flange` · depth · valid · pose. "
+             "**«어디서 깨졌는가» 를 보는 도구다** — 분할 0, depth 미관통, 노출 이상이 여기서 갈린다.")
+    L.append("  - depth 는 **물체 마스크 안에서** 구간을 잡는다(배경으로 잡으면 물체가 단색이 된다). "
+             "캡션의 `scale[obj] lo~hi` 를 보지 않고 색을 프레임 간에 비교하면 안 된다.")
+    L.append(f"- 🔴 **프레임 추이 — `{root}/diag/diag_trends.png`** · 수치 `{root}/diag/diag_metrics.json`")
+    L.append("  - **전 프레임**의 등가지름·depth·평면잔차·유효율·이동량을 한 장에. "
+             "40장을 눈으로 훑는 대신 **여기서 이상 프레임을 찾아 그 장만 연다**. "
+             "붉은 세로 띠 = 게이트 후퇴 프레임.")
+    L.append(f"- 🔴 **pose 오버레이 — `{root}/overlay_sheet.png`** (프레임마다: `{root}/overlay/overlay_frame_*.png`)")
+    L.append("  - **GT 가 없으니 이게 «맞는가» 를 보는 유일한 수단이다.** 초록 윤곽이 사진 속 flange "
+             "테두리에 붙어 있는지, 축 삼각대(X/Y/Z)가 상식적인 방향인지, 변형 다섯이 서로 어긋나는지를 본다.")
+    L.append("  - 어긋남이 **한 방향으로 일관**되면 계통 편향(§29 외곽 융기 축)이고 **게이트가 못 막는다**. "
+             "프레임마다 제각각이면 초기값 폭주다.")
     L.append(f"- depth 유효 마스크 — `{root/'st'}/frame_*/valid.png`  🔴 열린 항목 #1")
     L.append(f"- flange 마스크 — `{root/'seg'}/frame_*/mask_flange.png`")
-    L.append(f"- FP 오버레이 — `{root/'fp_ns2'}/frame_*/`")
     L.append(f"- 정합 디버그 — `--debug` 로 다시 돌리면 `{root}/A1/frame_*/contour_debug.png`")
     L.append(f"- 최종 pose — `{root}/A1/frame_*/pose_refined.json`\n")
+    L.append("## 직접 분석할 것\n")
+    L.append(f"- 🔴 **변형 비교 그래프 — `{root}/stats/variants.png`** "
+             "(후퇴율 · 이동량 분포 · 좌우 일관성 · 대응점). **상자 + 점**이라 꼬리가 보인다.")
+    L.append(f"- 🔴 **`{root}/stats/metrics_long.csv`** — (프레임 × 변형) 긴 형식. "
+             "pandas/엑셀로 바로 연다. `frames.csv` 는 촬영지표(노출·마스크·depth·유효율).")
+    L.append(f"- `{root}/stats/summary.md` — 변형별 **중앙 / p90 / 최대**. "
+             "⚠️ 중앙값만 보고 우열을 정하지 않는다(교훈 #16).")
+    L.append(f"- `{root}/stats/repeatability.png` — **정지 구간 반복도**. "
+             "⚠️ 거리 산포가 크면 그건 반복도가 아니라 자세 변화다 — `summary.md` 가 자동 판정한다.\n")
 
     txt = "\n".join(L)
     (root / "report.md").write_text(txt)
@@ -396,8 +512,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--obj", default="assets/obj/foup_300_semi_r2")
     ap.add_argument("--preset", default="n25", choices=list(REFS_BY_PRESET),
-                    help="촬영 거리대 → SAM3 참조 (" +
-                         " · ".join(f"{k} {d}" for k, (_, d) in REFS_BY_PRESET.items()) + ")")
+                    help="촬영 거리대(cm) + 몸체 외관 → SAM3 참조. "
+                         "예 `n50orange` = 0.45~0.55m · 반투명 주황. "
+                         "거리 " + "/".join(_BANDS) + " × 외관 " + "/".join(_APPS) +
+                         ". 목록은 --list-presets")
+    ap.add_argument("--list-presets", action="store_true", help="참조 프리셋 목록과 존재 여부만 출력")
     ap.add_argument("--refs", default=None, help="참조 디렉토리 이름을 직접 지정 (--preset 무시)")
     ap.add_argument("--n-refs", type=int, default=3)
     ap.add_argument("--refs-mode", default="chain", choices=["chain", "independent"])
@@ -408,11 +527,30 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--gate-deg", type=float, default=1.5)
     ap.add_argument("--fix-z", action="store_true",
                     help="§23 — depth 가 깨끗하면 켠다. 실물 depth 품질을 모르므로 기본은 끔")
+    ap.add_argument("--overlay-frames", type=int, default=4, help="오버레이 시트에 넣을 프레임 수")
+    ap.add_argument("--diag-all", action="store_true",
+                    help="진단 시트를 **모든 프레임**에 대해 개별 장으로 쓴다 (기본은 시트에 든 것만)")
+    ap.add_argument("--overlay-mask-alpha", type=float, default=0.22,
+                    help="0 이면 마스크를 안 깐다 — 실물 테두리를 가리지 않고 보고 싶을 때")
     ap.add_argument("--only", default=None, help="쉼표로 구분한 스텝 id 만 실행 (예: A1,A2a,lr_A1)")
     ap.add_argument("--force", action="store_true", help="산출물이 있어도 다시 돌린다")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--report-only", action="store_true")
     a = ap.parse_args(argv)
+
+    if a.list_presets:
+        print(f"{'preset':14s}{'참조 디렉토리':44s}{'있음':5s} 설명")
+        for k, (name, desc) in REFS_BY_PRESET.items():
+            ok = (VISION / a.obj / name).is_dir()
+            print(f"{k:14s}{name:44s}{'✅' if ok else '❌':5s} {desc}")
+        return 0
+
+    # ★ 혼합 세트는 **참조마다 독립 질의**여야 한다 — `chain` 은 박스가 ref_0 에만 걸려
+    #   («혼합» 이 아니라 «ref_0 세트») 가 된다. 조용히 틀리느니 여기서 바꾸고 알린다.
+    if a.preset.endswith("mixed") and a.refs_mode == "chain":
+        a.refs_mode = "independent"
+        print("⚠️ mixed 프리셋 → --refs-mode 를 independent 로 자동 전환한다 "
+              "(chain 은 박스가 ref_0 에만 걸린다)")
 
     # cwd 가 어디든 같게 동작해야 한다 — 스테이지는 cwd=VISION 으로 부르므로 여기서 절대화한다
     in_dir = Path(a.in_dir)
@@ -421,6 +559,14 @@ def main(argv: list[str] | None = None) -> int:
     a.in_dir = str(in_dir)
     out_dir = Path(a.out)
     a.out = str(out_dir if out_dir.is_absolute() else VISION / out_dir)
+
+    # 🔴 참조가 없으면 SAM3 가 **검출 0 으로 조용히 끝난다** — 여기서 죽는 게 낫다
+    refs_dir = VISION / a.obj / (a.refs or REFS_BY_PRESET[a.preset][0])
+    if not refs_dir.is_dir():
+        print(f"❌ 참조 세트가 없다: {refs_dir}\n"
+              f"   `--list-presets` 로 있는 것을 확인하거나 RESULTS.md §35-2f 「재현」 으로 만들 것",
+              file=sys.stderr)
+        return 2
 
     frames = sorted([p for p in in_dir.glob("frame_*") if (p / "left.png").exists()])
     if not frames:
@@ -456,6 +602,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\n[{s.sid}] {s.desc}")
         rc = sh(s.cmd, a.dry_run)
         if rc != 0:
+            if s.optional:
+                print(f"⚠️ [{s.sid}] 실패 (rc={rc}) — **넘어간다**(진단용). "
+                      f"본 파이프라인은 계속된다", file=sys.stderr)
+                continue
             print(f"❌ [{s.sid}] 실패 (rc={rc}) — 여기서 멈춘다", file=sys.stderr)
             return rc
     print(f"\n== 전체 {time.time()-t0:.1f}s")

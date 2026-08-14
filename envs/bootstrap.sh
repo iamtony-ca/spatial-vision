@@ -166,12 +166,22 @@ if have seg_sam6d; then
   # ⚠️ Blender 기본 설치 경로가 `/home_local/$USER/blender/` 라 ws 밖을 오염시킨다 →
   #    실행 시 반드시 `--blender-install-path $VISION_ROOT/envs/blender` 를 준다(아래 프리페치와 동일 경로).
   $UV pip install --python envs/seg_sam6d/bin/python "blenderproc==2.8.0"
-  if [ ! -d envs/blender ]; then
+  # 🔴 Blender 프리페치는 **실패해도 넘어간다** — ISM «추론» 은 blenderproc 을 import 하지 않는다.
+  #    필요한 건 렌더된 템플릿(assets/obj/<id>/ism_full)이고 그건 자산 릴리스에 들어 있다.
+  #    Blender 가 실제로 필요한 경우는 **새 CAD 로 템플릿을 다시 렌더할 때뿐**이다(SETUP §10).
+  #    사내망은 download.blender.org 를 프록시가 막아 HTTP 401 이 난다 → 여기서 죽으면
+  #    뒤의 stereo_onnx·cad venv 까지 통째로 안 만들어진다(set -e). 그래서 || true 다.
+  if [ -n "${SKIP_BLENDER:-}" ]; then
+    echo "  ⏭ Blender 프리페치 건너뜀 (SKIP_BLENDER)"
+  elif [ ! -d envs/blender ]; then
     echo "  Blender 다운로드(~1GB) — envs/blender"
     envs/seg_sam6d/bin/blenderproc run --blender-install-path "$ROOT/envs/blender" \
-      "$ROOT/envs/blenderproc_smoke.py"
+      "$ROOT/envs/blenderproc_smoke.py" || {
+        echo "  ⚠️ Blender 다운로드 실패 — **넘어간다**. ISM 추론에는 필요 없다." >&2
+        echo "     템플릿을 새로 렌더해야 할 때만 필요하다 → docs/SETUP.md §11 «Blender 401»" >&2
+      }
   fi
-  ls -d envs/blender/*/ 2>/dev/null | head -1
+  ls -d envs/blender/*/ 2>/dev/null | head -1 || true
 fi
 
 # --- venv: stereo_onnx (NGC FoundationStereo ONNX — 상업 라이선스 경로) ----------
