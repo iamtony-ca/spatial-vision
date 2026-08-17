@@ -178,7 +178,8 @@ if have seg_sam6d; then
     envs/seg_sam6d/bin/blenderproc run --blender-install-path "$ROOT/envs/blender" \
       "$ROOT/envs/blenderproc_smoke.py" || {
         echo "  ⚠️ Blender 다운로드 실패 — **넘어간다**. ISM 추론에는 필요 없다." >&2
-        echo "     템플릿을 새로 렌더해야 할 때만 필요하다 → docs/SETUP.md §11 «Blender 401»" >&2
+        echo "     템플릿을 새로 렌더해야 할 때만 필요하다 → docs/SETUP.md §9.1 «Blender 401»" >&2
+        echo "     이 소음을 아예 없애려면: SKIP_BLENDER=1 bash envs/bootstrap.sh" >&2
       }
   fi
   ls -d envs/blender/*/ 2>/dev/null | head -1 || true

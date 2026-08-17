@@ -13,7 +13,8 @@
 
 ```
 ①  git clone           16MB   코드 · 원본 STEP · 카메라 프로파일 · 자산 씨앗 JSON
-②a GitHub Release     117MB   우리가 만든 무거운 자산 (ply·usda·ism_full·sam3_refs)
+②a GitHub Release     432MB   우리가 만든 무거운 자산 (ply·usda·ism_full·sam3_refs)
+                              현행 태그 **`assets-r3`** (2026-08-14, SAM3 참조 20종 편입)
 ②b 수동 이관          가변    실물 캡처 runs/real*  ← 사용자가 직접 옮긴다 (2026-08-12)
 ③  자동 다운로드       3.9G    NGC ONNX · SAM vit_h · DINOv2   ← 스크립트가 받는다
 ④  수동(게이트)        6.6G    FoundationStereo · FoundationPose · SAM 3
@@ -45,7 +46,8 @@
 | — | | | |
 | `assets/obj/foup_300_semi_r2/{*.ply, mesh.usda, views.png}` | 27M | **②a Release** | STEP 에서 재생성 가능(§10) |
 | `assets/obj/foup_300_semi_r2/ism_full/` | 69M | **②a Release** | blenderproc 42장 렌더 |
-| `assets/obj/foup_300_semi_r2/sam3_refs_*/` | 102M | **②a Release** | 🔴 **재생성에 Isaac Sim 캡처가 필요**하다 |
+| `assets/obj/foup_300_semi_r2/sam3_refs_*/` | 111M | **②a Release** | 선정 세트 20종(거리 5대역 × 몸체 3종 +혼합). 🔴 **재생성에 Isaac Sim 캡처가 필요**하다 |
+| `assets/obj/foup_300_semi_r2/sam3_refs_*_cand/` | 231M | **②a Release** | 후보 풀. **§19 선정 기준을 바꿔 다시 고를 때만** 쓴다 — 급하면 안 풀어도 된다 |
 | `runs/real*/` (실물 캡처) | 촬영량 | **②b 수동** | 🔴 **다시 못 찍는다** — 그 자세, 그 조명. `runs/` 는 `.gitignore` 에 있으니 **git 밖에서 백업**할 것 |
 | — | | | |
 | `weights/ngc_foundationstereo/…_s_dynamic_v2.0.onnx` | 331M | **③ 자동** | `bootstrap.sh`·`fetch_weights.sh` 가 NGC 공개 URL 에서 받는다 |
@@ -93,19 +95,56 @@ rsync -avPR weights/models/foundationstereo/23-51-11 weights/models/foundationpo
 ```bash
 bash envs/pack_assets.sh --list            # 담을 목록만 확인
 bash envs/pack_assets.sh                   # → dist/foup_300_semi_r2_assets.tar.gz (+ .sha256)
-gh release create assets-r2 dist/*.tar.gz dist/*.sha256 --title "자산 r2"
+gh release create assets-r3 dist/*.tar.gz dist/*.sha256 --title "자산 r3"
 ```
+
+🔴 **`gh` 가 없는 머신이 흔하다**(이 워크스테이션도 없다). REST API 로 하면 설치가 필요 없다 —
+**토큰은 `read -rs` 로 받는다**(`export GH_TOKEN=ghp_…` 로 치면 셸 히스토리에 평문으로 남는다):
+
+```bash
+read -rsp "PAT: " GH_TOKEN; echo; export GH_TOKEN     # 권한은 Contents: Read and write 하나면 된다
+REPO=iamtony-ca/spatial-vision
+curl -sS -o /dev/null -w "auth HTTP %{http_code}\n" \
+    -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/user      # 200 이어야 한다
+
+git tag -a assets-r3 -m "자산 r3" && git push origin assets-r3
+python3 -c 'import json; json.dump({"tag_name":"assets-r3","name":"자산 r3",
+    "body":open("dist/RELEASE_NOTES_assets-r3.md").read()},
+    open("/tmp/payload.json","w"), ensure_ascii=False)'
+curl -sS -X POST "https://api.github.com/repos/$REPO/releases" \
+    -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+    --data @/tmp/payload.json -o /tmp/rel.json -w "HTTP %{http_code}\n"   # 201
+export RELEASE_ID=$(python3 -c 'import json; print(json.load(open("/tmp/rel.json"))["id"])')
+
+for f in dist/foup_300_semi_r2_assets.tar.gz dist/foup_300_semi_r2_assets.tar.gz.sha256; do
+  curl -sS --progress-bar -X POST \
+    "https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$(basename $f)" \
+    -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" \
+    --data-binary "@$f" -o /tmp/up.json -w "HTTP %{http_code}\n"          # 201
+done
+unset GH_TOKEN
+```
+
+⚠️ **curl 응답을 파서로 바로 파이프하지 말 것** — 실패하면 `KeyError: 'id'` 만 보이고 진짜 이유
+(`Bad credentials` 등)가 삼켜진다. `-o <파일> -w "HTTP %{http_code}"` 로 **본문과 코드를 따로** 받는다.
 
 **새 머신에서:**
 
 ```bash
-gh release download assets-r2 --dir dist
+gh release download assets-r3 --dir dist     # gh 없으면 아래 curl
+#   curl -sSL -O https://github.com/$REPO/releases/download/assets-r3/foup_300_semi_r2_assets.tar.gz
+#   curl -sSL -O https://github.com/$REPO/releases/download/assets-r3/foup_300_semi_r2_assets.tar.gz.sha256
 bash envs/pack_assets.sh --check dist/foup_300_semi_r2_assets.tar.gz    # sha256
 tar -C assets/obj -xzf dist/foup_300_semi_r2_assets.tar.gz
+envs/pose/bin/python tools/run_group_a.py --list-presets                # 23종 ✅ 확인
 ```
 
-실측: 196M → **117M**, 3초. ⚠️ `dist/` 는 `.gitignore` 에 있다 — **커밋하는 게 아니라 릴리스로 올린다.**
-⚠️ 자산을 재생성하면 **새 태그**를 만든다(`assets-r3`). 옛 태그를 지우면 용량이 실제로 회수된다.
+실측: 513M → **432M**(`assets-r3`, sha256 `a0f21cb0…`). 대부분이 SAM3 참조(선정 111M + 후보 231M)다.
+🔴 **업로드는 끝나도 잘렸을 수 있다** — 올린 뒤 **다시 받아서 sha256 을 대조**한다. GitHub 은
+잘린 파일도 `state: uploaded` 로 보고한다.
+⚠️ `dist/` 는 `.gitignore` 에 있다 — **커밋하는 게 아니라 릴리스로 올린다.**
+⚠️ 자산을 재생성하면 **새 태그**를 만든다(`assets-r4`). 같은 태그에 덮어쓰면 이미 받아 간 쪽의
+`--check` 가 조용히 깨진다. 옛 태그를 지우면 용량이 실제로 회수된다.
 
 ### 0.2 컨테이너 — 트리는 **호스트**에 두고 bind-mount 한다
 
@@ -341,6 +380,7 @@ envs/pose/bin/python tools/run_group_a.py --in runs/real01_near --out runs/real0
 | `~/.cache` 가 커진다 / 다른 ws 가 깨진다 | `source envs/env.sh` 를 빼먹었다 | 항상 먼저 source |
 | import 는 되는데 런타임 crash | venv 재생성 후 CUDA 심링크 끊김 | `bash envs/link_cuda_libs.sh envs/pose` |
 | `weights/sam3` 가 깨진 링크 | 심링크가 **절대 경로**다 | `bash envs/place_weights.sh` 재실행 |
+| **`bootstrap.sh` 가 Blender 받다 `HTTPError: 401 authenticationrequired`** | **사내망 프록시**가 가로챈 응답이다 — `download.blender.org` 는 인증이 없다 | **무시해도 된다.** `SKIP_BLENDER=1 bash envs/bootstrap.sh` → **§9.1** |
 | `uv venv` 가 에러로 멈춤 | uv 0.9+ 는 기존 venv 에서 멈춘다 | `bootstrap.sh` 가 `--allow-existing` 을 준다. 완전 재생성은 해당 디렉토리를 지우고 실행 |
 | `capture_sim` 이 실패했는데 종료코드 0 | Isaac 의 `fastShutdown` 이 `SystemExit` 을 삼킨다 | 이미 `os._exit(code)` 로 강제해 뒀다. 산출물 개수를 함께 확인할 것 |
 | FoundationPose OOM (1920×1200) | crop 을 원본 크기로 되돌리며 warp 한다 | **`pose_fp --input-scale 0.5` 필수** |
@@ -349,6 +389,47 @@ envs/pose/bin/python tools/run_group_a.py --in runs/real01_near --out runs/real0
 | `stat -c%s` 가 이상한 값 | 심링크 자체 크기 | `stat -Lc%s` |
 | **Jetson 에서 `UnicodeDecodeError: 'ascii' codec can't decode byte 0xeb`** | `LANG` 이 없어 파이썬 기본 인코딩이 ASCII 다. **이 저장소는 문자열이 전부 한국어**라 구조적으로 노출된다 | `export LANG=C.UTF-8` (또는 `PYTHONUTF8=1`). 코드 쪽은 `encoding="utf-8"` 명시 + stdout 재설정으로 막아 뒀다 → 횡단 정리 #77 |
 | 새 머신에서 `assets/cad` 가 `<dst>/cad` 로 들어갔다 | `rsync` 에 `-R` 을 빼먹었다 | §0.1 의 명령을 그대로 쓴다 |
+
+### 9.1 Blender 401 — **넘어가는 게 정답이다**
+
+사내망에서 `bootstrap.sh seg_sam6d` 가 이렇게 죽는 것처럼 보인다:
+
+```
+Downloading blender from https://download.blender.org/release/Blender4.2/blender-4.2.1-linux-x64.tar.xz
+urllib.error.HTTPError: HTTP Error 401: authenticationrequired
+```
+
+🔴 **401 은 blender.org 가 아니라 프록시가 낸 것**이다. 그 서버는 인증을 요구하지 않는다 — 사외 PC 에서는 안 나고 사내에서만 난다.
+
+**Blender 가 필요한 경우는 «새 CAD 로 ISM 템플릿을 다시 렌더할 때» 하나뿐이다.** ISM **추론**은
+`blenderproc` 을 import 하지 않는다. 필요한 건 렌더 «결과물»인 `assets/obj/<id>/ism_full/` (42장, 69MB)이고
+그건 **②a 자산 릴리스에 들어 있다**(§0.1c). 즉 릴리스를 푼 머신은 Blender 없이 전 파이프라인이 돈다.
+
+`bootstrap.sh` 는 이 실패를 `|| { … }` 로 삼키게 돼 있다(`envs/bootstrap.sh` 의 Blender 프리페치 블록).
+traceback 바로 다음 줄에 이게 찍혔으면 **그 런은 정상 완료된 것**이고 뒤의 `stereo_onnx`·`cad` venv 도 다 만들어졌다:
+
+```
+⚠️ Blender 다운로드 실패 — **넘어간다**. ISM 추론에는 필요 없다.
+```
+
+소음과 1GB 헛시도까지 없애려면:
+
+```bash
+SKIP_BLENDER=1 bash envs/bootstrap.sh
+bash envs/verify.sh          # 5단계 스모크 — Blender 항목은 애초에 없다
+```
+
+**정말 필요해지면 손으로 넣는다** — `envs/blender/blender-4.2.1-linux-x64/` 가 있으면 다운로드를 건너뛴다:
+
+```bash
+mkdir -p envs/blender
+tar -xJf blender-4.2.1-linux-x64.tar.xz -C envs/blender
+ls envs/blender/blender-4.2.1-linux-x64/blender    # 이게 보이면 끝
+```
+
+⚠️ **버전은 4.2.1 이어야 한다** — `blenderproc==2.8.0` 이 그 경로명을 기대한다.
+⚠️ 첫 실행 때 blenderproc 이 번들 python 에 패키지를 더 깔아 **1.0G → 2.0G** 로 불어난다(PyPI 라 대개 열려 있다).
+그것도 막히면 **다 만들어진 `envs/blender/` 를 통째로 rsync** 하는 게 제일 빠르다.
 
 ---
 
