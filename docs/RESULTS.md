@@ -5665,16 +5665,25 @@ exemplar 경로에서 **분할의 성패는 참조가 거의 다 정하는데**(
   **경계가 사라져** 참조 자체가 실패한다.
 
 **만든 자산** (전부 §19 규칙 = 후보 16 → 마스크 면적 중앙값 **상위 5장**, GT 불필요).
-🔴 **거리대를 열어 두고 5대역을 다 만들었다** (2026-08-14) — 실물에서 **0.5m 가 sim 최적점
-(0.22~0.30m)보다 좋았기 때문**이다. sim 최적점이 실물로 전이되지 않았으므로 거리를 고정하지 않는다.
+🔴 **거리대를 열어 두고 6대역을 다 만들었다** (2026-08-14, `n30` 추가 2026-08-17) — 실물에서
+**0.5m 가 sim 최적점(0.22~0.30m)보다 좋았기 때문**이다. sim 최적점이 실물로 전이되지 않았으므로
+거리를 고정하지 않는다.
 
 | 거리대 | 범위 | 세트 |
 |---|---|---|
 | `n25` | 0.22~0.30m | `_black` `_orange` `_clear` `_mixed` |
+| **`n30`** | **0.28~0.35m** | 〃 |
 | **`n40`** | **0.35~0.45m** | 〃 |
 | **`n50`** | **0.45~0.55m** ← 실물 양호 구간 | 〃 |
 | **`n60`** | **0.55~0.65m** | 〃 |
 | **`n70`** | **0.65~0.75m** | 〃 |
+
+⚠️ **구 `sam3_refs_flange_n30`(접미사 없음)과 헷갈리지 말 것** — 그건 외관 축이 생기기 전에
+**몸체를 randomize 해서** 만든 **후보** 세트(n=3, §19 선정 없음)다. 남겨는 뒀지만 거리 스윕에는
+`n30_black` 등 **새 세트**를 쓴다. 안 그러면 30cm 만 다른 조건에서 만든 참조로 재게 되어
+**«거리 탓인가 참조 탓인가» 를 못 가른다.**
+✅ 통제 확인: `n30` 참조 박스 면적 중앙 0.0592 vs `n40` 0.0365 = **1.64배**, 거리비 제곱
+(0.40/0.30)²=1.78 과 같은 자릿수다. 거리 중앙도 0.296~0.320m 로 밴드 안에 든다.
 
 각 대역마다 `_black`/`_orange`/`_clear` 는 **5장**(후보 16 → 상위 5), `_mixed` 는 **6장**
 (외관별 상위 2장, `cad.mix_sam3_refs`). seed 를 101/202 로 고정해 **거리대·외관이 달라도
@@ -5703,7 +5712,7 @@ cd vision && source envs/env.sh
 OBJ=assets/obj/foup_300_semi_r2
 CAM="--width 1920 --height 1200 --fx 727.5751343 --fy 727.5751343 \
      --cx 960.99988 --cy 604.824219 --baseline-mm 120.201996"     # ← cx/cy 는 코너 원점(+0.5)
-# 거리대: n25 0.22~0.30 · n40 0.35~0.45 · n50 0.45~0.55 · n60 0.55~0.65 · n70 0.65~0.75
+# 거리대: n25 0.22~0.30 · n30 0.28~0.35 · n40 0.35~0.45 · n50 0.45~0.55 · n60 0.55~0.65 · n70 0.65~0.75
 LO=0.45; HI=0.55; CM=50                                            # ← 예: n50
 SCENE="--distance-m $LO $HI --elevation-deg 35 70 --flange-color 0.03 0.03 0.03 \
        --ground-material --hdri assets/env/hdri --dome-intensity 110 210 --light-fixtures-active 1 2"
@@ -5727,14 +5736,41 @@ for app in black orange clear; do
       --refs $OBJ/sam3_refs_flange_n${CM}_${app}_cand --probe runs/zx_refsel_n${CM}_${app} --obj $OBJ --k 5 \
       --out-name sam3_refs_flange_n${CM}_${app}
 done
-# ⑤ 혼합 세트 (외관별 상위 2장, 난이도 순 black 먼저) — 계산 0, 파일 복사뿐이다
+  # ⑤ 🔴 출처 메타 — **선정 세트와 후보 세트 «둘 다»** 에 붙인다. 빠뜨리기 쉬운 단계다(아래 ⚠️)
+  for s in "" "_cand"; do
+    envs/pose/bin/python - "$OBJ/sam3_refs_flange_n${CM}_${app}${s}/refs.json" "$app" "$CM" "$LO" "$HI" <<'PY'
+import json, sys
+p, app, cm, lo, hi = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4]), float(sys.argv[5])
+d = json.load(open(p, encoding="utf-8"))
+# 외관 dict 는 하드코딩하지 않고 **이미 있는 세트에서 복사**한다 (값이 갈라지지 않게)
+donor = "assets/obj/foup_300_semi_r2/sam3_refs_flange_n40_%s/refs.json" % app
+d["body_appearance"] = json.load(open(donor, encoding="utf-8"))["body_appearance"]
+d["band"], d["distance_band_m"] = "n%s" % cm, [lo, hi]
+d["capture_args"] = ("--body-appearance %s --distance-m %s %s --elevation-deg 35 70 "
+    "--flange-color 0.03 0.03 0.03 --ground-material --hdri assets/env/hdri "
+    "--dome-intensity 110 210 --light-fixtures-active 1 2") % (app, lo, hi)
+d["regen"] = "RESULTS.md §35-2f 「재현」"
+open(p, "w", encoding="utf-8").write(json.dumps(d, ensure_ascii=False, indent=2) + "\n")
+PY
+  done
+done
+# ⑥ 혼합 세트 (외관별 상위 2장, 난이도 순 black 먼저) — 계산 0, 파일 복사뿐이다
 envs/seg_sam3/bin/python -m spatial_vision.cad.mix_sam3_refs --obj $OBJ --band n${CM} --per-set 2
-# ⑥ 육안 확인 시트
+# ⑦ 육안 확인 시트
 envs/pose/bin/python -m spatial_vision.viz.ref_sheet \
     --refs $OBJ/sam3_refs_flange_n${CM}_black --n-refs 3 --cols 5 --out /tmp/refs_black.png
 ```
 
 ⚠️ **자산(`mesh.usda`)이 바뀌면 이 셋을 전부 다시 만들어야 한다**(교훈 #40).
+
+🔴 **⑤는 초판 재현 절차에 없었다** (2026-08-17 에 `n30` 을 만들다 드러났다). `build_sam3_refs` 도
+`select_sam3_refs` 도 **거리·외관을 기록하지 않는다** — n40~n70 의 메타는 손으로 붙인 것이었고,
+절차만 따라 만든 `n30` 은 `band`/`body_appearance`/`capture_args`/`regen` 없이 나왔다.
+**자산 tarball 은 git 밖이라 이 메타가 없으면 «어떤 조건에서 만든 참조인가» 를 되살릴 수 없다.**
+→ 횡단 정리: **재현 절차에서 «산출물을 만드는 단계» 와 «산출물을 설명하는 단계» 를 같이 적는다.**
+검증은 키 집합 대조로 한다 — `n30_*` 과 `n40_*` 의 `refs.json` 최상위 키가 같아야 한다.
+⚠️ `_mixed` 는 예외다: `mix_sam3_refs` 가 메타를 스스로 쓰지만 `distance_band_m` 은 `null` 로 남는다
+(원본 세트에서 읽는데 ⑤보다 먼저 도는 순서다). **n25~n70 전부 그러니 그대로 두는 게 일관된다.**
 
 ## 35-3. 한계
 
@@ -5742,7 +5778,8 @@ envs/pose/bin/python -m spatial_vision.viz.ref_sheet \
 - ⚠️ `lr_consistency` 는 `--outer-only` 만 지원한다(`--keep-hole-mm` 등은 정합기 내부 전용).
   **모든 변형을 같은 잣대로 채점**하는 게 목적이라 의도된 제약이다.
 - ⚠️ 러너는 **A5(거리 스윕)를 자동화하지 않는다** — 거리마다 참조 세트가 달라 `--preset` 을 바꿔
-  따로 돌려야 한다(`n20`/`n25`/`n30`). 거리와 참조가 어긋나면 IoU 가 조용히 무너진다(§34-6).
+  따로 돌려야 한다(`n25`~`n70` × 외관). 거리와 참조가 어긋나면 IoU 가 조용히 무너진다(§34-6).
+  ✅ 존재 여부는 `tools/run_group_a.py --list-presets` 로 확인한다(현재 **27종**).
 - ⚠️ **B그룹(원거리)은 아직 러너가 없다.** 분할 백엔드 3종 비교라 구조가 달라 별도다.
 
 ## 재현 (§35)

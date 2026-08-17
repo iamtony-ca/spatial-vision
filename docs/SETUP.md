@@ -13,8 +13,8 @@
 
 ```
 ①  git clone           16MB   코드 · 원본 STEP · 카메라 프로파일 · 자산 씨앗 JSON
-②a GitHub Release     432MB   우리가 만든 무거운 자산 (ply·usda·ism_full·sam3_refs)
-                              현행 태그 **`assets-r3`** (2026-08-14, SAM3 참조 20종 편입)
+②a GitHub Release     501MB   우리가 만든 무거운 자산 (ply·usda·ism_full·sam3_refs)
+                              현행 태그 **`assets-r4`** (2026-08-17, SAM3 참조 24종 = 거리 6대역 × 외관 4)
 ②b 수동 이관          가변    실물 캡처 runs/real*  ← 사용자가 직접 옮긴다 (2026-08-12)
 ③  자동 다운로드       3.9G    NGC ONNX · SAM vit_h · DINOv2   ← 스크립트가 받는다
 ④  수동(게이트)        6.6G    FoundationStereo · FoundationPose · SAM 3
@@ -46,8 +46,8 @@
 | — | | | |
 | `assets/obj/foup_300_semi_r2/{*.ply, mesh.usda, views.png}` | 27M | **②a Release** | STEP 에서 재생성 가능(§10) |
 | `assets/obj/foup_300_semi_r2/ism_full/` | 69M | **②a Release** | blenderproc 42장 렌더 |
-| `assets/obj/foup_300_semi_r2/sam3_refs_*/` | 111M | **②a Release** | 선정 세트 20종(거리 5대역 × 몸체 3종 +혼합). 🔴 **재생성에 Isaac Sim 캡처가 필요**하다 |
-| `assets/obj/foup_300_semi_r2/sam3_refs_*_cand/` | 231M | **②a Release** | 후보 풀. **§19 선정 기준을 바꿔 다시 고를 때만** 쓴다 — 급하면 안 풀어도 된다 |
+| `assets/obj/foup_300_semi_r2/sam3_refs_*/` | 148M | **②a Release** | 선정 세트 24종(거리 6대역 × 몸체 3종 +혼합). 🔴 **재생성에 Isaac Sim 캡처가 필요**하다 |
+| `assets/obj/foup_300_semi_r2/sam3_refs_*_cand/` | 339M | **②a Release** | 후보 풀. **§19 선정 기준을 바꿔 다시 고를 때만** 쓴다 — 급하면 안 풀어도 된다 |
 | `runs/real*/` (실물 캡처) | 촬영량 | **②b 수동** | 🔴 **다시 못 찍는다** — 그 자세, 그 조명. `runs/` 는 `.gitignore` 에 있으니 **git 밖에서 백업**할 것 |
 | — | | | |
 | `weights/ngc_foundationstereo/…_s_dynamic_v2.0.onnx` | 331M | **③ 자동** | `bootstrap.sh`·`fetch_weights.sh` 가 NGC 공개 URL 에서 받는다 |
@@ -95,7 +95,7 @@ rsync -avPR weights/models/foundationstereo/23-51-11 weights/models/foundationpo
 ```bash
 bash envs/pack_assets.sh --list            # 담을 목록만 확인
 bash envs/pack_assets.sh                   # → dist/foup_300_semi_r2_assets.tar.gz (+ .sha256)
-gh release create assets-r3 dist/*.tar.gz dist/*.sha256 --title "자산 r3"
+gh release create assets-r4 dist/*.tar.gz dist/*.sha256 --title "자산 r4"
 ```
 
 🔴 **`gh` 가 없는 머신이 흔하다**(이 워크스테이션도 없다). REST API 로 하면 설치가 필요 없다 —
@@ -107,9 +107,9 @@ REPO=iamtony-ca/spatial-vision
 curl -sS -o /dev/null -w "auth HTTP %{http_code}\n" \
     -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/user      # 200 이어야 한다
 
-git tag -a assets-r3 -m "자산 r3" && git push origin assets-r3
-python3 -c 'import json; json.dump({"tag_name":"assets-r3","name":"자산 r3",
-    "body":open("dist/RELEASE_NOTES_assets-r3.md").read()},
+git tag -a assets-r4 -m "자산 r4" && git push origin assets-r4
+python3 -c 'import json; json.dump({"tag_name":"assets-r4","name":"자산 r4",
+    "body":open("dist/RELEASE_NOTES_assets-r4.md").read()},
     open("/tmp/payload.json","w"), ensure_ascii=False)'
 curl -sS -X POST "https://api.github.com/repos/$REPO/releases" \
     -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
@@ -131,19 +131,19 @@ unset GH_TOKEN
 **새 머신에서:**
 
 ```bash
-gh release download assets-r3 --dir dist     # gh 없으면 아래 curl
-#   curl -sSL -O https://github.com/$REPO/releases/download/assets-r3/foup_300_semi_r2_assets.tar.gz
-#   curl -sSL -O https://github.com/$REPO/releases/download/assets-r3/foup_300_semi_r2_assets.tar.gz.sha256
+gh release download assets-r4 --dir dist     # gh 없으면 아래 curl
+#   curl -sSL -O https://github.com/$REPO/releases/download/assets-r4/foup_300_semi_r2_assets.tar.gz
+#   curl -sSL -O https://github.com/$REPO/releases/download/assets-r4/foup_300_semi_r2_assets.tar.gz.sha256
 bash envs/pack_assets.sh --check dist/foup_300_semi_r2_assets.tar.gz    # sha256
 tar -C assets/obj -xzf dist/foup_300_semi_r2_assets.tar.gz
-envs/pose/bin/python tools/run_group_a.py --list-presets                # 23종 ✅ 확인
+envs/pose/bin/python tools/run_group_a.py --list-presets                # 27종 ✅ 확인
 ```
 
-실측: 513M → **432M**(`assets-r3`, sha256 `a0f21cb0…`). 대부분이 SAM3 참조(선정 111M + 후보 231M)다.
+실측: 582M → **501M**(`assets-r4`, sha256 `b18d9ab1…`). 대부분이 SAM3 참조(선정 148M + 후보 339M)다.
 🔴 **업로드는 끝나도 잘렸을 수 있다** — 올린 뒤 **다시 받아서 sha256 을 대조**한다. GitHub 은
 잘린 파일도 `state: uploaded` 로 보고한다.
 ⚠️ `dist/` 는 `.gitignore` 에 있다 — **커밋하는 게 아니라 릴리스로 올린다.**
-⚠️ 자산을 재생성하면 **새 태그**를 만든다(`assets-r4`). 같은 태그에 덮어쓰면 이미 받아 간 쪽의
+⚠️ 자산을 재생성하면 **새 태그**를 만든다(다음은 `assets-r5`). 같은 태그에 덮어쓰면 이미 받아 간 쪽의
 `--check` 가 조용히 깨진다. 옛 태그를 지우면 용량이 실제로 회수된다.
 
 ### 0.2 컨테이너 — 트리는 **호스트**에 두고 bind-mount 한다
