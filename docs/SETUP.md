@@ -386,6 +386,8 @@ envs/pose/bin/python tools/run_group_a.py --in runs/real01_near --out runs/real0
 | FoundationPose OOM (1920×1200) | crop 을 원본 크기로 되돌리며 warp 한다 | **`pose_fp --input-scale 0.5` 필수** |
 | ONNX stereo 가 1280×720 이상에서 OOM | Softmax 단일 버퍼 10.2GB | `--scale` 로 줄인다(1920×1200 은 0.5) |
 | 스테이지 1회 실행에 40초 | **콜드 스타트** — ONNX 세션 31.5s + FP 7.1s | 배포에서는 **상주 서버 + IPC** 가 필요하다(`RESULTS.md §34-12b`) |
+| **스테레오가 미칠 듯이 느리다 / `Failed to load library libonnxruntime_providers_cuda.so … libcublasLt.so.12`** | `source envs/env.sh` 를 안 했다 → `LD_LIBRARY_PATH` 에 `envs/cuda/lib64` 가 없어 ONNX 가 **조용히 CPU 로 폴백**한다(결과는 맞고 속도만 죽는다) | `source envs/env.sh` 먼저. `run_group_a.py` 는 이제 **종료코드 2 로 차단**한다(의도적이면 `--allow-cpu`) → 횡단 정리 #80 |
+| **`seg_ism` 이 중간 프레임에서 `RuntimeError: Input and output sizes should be greater than 0, but got input (H: 0, W: 30)`** | SAM 이 **높이 0 인 제안**을 내면 ISM 의 `CropResizePad` 가 빈 텐서를 `F.interpolate` 에 넣는다. **한 프레임 때문에 스테이지 전체가 종료**된다 | 고쳐 뒀다(`segment_sam6d.py` 가 퇴화 제안을 거르고 제외 개수를 로그로 찍는다). 옛 체크아웃이면 그 커밋을 받는다 → 횡단 정리 #81 |
 | `stat -c%s` 가 이상한 값 | 심링크 자체 크기 | `stat -Lc%s` |
 | **Jetson 에서 `UnicodeDecodeError: 'ascii' codec can't decode byte 0xeb`** | `LANG` 이 없어 파이썬 기본 인코딩이 ASCII 다. **이 저장소는 문자열이 전부 한국어**라 구조적으로 노출된다 | `export LANG=C.UTF-8` (또는 `PYTHONUTF8=1`). 코드 쪽은 `encoding="utf-8"` 명시 + stdout 재설정으로 막아 뒀다 → 횡단 정리 #77 |
 | 새 머신에서 `assets/cad` 가 `<dst>/cad` 로 들어갔다 | `rsync` 에 `-R` 을 빼먹었다 | §0.1 의 명령을 그대로 쓴다 |

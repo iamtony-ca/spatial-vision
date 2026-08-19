@@ -28,6 +28,23 @@
 
     ov        overlay_sheet.png + overlay/overlay_frame_*.png   ← 육안 판정
 
+★ `--ism` — ISM 경로(I그룹, SAM-6D ISM)를 함께 돌린다. **추가 촬영 0, 플래그 하나.**
+
+    seg_ism   segment_sam6d --target full --select score   ← CAD 템플릿. SAM3 비의존
+    fp_ism    pose_fp --primary full --no-stage2 --masks seg_ism
+    I1        refine_contour --outer-only                  ← A1 과 정합 조건 동일
+    I3        정합 off (= fp_ism/pose_coarse.json)         ← I1 의 이득 분모
+
+    🔴 목적은 «어느 쪽이 정확한가» 가 아니라 **«도메인 갭이 어디에 오는가»** 다.
+       SAM3 참조는 **sim 렌더**라 실사진과 갭이 있고, ISM 템플릿은 **CAD 형상**이라 그 축이 없다.
+       그래서 두 경로가 «독립» 이어야 뜻이 있다 — `--select score` 를 쓰고 진단용 `seg_full` 처럼
+       SAM3 마스크를 exemplar 로 받지 않는다.
+    ⚠️ **I1 은 `--primary full` 이다** — ISM 은 `full` 만 쓸 수 있다(flange 전용 ISM 템플릿은
+       오선택 23/40 으로 금지). 즉 A1↔I1 은 **분할뿐 아니라 pose 메쉬도 다르다.**
+       차이를 «분할 백엔드» 하나로 돌리면 안 된다 — 리포트도 방향만 말한다.
+    ⚠️ ISM 템플릿(`ism_full/`)은 CAD 렌더라 **거리 무관**이다. SAM3 참조와 정반대로
+       거리대마다 다시 만들 필요가 없다.
+
 🔴 실환경에는 GT 가 없다 — 리포트는 **GT-free 지표만** 낸다
     ① **게이트 후퇴율**  — 폭주 여부. 홀 전략 셋을 비교하면 *"CAD 홀이 실물과 맞는가"* 가 나온다(§28-5)
     ② **좌우 투영 일관성** — 왼쪽만 보고 정합한 pose 를 오른쪽에 투영해 채점. A3 판정의 유일한 근거
@@ -48,6 +65,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -161,6 +179,32 @@ def build_steps(a) -> list[Step]:
              s2, "meta_pose.json"),
     ]
 
+    # ── ISM 경로 (I그룹) — CAD 템플릿 단독, SAM3 비의존 ────────────────────────────────────────
+    # 🔴 A그룹과 **한 군데도 공유하지 않는다**(stereo depth 만 공유). 분할도 pose 도 따로 간다.
+    #    그래야 «SAM3 참조의 도메인 갭» 이 결과 차이로 드러난다.
+    if a.ism:
+        seg_i, ism_fp = o / "seg_ism", o / "fp_ism"
+        steps += [
+            # ⚠️ `--select score` 다 — 진단용 `seg_full` 은 SAM3 마스크를 exemplar 로 받지만
+            #    여기서 그러면 SAM3 에 의존하게 돼 비교가 성립하지 않는다.
+            #    ⚠️ `--select center` 는 쓰지 않는다(교훈 #15: 파편·배경을 집는다).
+            Step("seg_ism", "segment full (ISM · CAD 템플릿, SAM3 비의존)",
+                 [PY["sam6d"], "-m", "spatial_vision.stages.segment_sam6d",
+                  "--in", a.in_dir, "--out", seg_i, "--target", "full",
+                  "--templates", obj / "ism_full", "--cad", obj / "full.ply",
+                  "--depth", "stereo", "--depth-dir", st, "--select", "score"],
+                 seg_i, "meta_segment_full.json"),
+            # 🔴 `--primary full` 이다 — ISM 은 `full` 만 쓸 수 있다. **flange 전용 ISM 템플릿은
+            #    금지**다(오선택 23/40): flange 만 떼면 CAD 형상의 변별력이 사라진다.
+            Step("fp_ism", "FoundationPose (ISM 마스크 · --primary full)",
+                 [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
+                  "--in", a.in_dir, "--out", ism_fp, "--no-stage2",
+                  "--obj", obj, "--masks", seg_i, "--depth", "stereo", "--depth-dir", st,
+                  "--primary", "full", "--flange-mask-from", "pose",
+                  "--input-scale", a.input_scale],
+                 ism_fp, "meta_pose.json"),
+        ]
+
     # (id, 설명, 초기 pose 디렉토리, 초기 pose 파일명, 추가 플래그)
     arms = [
         ("A1", "홀 제외  --outer-only            ← 배포본 [A]/P9", ns2, "pose_coarse.json",
@@ -171,6 +215,11 @@ def build_steps(a) -> list[Step]:
          ["--outer-only", "--keep-hole-mm", "25", "--hole-center-mm", "25"]),
         ("A4", "refine on 초기값 (§32 판정)", s2, "pose_refined.json", ["--outer-only"]),
     ]
+    # I1 = ISM 초기값 + 같은 정합·같은 게이트. **A1 과 정합 조건이 동일**해야 앞단(분할·pose)의
+    # 차이만 남는다 — 그래서 `--outer-only` 를 똑같이 준다.
+    if a.ism:
+        arms.append(("I1", "ISM 초기값 + 정합       ← A1 의 CAD-only 대조군",
+                     o / "fp_ism", "pose_coarse.json", ["--outer-only"]))
     for sid, desc, pdir, pname, extra in arms:
         d = Path(a.out) / sid
         steps.append(Step(sid, desc,
@@ -180,8 +229,12 @@ def build_steps(a) -> list[Step]:
                           d, "meta_contour.json"))
 
     # 좌우 투영 일관성 — 전부 **같은 잣대**(외곽 실루엣)로 채점한다
-    lr = [("A3", ns2, "pose_coarse.json")] + [(sid, Path(a.out) / sid, "pose_refined.json")
-                                              for sid, *_ in arms]
+    # ⚠️ 정합 «전» 도 채점한다 — 이득 배수(정합 후/전)를 내려면 분모가 있어야 한다.
+    #    A3 = SAM3 경로의 정합 전, I3 = ISM 경로의 정합 전. **경로마다 자기 분모를 쓴다.**
+    lr = [("A3", ns2, "pose_coarse.json")]
+    if a.ism:
+        lr.append(("I3", o / "fp_ism", "pose_coarse.json"))
+    lr += [(sid, Path(a.out) / sid, "pose_refined.json") for sid, *_ in arms]
     for sid, pdir, pname in lr:
         steps.append(Step(f"lr_{sid}", f"좌우 투영 일관성 · {sid}",
                           [PY["pose"], "-m", "spatial_vision.eval.lr_consistency",
@@ -310,7 +363,7 @@ def read_variant(root: Path, sid: str) -> dict:
     return out
 
 
-def verdicts(v: dict[str, dict], diag: dict) -> list[str]:
+def verdicts(v: dict[str, dict], diag: dict, ism: bool = False) -> list[str]:
     """측정값 → **처방**. 규칙은 전부 문서에 근거가 있고 GT 를 쓰지 않는다."""
     out = []
     med = diag.get("median", {})
@@ -330,7 +383,7 @@ def verdicts(v: dict[str, dict], diag: dict) -> list[str]:
                    "«배포 조건에서» 만들어야 하고(원거리 참조로 근접 질의 시 IoU 0.044 전례), "
                    "**실사진은 마지막 남은 도메인 갭 축**이다.")
         out.append("  ③ **대안은 ISM 이다** — CAD 렌더 템플릿을 쓰므로 사진 참조가 필요 없고, "
-                   "randomization 하에서도 유지된 전례가 있다. B1 대조군이 원래 이 비교다.")
+                   "randomization 하에서도 유지된 전례가 있다. **`--ism` 을 붙이면 I1 이 바로 그 비교다.**")
         return out
 
     d = med.get("flange_dia_px")
@@ -404,6 +457,44 @@ def verdicts(v: dict[str, dict], diag: dict) -> list[str]:
             out.append(f"⚠️ **A3 판정 보류** — 좌우 |Δdx| {a3:.2f} → {a1:.2f}px 로 구분이 안 된다. "
                        f"프레임 수를 늘리거나(≥20) 융기 유무를 직접 확인할 것.")
 
+    # ── ISM 경로 판정 — «어느 쪽이 정확한가» 가 아니라 «도메인 갭이 어디에 오는가» ──────────
+    # ⚠️ `read_variant` 는 **부분 dict** 를 돌려준다(스테이지가 일부만 돌았을 때).
+    #    `is not None` 으로는 부족하고 **쓰려는 키의 존재**를 봐야 한다 — lr 은 optional 이 아니지만
+    #    실물에서 한 스테이지가 죽으면 리포트가 통째로 KeyError 로 날아간다.
+    i1, i3 = v.get("I1") or {}, v.get("I3") or {}
+    if i1.get("lr_ddx") is not None and a1 is not None:
+        gb, ga = i1.get("gated_pct"), v.get("A1", {}).get("gated_pct")
+        out.append(f"── **ISM 경로 (SAM-6D ISM · CAD 템플릿 단독)** — 후퇴율 A1 {ga}% vs I1 {gb}%, "
+                   f"좌우 |Δdx| A1 {a1:.2f}px vs I1 {i1['lr_ddx']:.2f}px")
+        # 🔴 두 경로는 **분할도 pose 메쉬도 다르다**(SAM3 flange vs ISM full) —
+        #    차이를 «분할 백엔드» 하나로 돌리면 안 된다. 그래서 판정을 **방향으로만** 낸다.
+        if i1["lr_ddx"] < a1 * 0.8:
+            # 🔴 **원인을 단정하지 않는다.** 두 경로는 분할·pose 메쉬가 «둘 다» 다르므로
+            #    I1 이 낫다는 것만으로 도메인 갭을 결론지을 수 없다 — sim 데이터(갭 0)에서도
+            #    이 부등식이 성립하는 것을 확인했다(§35-2g 스모크). 후보를 나열하고 **가르는
+            #    방법**까지 준다. 그러지 않으면 «그럴듯한 오진» 을 리포트가 만들어 낸다.
+            out.append("  ⚠️ **ISM 경로가 낫다** — 원인 후보가 셋이고 이 지표만으로는 못 가른다: "
+                       "①SAM3 참조의 도메인 갭(참조가 sim 렌더다) "
+                       "②pose 메쉬 차이(I1 은 `--primary full`, A1 은 `flange`) "
+                       "③거리·조건이 A1 에 불리(등가지름·후퇴율을 위 표에서 확인). "
+                       "→ 가르는 법: **`seg/mask_flange.png` 를 눈으로 본다**(갭이면 마스크부터 어긋난다) · "
+                       "실사진 참조를 만들어 A1 을 다시 돌린다(박스만 그리면 된다) · "
+                       "등가지름이 목표에서 멀면 거리부터 맞춘다.")
+        elif i1["lr_ddx"] > a1 * 1.25:
+            out.append("  ✅ **SAM3 경로가 낫다** — sim 참조가 실물에 전이됐다는 «방향» 이다. "
+                       "배포본 [A] 를 그대로 간다. ⚠️ 이것도 pose 메쉬 차이가 섞인 값이므로 "
+                       "«참조에 갭이 없다» 의 증명은 아니다.")
+        else:
+            out.append("  ⚠️ **구분이 안 된다** — 두 경로가 같은 수준이면 «갭이 없다» 가 아니라 "
+                       "«이 표본으로는 못 가른다» 다. 프레임을 늘리거나 두 오버레이를 겹쳐 볼 것.")
+    if i3.get("lr_ddx") and i1.get("lr_ddx"):
+        out.append(f"  · ISM 경로 정합 이득 {i3['lr_ddx']:.2f} → {i1['lr_ddx']:.2f}px "
+                   f"({i3['lr_ddx']/max(i1['lr_ddx'],1e-6):.2f}배) — A3 이득과 나란히 볼 것.")
+    if ism and not i1.get("lr_ddx"):
+        out.append("🔴 **ISM 경로 결과가 비어 있다** — `seg_ism`/`fp_ism` 이 실패했을 수 있다. "
+                   "ISM 은 검출 0 이어도 조용히 끝나므로 `seg_ism/frame_0000/mask_full.png` 를 "
+                   "**눈으로** 확인할 것.")
+
     if diag.get("n_frames", 0) < 20:
         out.append(f"⚠️ **표본 {diag.get('n_frames')}장** — 꼬리로 우열을 가리기엔 부족하다"
                    f"(교훈 #58: n=40 무결점이 n=120 에서 110/120 이었다). "
@@ -415,11 +506,14 @@ def report(a) -> int:
     root = Path(a.out)
     in_dir = Path(a.in_dir)
     diag = capture_diag(in_dir, root / "st", root / "seg", root / "fp_ns2")
-    ids = ["A1", "A2a", "A2b", "A4"]
+    ids = ["A1", "A2a", "A2b", "A4"] + (["I1"] if a.ism else [])
     v = {sid: read_variant(root, sid) for sid in ids}
     v["A3"] = read_variant(root, "A3")                       # 정합 없음 — lr 만 있다
+    if a.ism:
+        v["I3"] = read_variant(root, "I3")                   # ISM 경로의 정합 전 (I1 의 분모)
     labels = {"A1": "A1 홀 제외 (배포본)", "A2a": "A2a 홀 윤곽 (규격부)",
-              "A2b": "A2b 홀 중심", "A3": "A3 정합 off (FP 단독)", "A4": "A4 refine 초기값"}
+              "A2b": "A2b 홀 중심", "A3": "A3 정합 off (FP 단독)", "A4": "A4 refine 초기값",
+              "I1": "I1 ISM 초기값 + 정합 (CAD only)", "I3": "I3 ISM 정합 off"}
 
     L = []
     L.append(f"# A그룹 결과 — `{in_dir}`\n")
@@ -447,7 +541,8 @@ def report(a) -> int:
     L.append("## 변형 비교 (GT-free)\n")
     L.append("| 변형 | 게이트 후퇴 | 대응점 | rms px | 이동 ° 중앙/최대 | 좌우 \\|Δdx\\| px | 좌우 dz mm |")
     L.append("|---|---|---|---|---|---|---|")
-    for sid in ["A3", "A1", "A2a", "A2b", "A4"]:
+    # ⚠️ ISM 경로도 **같은 표**에 넣는다 — 따로 내면 나란히 비교가 안 된다.
+    for sid in ["A3", "A1", "A2a", "A2b", "A4"] + (["I3", "I1"] if a.ism else []):
         r = v.get(sid, {})
         gp = f"{r['gated']}/{r['n']} ({r['gated_pct']}%)" if "gated" in r else "—"
         mv = f"{r['moved_deg_med']:.2f} / {r['moved_deg_max']:.2f}" if "moved_deg_med" in r else "—"
@@ -463,7 +558,7 @@ def report(a) -> int:
              "0 이 아닌 게 정상이다.\n")
 
     L.append("## 판정\n")
-    for s in verdicts(v, diag):
+    for s in verdicts(v, diag, ism=a.ism):
         L.append(f"- {s}")
     L.append("")
 
@@ -523,6 +618,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--refs-mode", default="chain", choices=["chain", "independent"])
     ap.add_argument("--use-prompts-file", action="store_true",
                     help="객체의 sam3_prompts.json 을 쓴다. ⚠️ 기본값(끔)이 §34 sim 재현과 같다")
+    # ★ ISM 경로 — **CAD 템플릿만 쓰는 분할 백엔드**(SAM-6D ISM)로 같은 데이터를 한 번 더 푼다.
+    #   🔴 목적은 «어느 쪽이 정확한가» 가 아니라 **«도메인 갭이 어느 쪽에 오는가»** 다:
+    #   SAM3 참조는 **sim 렌더**라 실사진과 갭이 있고, ISM 템플릿은 **CAD 형상**이라 그 축이 없다.
+    #   그래서 두 경로는 «독립» 이어야 뜻이 있다 — `--select score`(ISM 자체 점수)를 쓰고
+    #   진단용 `seg_full` 처럼 SAM3 마스크를 exemplar 로 받지 않는다.
+    ap.add_argument("--ism", action="store_true",
+                    help="SAM-6D ISM 경로(ISM 경로)를 함께 돌린다 — CAD 템플릿 단독, SAM3 비의존")
     ap.add_argument("--stereo-scale", type=float, default=0.5)
     ap.add_argument("--input-scale", type=float, default=0.5, help="🔴 1.0 은 OOM (§34-12)")
     ap.add_argument("--gate-deg", type=float, default=1.5)
@@ -537,6 +639,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--force", action="store_true", help="산출물이 있어도 다시 돌린다")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--report-only", action="store_true")
+    ap.add_argument("--allow-cpu", action="store_true",
+                    help="env.sh 없이 CPU 폴백으로 돌리는 것을 허용 (수십 배 느리다)")
     a = ap.parse_args(argv)
 
     if a.list_presets:
@@ -581,6 +685,24 @@ def main(argv: list[str] | None = None) -> int:
         if missing:
             print(f"❌ {f.name}: {', '.join(missing)} 없음", file=sys.stderr)
             return 2
+
+    # 🔴 **`source envs/env.sh` 를 빼먹으면 조용히 CPU 로 떨어진다.**
+    #    ONNX Runtime 은 `libcublasLt.so.12`(= `$CUDA_HOME/lib64`)를 못 찾으면 CUDAExecutionProvider
+    #    생성에 실패하고 **경고만 찍은 뒤 CPUExecutionProvider 로 계속 간다.** 결과는 맞는데
+    #    스테레오가 수십 배 느려져서 «원래 이만큼 걸리나 보다» 로 넘어가게 된다 — 실제로 그랬다.
+    #    ⚠️ 진단이 아니라 **차단**이다: 느린 건 «틀린 것» 은 아니지만 20프레임 × 여러 거리대를
+    #    돌릴 때 하루가 날아간다. 정말 CPU 로 돌리려면 `--allow-cpu` 를 준다.
+    if not a.report_only:
+        cuda_lib = VISION / "envs/cuda/lib64/libcublasLt.so.12"
+        ld = os.environ.get("LD_LIBRARY_PATH", "")
+        if cuda_lib.exists() and str(VISION / "envs/cuda/lib64") not in ld:
+            msg = ("🔴 `LD_LIBRARY_PATH` 에 envs/cuda/lib64 가 없다 — ONNX 가 **조용히 CPU 로 폴백**한다.\n"
+                   "   먼저 실행할 것:  source envs/env.sh\n"
+                   "   (일부러 CPU 로 돌리려면 --allow-cpu)")
+            if not a.allow_cpu:
+                print(msg, file=sys.stderr)
+                return 2
+            print(msg.replace("🔴", "⚠️ (--allow-cpu)"), file=sys.stderr)
 
     if a.report_only:
         return report(a)

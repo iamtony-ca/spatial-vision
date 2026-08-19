@@ -162,6 +162,21 @@ def segment_frame(model, device, rgb_path: Path, depth_mm: np.ndarray, K: np.nda
     proposals = model.segmentor_model.generate_masks(np.array(rgb))
     detections = Detections(proposals)
     n_proposals = len(detections.masks)
+
+    # 🔴 폭·높이가 0 인 제안을 걸러낸다. ISM 의 `CropResizePad` 가 그 상자로 crop 한 뒤
+    #    `F.interpolate` 를 부르는데 빈 텐서에서 죽는다 —
+    #    `RuntimeError: Input and output sizes should be greater than 0, but got input (H: 0, W: 30)`.
+    #    상류(third_party) 는 손대지 않고 여기서 막는다. **한 프레임의 퇴화 제안 하나가
+    #    스테이지 전체를 죽이면 안 된다** (실제로 n30 캡처 frame_0001 에서 났다).
+    wh = detections.boxes[:, 2:] - detections.boxes[:, :2]
+    keep = ((wh[:, 0] >= 1) & (wh[:, 1] >= 1)).nonzero(as_tuple=True)[0]
+    if len(keep) < n_proposals:                     # 교훈 #21: 필터는 남은 개수를 반드시 로그로
+        print(f"    ⚠️ 퇴화 제안 {n_proposals - len(keep)}개 제외 (폭 또는 높이 0) "
+              f"→ {len(keep)}개", flush=True)
+    if len(keep) == 0:
+        return None, 0.0, None, n_proposals
+    detections.filter(keep)
+
     q_desc, q_appe = model.descriptor_model.forward(np.array(rgb), detections)
 
     idx_sel, pred_idx_obj, semantic_score, best_template = model.compute_semantic_score(q_desc)
