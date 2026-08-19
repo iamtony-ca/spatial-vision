@@ -42,6 +42,8 @@ from pathlib import Path
 
 import numpy as np
 
+from spatial_vision.contracts import rotation_angle_deg
+
 
 def load_pose(p: Path) -> np.ndarray | None:
     if not p.exists():
@@ -60,9 +62,11 @@ def pose_json(T: np.ndarray, stage: str, extra: dict | None = None) -> dict:
             "stage": stage, **(extra or {})}
 
 
+# 🔴 `arccos((tr−1)/2)` 는 항등 근처에서 오차를 **제곱근으로 증폭**한다 — 저장된 R 이
+#    정확히 직교가 아니라(9자리 반올림) **자기 자신과 비교해도 0.03° 가 나왔다**
+#    (실측 p90 0.028° · 최대 0.049°, 2026-08-19). 정본은 `contracts.rotation_angle_deg`.
 def ang_deg(R1: np.ndarray, R2: np.ndarray) -> float:
-    c = (np.trace(R1.T @ R2) - 1.0) / 2.0
-    return float(np.degrees(np.arccos(np.clip(c, -1.0, 1.0))))
+    return rotation_angle_deg(R1, R2)
 
 
 def chordal_mean(Rs: list[np.ndarray]) -> np.ndarray:

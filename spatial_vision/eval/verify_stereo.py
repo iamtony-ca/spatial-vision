@@ -23,6 +23,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from spatial_vision.contracts import rotation_angle_deg
+
 
 def load_frame(d: Path) -> dict:
     f = {
@@ -50,7 +52,8 @@ def check_rectification(f: dict, tol_deg=0.01, tol_mm=0.05) -> tuple[bool, str]:
     Tr = np.asarray(f["meta"]["T_cam_world_right"], float)
     T_rl = Tr @ np.linalg.inv(Tl)  # 좌 카메라 좌표 → 우 카메라 좌표
     R, t_mm = T_rl[:3, :3], T_rl[:3, 3] * 1000.0
-    ang = np.degrees(np.arccos(np.clip((np.trace(R) - 1) / 2, -1, 1)))
+    # 🔴 이 검사는 6자리까지 찍는다 — arccos 식은 그 자릿수에서 **잡음이 지배**한다(0.03° 급)
+    ang = rotation_angle_deg(R)
     B = f["cam"]["baseline_mm"]
     err = t_mm - np.array([-B, 0.0, 0.0])
     ok = ang <= tol_deg and np.abs(err).max() <= tol_mm

@@ -53,6 +53,18 @@
        사진 위에 투영해 눈으로 보는 것만이 그 축을 본다(교훈 #39·#46 이 그렇게 잡혔다).
     절대 오차(mm·도)는 실물에서 **잴 수 없다.** 리포트에 R/t 오차가 없는 것은 버그가 아니다.
 
+★ **거리 삼각 대조** (`RESULTS.md §35-2l`) — GT 가 없어도 **z 편향은 잡을 수 있다**
+    `FP 추정 z` ↔ `stereo depth(flange **평면적합**)` ↔ (선택) `--true-distance-mm 줄자값`.
+    앞의 둘만으로도 *"둘 중 하나가 틀렸다"* 는 갈리고, 줄자를 주면 **어느 쪽인지**까지 나온다.
+    🔴 depth 쪽은 **평면 적합**이어야 한다 — 마스크 안 depth 중앙값은 원근·융기 때문에 pose
+    원점 z 보다 구조적으로 ~7mm 작아 **거짓 경보를 낸다**(교훈 #84, 실제로 밟았다).
+    덤으로 나오는 **flange 평면 잔차 rms** 가 «depth 가 맞는가» 의 정량 지표다 —
+    `valid.png` 100% 는 범위 검사일 뿐이라 «뚫렸다» 를 뜻하지 않는다. sim 기준선 **0.37mm**.
+
+★ **실험 노트** — 실물은 한 번에 안 된다. 시행착오가 복구 가능해야 한다
+    `<out>/run_meta.json`   날짜·시각 · `--note` 메모 · 전체 인자 · 참조 출처 · **내용 해시**
+    `tools/compare_runs.py <런들…> --index runs/runs_index.md`  설정 diff 먼저 → 지표 나란히
+
 ⚠️ 프레임 레이아웃은 `<in>/frame_XXXX/` 여야 한다
     `tools/make_frame_from_zed.py --out runs/real01/frame_0000` 이 그렇게 만든다.
     단일 프레임 디렉토리를 바로 주면 `pose_fp --depth-dir` 의 경로 규약과 어긋나
@@ -64,6 +76,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -103,6 +116,28 @@ for _cm, _band in _BANDS.items():
         REFS_BY_PRESET[f"n{_cm}{_app}"] = (f"sam3_refs_flange_n{_cm}_{_app}", f"{_band} · {_d}")
 # §34-9 — 이 거리대에서 flange 등가지름이 이 근처여야 정합 이득이 난다(0.82× ↔ 1.66× 를 가른 값)
 TARGET_FLANGE_PX = 419.0
+
+# ────────────────────────────────────────────────────────── sim 기준선
+# 🔴 **이건 «정상 범위» 가 아니라 «sim 에서 잰 값» 이다.** 실물이 여기서 벗어나는 것은
+#    «고장» 일 수도 «도메인 갭» 일 수도 있다 — 표는 판정을 대신하지 않고 **비교 대상을 준다.**
+#    출처: `runs/e2e_A`·`runs/fakereal_oA`(n25 orange) · `runs/fakereal30oA`(n30 orange), 각 n=20,
+#    2026-08-19. **조건 2개에서만 잰 값**이라 대역이 좁다 — 첫 실물 런 이후 real 값으로 갱신할 것.
+#    (키, 라벨, lo, hi, 단위, 주석)
+SIM_BASELINE_CAPTURE = [
+    ("plane_rms_mm", "flange 평면 잔차", 0.30, 0.45, "mm",
+     "🔴 실물에서 가장 벌어질 값 — 스테레오 관통 품질. 3mm 초과면 열린 항목 #1"),
+    ("z_minus_depth_mm", "FP z − depth 평면", 0.3, 1.6, "mm",
+     "두 독립 추정의 일치도. 부호까지 본다"),
+    ("valid_ring", "주변 depth 유효율", 0.99, 1.0, "",
+     "⚠️ sim 은 항상 1.0 이다 — 실물이 낮은 건 당연하고, **얼마나** 낮은지가 정보다"),
+]
+SIM_BASELINE_A1 = [
+    ("gated_pct", "게이트 후퇴", 0.0, 15.0, "%", "초기값이 나쁘거나 CAD 가 다르면 오른다"),
+    ("n_corr", "대응점", 1500, 2100, "개", "`--outer-only` 기준. 홀을 쓰면 14,000 급이 정상"),
+    ("rms_px", "정합 잔차", 0.30, 1.00, "px", "적합도 — 🔴 «맞는가» 는 못 말한다(교훈 #56)"),
+    ("moved_deg_med", "정합 이동량", 0.40, 0.90, "°", "게이트 τ=1.5° 와 같은 축"),
+    ("lr_ddx", "좌우 |Δdx|", 0.15, 0.60, "px", "변형 간 차이로 읽는 게 원칙이지만 대역은 참고된다"),
+]
 
 
 def sh(cmd: list[str], dry: bool) -> int:
@@ -285,6 +320,151 @@ def _med(v):
     return float(np.median(v)) if len(v) else float("nan")
 
 
+def flange_plane_depth(depth: np.ndarray, core: np.ndarray, K: np.ndarray,
+                       uv: np.ndarray) -> tuple[float, float, int] | None:
+    """flange 중앙부 depth 에 **평면을 적합**하고 그 평면이 `uv` 시선과 만나는 z 를 낸다.
+
+    🔴 **왜 중앙값이 아니라 평면인가** — 처음엔 «flange 마스크 안 depth 중앙값» 을 FP 의 z 와
+    비교했는데 **거짓 경보가 났다**. sim GT 로 확인하니 그 중앙값은 pose 원점 z 보다 구조적으로
+    **~7mm 작다**(GT depth 로 재도 똑같다). 원근 때문에 **가까운 쪽이 픽셀을 더 차지**하고,
+    융기(+2mm)와 홀 깔때기가 섞이기 때문이다. **두 양이 애초에 같은 것이 아니었다.**
+    평면을 적합해 **원점이 투영되는 시선 위에서** 평가하면 같은 양이 되고, 실측 오차가
+    `-0.81mm`(GT 대비)로 떨어졌다.
+
+    덤으로 **평면 잔차 rms** 가 나온다 — *"스테레오가 이 표면을 제대로 뚫었는가"* 의 정량 지표다
+    (`valid.png` 100% 는 범위 검사일 뿐이라 틀린 값도 유효로 센다).
+    """
+    ys, xs = np.nonzero(core)
+    if len(ys) < 200:
+        return None
+    z = depth[ys, xs].astype(np.float64)
+    ok = z > 0
+    ys, xs, z = ys[ok], xs[ok], z[ok]
+    if len(z) < 200:
+        return None
+    X = (xs - K[0, 2]) / K[0, 0] * z
+    Y = (ys - K[1, 2]) / K[1, 1] * z
+    A = np.stack([X, Y, np.ones_like(z)], 1)             # z = aX + bY + c
+    c = np.linalg.lstsq(A, z, rcond=None)[0]
+    keep = np.ones(len(z), bool)
+    for _ in range(3):                                   # 강건화 — 3σ 절단 반복
+        r = z - A @ c
+        s = 1.4826 * np.median(np.abs(r - np.median(r))) + 1e-6
+        keep = np.abs(r - np.median(r)) < 3 * s
+        if keep.sum() < 100:
+            break
+        c = np.linalg.lstsq(A[keep], z[keep], rcond=None)[0]
+    rms = float(np.sqrt(np.mean((z[keep] - A[keep] @ c) ** 2))) if keep.sum() else float("nan")
+    x, y = (uv[0] - K[0, 2]) / K[0, 0], (uv[1] - K[1, 2]) / K[1, 1]
+    den = 1.0 - c[0] * x - c[1] * y
+    if abs(den) < 1e-6:                                  # 평면이 시선과 거의 평행 — 못 쓴다
+        return None
+    return float(c[2] / den), rms, int(keep.sum())
+
+
+def _sha8(p: Path) -> str | None:
+    """파일 내용 해시 앞 8자리. **«같은 입력인가» 를 이름이 아니라 내용으로 확인**하기 위한 것."""
+    if not Path(p).is_file():
+        return None
+    h = hashlib.sha256()
+    with open(p, "rb") as fh:
+        for blk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(blk)
+    return h.hexdigest()[:8]
+
+
+def write_run_meta(a, frames: list[Path], elapsed: float | None = None) -> dict:
+    """`<out>/run_meta.json` — **이 런이 무엇이었는가**. 실험 노트의 기계 판독본이다.
+
+    왜 필요한가 — 실물은 시행착오다. 거리·조명·참조 세트·플래그를 바꿔 가며 여러 번 돌리는데,
+    지금까지는 **무엇을 바꿨는지가 어디에도 안 남았다.** 지표를 아무리 늘려도 런 간 비교가
+    안 되면 방향을 못 정한다. `tools/compare_runs.py` 가 이 파일을 읽어 **설정 diff 를 먼저** 낸다.
+
+    ⚠️ **git 정보는 넣지 않는다**(사용자 방침). 대신 «어떤 상태였나» 는 **입력 파일 내용 해시**로
+       남긴다 — 커밋 여부와 무관하게 «같은 사진·같은 CAD·같은 참조였나» 를 확정할 수 있다.
+    ⚠️ 참조 세트의 출처 메타(`band`·`body_appearance`·`capture_args`)는 `build_sam3_refs`·
+       `select_sam3_refs` 가 **기록하지 않는다**(RESULTS §35-2f 재현 ⑤). 있으면 싣고 없으면
+       `null` 로 두되 **없다는 사실 자체를 남긴다** — 조용히 빠뜨리면 나중에 못 되짚는다.
+    """
+    root = Path(a.out)
+    root.mkdir(parents=True, exist_ok=True)
+    refs_name = a.refs or REFS_BY_PRESET[a.preset][0]
+    refs_dir = VISION / a.obj / refs_name
+    refs_meta = None
+    for cand in ("meta_refs.json", "refs.json"):
+        if (refs_dir / cand).exists():
+            try:
+                d = json.loads((refs_dir / cand).read_text(encoding="utf-8"))
+                refs_meta = {k: d.get(k) for k in
+                             ("band", "body_appearance", "capture_args", "source_run",
+                              "n_candidates", "selected", "criterion")}
+            except Exception:                                  # 메타가 깨져도 런을 죽이지 않는다
+                refs_meta = {"error": f"{cand} 파싱 실패"}
+            break
+    n_refs_files = len(list(refs_dir.glob("*.png"))) + len(list(refs_dir.glob("*.jpg")))
+
+    cam = {}
+    if frames:
+        cj = frames[0] / "cam.json"
+        if cj.exists():
+            try:
+                cam = json.loads(cj.read_text(encoding="utf-8"))
+            except Exception:
+                cam = {}
+    now = time.localtime()
+    # 🔴 `--report-only` 로 다시 낼 때 **원래 런의 인자를 덮어쓰면 안 된다** — 산출물은 이전
+    #    호출이 만든 것인데 메타는 지금 호출을 기록하게 되어 «어떤 설정으로 나온 결과인가» 가
+    #    조용히 틀어진다. 원본을 보존하고 재생성 사실만 덧붙인다.
+    prev = None
+    if getattr(a, "report_only", False) and (root / "run_meta.json").exists():
+        try:
+            prev = json.loads((root / "run_meta.json").read_text(encoding="utf-8"))
+        except Exception:
+            prev = None
+    if prev and prev.get("args"):
+        prev["report_regenerated_at"] = time.strftime("%Y-%m-%d %H:%M:%S", now)
+        prev["report_args_note"] = ("이 파일의 `args` 는 **원래 런**의 것이다. "
+                                    "`--report-only` 재생성은 산출물을 다시 만들지 않는다.")
+        if a.note:
+            prev.setdefault("notes_added", []).append(
+                {"at": prev["report_regenerated_at"], "note": a.note})
+        if a.true_distance_mm is not None:
+            prev["true_distance_mm"] = a.true_distance_mm      # 줄자 값은 나중에 알 수 있다
+        (root / "run_meta.json").write_text(
+            json.dumps(prev, indent=2, ensure_ascii=False), encoding="utf-8")
+        return prev
+    meta = {
+        "tool": "tools/run_group_a.py",
+        # ★ 사람이 읽는 시각과 기계가 정렬하는 시각을 **둘 다** 남긴다
+        "datetime_local": time.strftime("%Y-%m-%d %H:%M:%S", now),
+        "datetime_iso": time.strftime("%Y-%m-%dT%H:%M:%S%z", now),
+        "note": a.note,
+        "in": str(a.in_dir), "out": str(a.out), "n_frames": len(frames),
+        "args": {k: (str(val) if isinstance(val, Path) else val)
+                 for k, val in sorted(vars(a).items()) if k not in ("list_presets",)},
+        "obj": a.obj,
+        "obj_hashes": {n: _sha8(VISION / a.obj / n)
+                       for n in ("full.ply", "top_flange.ply", "meta.json")},
+        "refs": {"name": refs_name, "dir": str(refs_dir), "n_files": n_refs_files,
+                 "n_refs_used": a.n_refs, "mode": a.refs_mode,
+                 # 🔴 없으면 «없다» 를 명시한다 — null 과 «안 봤다» 를 구분하기 위해서다
+                 "provenance": refs_meta,
+                 "provenance_note": None if refs_meta else
+                 "참조 디렉토리에 출처 메타가 없다 (build_sam3_refs/select_sam3_refs 가 안 남긴다)"},
+        "cam": {"width": cam.get("width"), "height": cam.get("height"),
+                "fx": cam.get("fx"), "cx": cam.get("cx"), "cy": cam.get("cy"),
+                "baseline_mm": cam.get("baseline_mm"),
+                "sha8": _sha8(frames[0] / "cam.json") if frames else None},
+        # ★ 사진 자체의 해시 — «같은 촬영을 다시 돌린 건가, 새로 찍은 건가» 가 이름으로는 안 갈린다
+        "frame_hashes": {f.name: _sha8(f / "left.png") for f in frames[:8]},
+        "true_distance_mm": a.true_distance_mm,
+        "elapsed_sec": round(elapsed, 1) if elapsed is not None else None,
+    }
+    (root / "run_meta.json").write_text(
+        json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+    return meta
+
+
 def capture_diag(in_dir: Path, st: Path, seg: Path, ns2: Path) -> dict:
     """촬영 진단 — **이 사진으로 계속 가도 되는가**.
 
@@ -318,18 +498,54 @@ def capture_diag(in_dir: Path, st: Path, seg: Path, ns2: Path) -> dict:
             r["seg_found"] = d.get("found")
             r["seg_instances"] = d.get("n_instances")
         pj = ns2 / f.name / "pose_coarse.json"
+        t = None
         if pj.exists():
-            r["z_mm"] = round(float(json.loads(pj.read_text())["t_mm"][2]), 1)
+            t = np.asarray(json.loads(pj.read_text(encoding="utf-8"))["t_mm"], float)
+            r["z_mm"] = round(float(t[2]), 1)
+            # 🔴 교훈 #83 — 벡터는 «크기» 가 아니라 «축» 으로 본다. 횡(x,y)을 따로 남긴다.
+            r["tx_mm"], r["ty_mm"] = round(float(t[0]), 1), round(float(t[1]), 1)
+            r["lat_mm"] = round(float(np.hypot(t[0], t[1])), 1)
+        # ★ **stereo depth 가 직접 말하는 거리** — FP 추정 z 와 대조할 독립 관측이다.
+        #   ⚠️ 경계 픽셀이 지표를 지배하므로(교훈 #5) 마스크를 **침식**해서 중앙부만 본다.
+        #   ⚠️ depth.png 는 16-bit mm 이고 **0 = invalid** 다 — 빼고 세지 않으면 거리가 당겨진다.
+        dp = cv2.imread(str(st / f.name / "depth.png"), cv2.IMREAD_UNCHANGED)
+        if dp is not None and mask is not None and t is not None and (f / "cam.json").exists():
+            cam = json.loads((f / "cam.json").read_text(encoding="utf-8"))
+            K = np.array([[cam["fx"], 0, cam["cx"]], [0, cam["fy"], cam["cy"]], [0, 0, 1]], float)
+            core = cv2.erode((mask > 127).astype(np.uint8), np.ones((9, 9), np.uint8),
+                             iterations=2) > 0
+            p = K @ t
+            res = flange_plane_depth(dp, core, K, p[:2] / max(p[2], 1e-9))
+            if res:
+                zp, rms, npx = res
+                r["depth_plane_mm"] = round(zp, 1)
+                r["plane_rms_mm"] = round(rms, 3)
+                r["plane_px"] = npx
+                # 부호를 살린다: + 면 FP 가 depth 평면보다 «멀다» 고 본 것
+                r["z_minus_depth_mm"] = round(float(t[2]) - zp, 1)
         rows.append(r)
 
     def col(k):
         return [r[k] for r in rows if r.get(k) is not None]
 
-    return {"n_frames": len(rows),
-            "median": {k: round(_med(col(k)), 4) for k in
-                       ("valid_all", "valid_flange", "valid_ring",
-                        "flange_dia_px", "z_mm") if col(k)},
-            "frames": rows}
+    out = {"n_frames": len(rows),
+           "median": {k: round(_med(col(k)), 4) for k in
+                      ("valid_all", "valid_flange", "valid_ring", "flange_dia_px",
+                       "z_mm", "depth_plane_mm", "z_minus_depth_mm", "plane_rms_mm",
+                       "lat_mm", "tx_mm", "ty_mm") if col(k)},
+           "frames": rows}
+    # ★ **눈금** — 이 런에서 1px 이 몇 mm 인가. 오버레이를 «정량적으로» 볼 수 있게 한다
+    #   (교훈: «10mm 틀렸다» 를 그림에서 확인하려면 그게 몇 px 인지 알아야 한다).
+    z = out["median"].get("z_mm")
+    if z and frames:
+        try:
+            cam = json.loads((frames[0] / "cam.json").read_text(encoding="utf-8"))
+            out["scale"] = {"mm_per_px": round(z / float(cam["fx"]), 4),
+                            "px_per_10mm": round(10.0 * float(cam["fx"]) / z, 1),
+                            "at_z_mm": z}
+        except Exception:
+            pass
+    return out
 
 
 def read_variant(root: Path, sid: str) -> dict:
@@ -358,8 +574,98 @@ def read_variant(root: Path, sid: str) -> dict:
         }
     lr = root / "lr" / f"lr_consistency_{sid}.json"
     if lr.exists():
-        a = json.loads(lr.read_text())["abs_median"]
+        d = json.loads(lr.read_text())
+        a = d["abs_median"]
         out |= {"lr_dxR": a["dx_R"], "lr_ddx": a["ddx_px"], "lr_dz": a["dz_mm"]}
+        # ★ **부호를 살린다** (교훈 #83). `|Δdx|` 는 «얼마나» 만 말하고 «어느 쪽으로» 를 못 말한다.
+        #   프레임마다 **부호가 같으면 계통 편향**이고, 그건 게이트가 못 막는 축이다(§29·§35-2i).
+        #   ⚠️ `lr_consistency` 는 이미 부호 있는 중앙값을 계산해 두는데 지금까지 안 읽고 있었다.
+        s = d.get("median", {})
+        out |= {"lr_ddx_signed": s.get("ddx_px"), "lr_ddy_signed": s.get("ddy_px"),
+                "lr_dz_signed": s.get("dz_mm")}
+    return out
+
+
+def distance_verdicts(diag: dict, true_mm: float | None) -> list[str]:
+    """**거리 삼각 대조** — FP 추정 z · stereo depth 중앙값 · (있으면) 줄자 실측.
+
+    왜 이게 필요한가 — 실물에서 *"t 가 10mm 넘게 틀린다"* 가 나왔을 때, GT 가 없어도
+    **두 독립 추정이 서로 맞는지는 잴 수 있다.** 둘이 어긋나면 어느 한쪽이 틀린 것이고,
+    둘이 맞는데도 물리적으로 틀렸다면 **공통 원인**(캘리브레이션·원점 규약)이다.
+
+    🔴 `--true-distance-mm` 은 **선택**이다. 없으면 «FP ↔ depth» 일관성만 본다 —
+       그것만으로도 «둘 중 하나가 틀렸다» 는 갈린다. 실측이 있어야 **어느 쪽이** 틀렸는지 나온다.
+    ⚠️ 실측 기준점은 **flange 상면 중심**이다(pose 원점 규약). 몸체 바닥이나 받침대를 재면
+       344mm 급으로 어긋나고, 그건 «편향» 이 아니라 «다른 것을 쟀다» 다.
+    """
+    out = []
+    med = diag.get("median", {})
+    zf, zd = med.get("z_mm"), med.get("depth_plane_mm")
+    sc = diag.get("scale", {})
+    if sc:
+        out.append(f"📏 **눈금** — 이 런의 1px = **{sc['mm_per_px']:.3f}mm** "
+                   f"(Z {sc['at_z_mm']:.0f}mm 기준). **10mm 어긋남 = {sc['px_per_10mm']:.0f}px** — "
+                   f"오버레이에서 이만큼 밀렸는지 보면 «2D 문제 vs 3D(깊이) 문제» 가 갈린다.")
+    if zf is None or zd is None:
+        if zf is not None:
+            out.append(f"⚠️ 거리 대조 불가 — FP z {zf:.0f}mm 는 있는데 flange 평면 적합에 실패했다"
+                       f"(마스크가 작거나 depth 가 비었다). `diag_sheet.png` 의 depth 패널 확인.")
+        return out
+
+    d = med.get("z_minus_depth_mm", zf - zd)
+    tol = 3.0                                   # 이 정도면 flange 융기·평면 적합 오차 범위다
+    if abs(d) <= tol:
+        out.append(f"✅ **거리 일관성** — FP 추정 z **{zf:.0f}mm** vs stereo depth 평면 "
+                   f"**{zd:.0f}mm** (차 {d:+.1f}mm). 두 독립 추정이 맞는다.")
+    else:
+        px = abs(d) / sc["mm_per_px"] if sc else None
+        out.append(f"🔴 **FP 와 depth 가 어긋난다** — FP z **{zf:.0f}mm** vs stereo depth 평면 "
+                   f"**{zd:.0f}mm** (차 **{d:+.1f}mm**"
+                   + (f", 횡으로 새면 최대 {px:.0f}px" if px else "") + "). "
+                   f"**둘 중 하나가 틀렸고 이 지표만으로는 못 가른다.** "
+                   f"→ ① `diag_sheet.png` depth 패널에서 물체 depth 가 실제 거리인지 "
+                   f"② `--true-distance-mm` 로 줄자 값을 주면 **어느 쪽이** 틀렸는지 나온다.")
+        out.append("  ⚠️ Z 오차는 물체가 광축에서 벗어나 있으면 **횡방향으로 샌다** "
+                   "(`δx = X_이탈/fx · δZ`). *«t 가 한 방향으로 밀린다»* 의 흔한 원인이고, "
+                   "**테두리 정합은 Z 를 못 고친다**(§35-2k-2).")
+
+    rms = med.get("plane_rms_mm")
+    if rms is not None:
+        # 🔴 `valid.png` 100% 를 «뚫렸다» 로 읽으면 안 된다 — 범위 검사일 뿐이라 틀린 값도 유효로 센다.
+        #    평면 잔차는 **값이 맞는가** 를 본다. sim(깨끗) 기준선 0.37mm.
+        if rms > 3.0:
+            out.append(f"🔴 **flange 평면 잔차 {rms:.2f}mm** — sim 기준선 0.37mm 의 8배 넘는다. "
+                       f"스테레오가 표면을 제대로 못 뚫고 있다(**열린 항목 #1**). "
+                       f"`valid.png` 100% 는 «뚫렸다» 를 뜻하지 않는다 — 범위 검사일 뿐이다.")
+        elif rms > 1.0:
+            out.append(f"⚠️ **flange 평면 잔차 {rms:.2f}mm** — sim 기준선(0.37mm)보다 크다. "
+                       f"치명적이진 않지만 depth 를 초기값으로 신뢰하기 전에 depth 패널을 볼 것.")
+        else:
+            out.append(f"✅ **flange 평면 잔차 {rms:.2f}mm** — depth 가 평면을 제대로 잡았다.")
+
+    if true_mm is None:
+        out.append("  · `--true-distance-mm <줄자값>` 을 주면 여기에 **실측 대조**가 붙는다"
+                   "(촬영 추가 0). 기준점은 **flange 상면 중심**이다.")
+        return out
+
+    ef, ed = zf - true_mm, zd - true_mm
+    out.append(f"📐 **실측 대조** (줄자 {true_mm:.0f}mm) — FP {ef:+.1f}mm · depth {ed:+.1f}mm")
+    bad = [n for n, e in (("FP", ef), ("depth", ed)) if abs(e) > 5.0]
+    if not bad:
+        out.append("  ✅ 둘 다 실측의 ±5mm 안이다. **거리 계통 편향은 아니다** — "
+                   "t 오차가 크다면 원인은 횡방향이거나 원점 규약이다.")
+    elif len(bad) == 2 and abs(ef - ed) <= tol:
+        out.append(f"  🔴 **둘 다 같은 방향으로 틀렸다** ({ef:+.1f} / {ed:+.1f}mm) → **공통 원인**이다: "
+                   f"baseline·fx 캘리브레이션, 또는 **실측 기준점이 pose 원점(flange 상면 중심)과 "
+                   f"다르다**. ⚠️ 후자가 훨씬 흔하다 — 먼저 무엇을 쟀는지 확인할 것. "
+                   f"`refine`·정합·게이트 어느 것도 이 축을 못 고친다.")
+    else:
+        out.append(f"  🔴 **{' 와 '.join(bad)} 가 틀렸다.** "
+                   + ("depth 가 맞고 FP 가 틀렸다면 마스크·초기화 문제이고, "
+                      if "FP" in bad and "depth" not in bad else "")
+                   + ("depth 가 틀렸다면 스테레오가 표면을 못 뚫은 것이다 — **열린 항목 #1**, "
+                      "`valid.png` 와 depth 패널을 볼 것."
+                      if "depth" in bad else ""))
     return out
 
 
@@ -502,6 +808,220 @@ def verdicts(v: dict[str, dict], diag: dict, ism: bool = False) -> list[str]:
     return out
 
 
+def baseline_rows(diag: dict, v: dict) -> list[tuple]:
+    """**(a) sim 기준선 대조** — «이 값이 상이한가» 를 한 표로.
+
+    지금까지 임계값이 판정 «문장 안» 에 박혀 있어 한눈에 안 보였다. 여기서는 **대역과 실측을
+    나란히** 놓고 벗어남만 표시한다.
+    🔴 **판정을 대신하지 않는다** — sim 대역 밖이 곧 고장이 아니다(도메인 갭일 수 있다).
+    """
+    out = []
+    med = diag.get("median", {})
+    for key, lab, lo, hi, unit, note in SIM_BASELINE_CAPTURE:
+        out.append((lab, lo, hi, unit, med.get(key), note))
+    a1 = v.get("A1", {})
+    for key, lab, lo, hi, unit, note in SIM_BASELINE_A1:
+        out.append((f"A1 {lab}", lo, hi, unit, a1.get(key), note))
+    return out
+
+
+def frame_outliers(root: Path, diag: dict, z_thr: float = 3.5, min_n: int = 8) -> dict:
+    """**(b) 프레임 이상치** — 강건 z-score(중앙값·MAD)로 *"이 프레임만 다르다"* 를 찾는다.
+
+    ★ `worst_frames` 와 **다른 도구다**:
+      · `worst_frames` 는 **순위** — 정상인 런에서도 «상대적으로 가장 나쁜» 장이 나온다.
+      · 여기는 **분포** — 아무것도 안 나오는 게 정상이고, **나오면 그 자체가 신호**다.
+    ★ **기준선이 필요 없다** — 런 자기 자신이 기준이라 **도메인 갭에 면역**이다.
+      실물 첫 런부터, sim 값과 아무리 달라도 그대로 작동한다.
+    ⚠️ 표본이 적으면 강건 통계가 무의미하다 → `min_n` 미만이면 아예 돌리지 않는다.
+    ⚠️ 이상치는 «pose 가 틀렸다» 가 아니다 — §35-2c 에서 분할이 깨졌는데 pose 는 정상인 실례가 있었다.
+    """
+    rows = {r["frame"]: dict(r) for r in diag.get("frames", [])}
+    mc = root / "A1" / "meta_contour.json"
+    if mc.exists():
+        for r in json.loads(mc.read_text(encoding="utf-8"))["frames"]:
+            rows.setdefault(r["frame"], {}).update(
+                {"A1 대응점": r.get("n_corr"), "A1 정합잔차": r.get("rms_px"),
+                 "A1 이동량°": r.get("moved_deg")})
+    lr = root / "lr" / "lr_consistency_A1.json"
+    if lr.exists():
+        for r in json.loads(lr.read_text(encoding="utf-8")).get("frames", []):
+            rows.setdefault(r["frame"], {})["A1 좌우Δdx"] = r.get("ddx_px")
+    if len(rows) < min_n:
+        return {"_note": f"프레임 {len(rows)}장 — 강건 통계에 최소 {min_n}장이 필요하다"}
+
+    LABEL = {"flange_dia_px": "flange 등가지름", "valid_all": "depth 유효율",
+             "valid_ring": "주변 유효율", "plane_rms_mm": "평면 잔차",
+             "z_mm": "FP 거리 z", "z_minus_depth_mm": "FP−depth", "lat_mm": "광축 이탈",
+             "seg_score": "분할 점수"}
+    keys = [k for k in (list(LABEL) + ["A1 대응점", "A1 정합잔차", "A1 이동량°", "A1 좌우Δdx"])
+            if sum(1 for r in rows.values() if isinstance(r.get(k), (int, float))) >= min_n]
+    hits: dict[str, list] = {}
+    bimodal = []
+    for k in keys:
+        vals = {f: float(r[k]) for f, r in rows.items() if isinstance(r.get(k), (int, float))}
+        a = np.array(list(vals.values()))
+        m = float(np.median(a))
+        # ⚠️ **MAD 만 쓰면 안 된다** — 값의 절반 이상이 같으면(예: sim 의 `valid_all` 이 1.0)
+        #    MAD 가 0 이 되어 z 가 발산한다(실측 z=209). IQR 과 **상대 바닥**을 함께 깐다.
+        mad = 1.4826 * float(np.median(np.abs(a - m)))
+        iqr = float(np.percentile(a, 75) - np.percentile(a, 25)) / 1.349
+        s = max(mad, iqr, 0.02 * abs(m))                 # 중앙값의 2% 미만 편차는 안 본다
+        if s < 1e-9:                                     # 전부 같은 값 → 판정 불가
+            continue
+        cand = [(f, abs(x - m) / s, x) for f, x in vals.items() if abs(x - m) / s >= z_thr]
+        # 🔴 **한 지표에서 25% 넘게 걸리면 그건 «이상치» 가 아니라 «분포가 갈라진 것» 이다.**
+        #    (실측: 좌우 Δdx 가 20장 중 6장에서 −1.5~−4.6px 로 뭉쳐 있었다. 그건 소수의 사고가
+        #     아니라 «30% 가 다르게 동작한다» 는 뜻이고, 이상치로 보고하면 오독을 만든다.)
+        if len(cand) > max(2, int(0.25 * len(vals))):
+            bimodal.append((LABEL.get(k, k), len(cand), len(vals), m,
+                            float(np.min(a)), float(np.max(a))))
+            continue
+        for f, z, x in cand:
+            hits.setdefault(f, []).append((LABEL.get(k, k), z, x, m))
+    out = {f: sorted(v, key=lambda t: -t[1]) for f, v in
+           sorted(hits.items(), key=lambda kv: -max(t[1] for t in kv[1]))}
+    if bimodal:
+        out["_bimodal"] = bimodal
+    return out
+
+
+def worst_frames(root: Path, diag: dict, v: dict, k: int = 2, cap: int = 6) -> dict:
+    """**«여기부터 보라»** — GT-free 지표별 최악 프레임을 골라 이유와 함께 돌려준다.
+
+    왜 필요한가 — `diag_trends.png` 가 이상 프레임을 «보여» 주지만, 그 다음에 사람이 어느 장을
+    열어야 하는지는 손으로 찾아야 했다. 실물은 20~40장이라 훑을 수는 있지만 **매 시도마다** 훑는
+    것은 비싸다. 지표마다 상위 `k` 장을 뽑아 합집합을 만든다.
+
+    ⚠️ **순위 기반이지 임계값 기반이 아니다** — 정상인 런에서도 «상대적으로 가장 나쁜» 장이
+    나온다. *"여기 이상이 있다"* 가 아니라 *"본다면 여기부터"* 다. 정상 판정은 리포트 본문이 한다.
+    """
+    rows = {r["frame"]: dict(r) for r in diag.get("frames", [])}
+    # 정합 지표를 배포본(A1) 기준으로 붙인다 — 변형마다 다르면 비교가 안 된다
+    mc = root / "A1" / "meta_contour.json"
+    if mc.exists():
+        for r in json.loads(mc.read_text(encoding="utf-8"))["frames"]:
+            rows.setdefault(r["frame"], {}).update(
+                {"c_rms": r.get("rms_px"), "c_ncorr": r.get("n_corr"),
+                 "c_moved": r.get("moved_deg"), "c_gated": r.get("gated")})
+    lr = root / "lr" / "lr_consistency_A1.json"
+    if lr.exists():
+        for r in json.loads(lr.read_text(encoding="utf-8")).get("frames", []):
+            rows.setdefault(r["frame"], {})["lr_ddx"] = r.get("ddx_px")
+
+    dia = [r.get("flange_dia_px") for r in rows.values() if r.get("flange_dia_px")]
+    dia_med = float(np.median(dia)) if dia else None
+
+    def rank(key, fn, why, reverse=True):
+        got = [(fn(r), f) for f, r in rows.items() if fn(r) is not None]
+        if not got:
+            return []
+        got.sort(reverse=reverse)
+        return [(f, why, val) for val, f in got[:k]]
+
+    picks = []
+    picks += rank("gated", lambda r: 1.0 if r.get("c_gated") else None,
+                  "게이트 후퇴 — 정합이 폭주했다")
+    picks += rank("moved", lambda r: r.get("c_moved"), "정합 이동량 최대")
+    picks += rank("rms", lambda r: r.get("c_rms"), "정합 잔차 rms 최대")
+    picks += rank("ncorr", lambda r: r.get("c_ncorr"), "대응점 최소 — 신호가 없었다", reverse=False)
+    picks += rank("lr", lambda r: abs(r["lr_ddx"]) if r.get("lr_ddx") is not None else None,
+                  "좌우 투영 불일치 최대")
+    picks += rank("plane", lambda r: r.get("plane_rms_mm"), "flange 평면 잔차 최대 — depth 의심")
+    picks += rank("zdiff", lambda r: abs(r["z_minus_depth_mm"])
+                  if r.get("z_minus_depth_mm") is not None else None, "FP−depth 어긋남 최대")
+    if dia_med:
+        picks += rank("dia", lambda r: abs(r["flange_dia_px"] - dia_med)
+                      if r.get("flange_dia_px") else None, "마스크 크기가 중앙값에서 최대 이탈")
+
+    out: dict[str, list] = {}
+    for f, why, val in picks:
+        out.setdefault(f, []).append((why, val))
+    # 여러 지표에 걸린 프레임을 먼저 — 그게 진짜 볼 값어치가 있는 장이다
+    ordered = sorted(out.items(), key=lambda kv: -len(kv[1]))[:cap]
+    return {f: reasons for f, reasons in ordered}
+
+
+def make_worst_dir(a, root: Path, picks: dict) -> Path | None:
+    """최악 프레임만 모아 **`contour_debug.png` 를 다시 낸다**.
+
+    `--debug` 를 전 프레임에 켜면 무겁고, 안 켜면 *"Sobel 이 물체 경계를 잡았나 · 융기 능선을
+    잡았나 · 그림자를 잡았나"* 를 볼 그림이 아예 없다. 🔴 **그 그림 없이는 §35-2i 의
+    «검정 몸체 계통 편향» 을 실물에서 대리 관측할 방법이 없다.**
+
+    구현: 고른 프레임만 **심링크**한 임시 캡처 디렉토리를 만들고 거기에 `refine_contour --debug`
+    를 돌린다. → `refine_contour` 를 **한 줄도 안 고친다**(배포 경로 무영향).
+    """
+    if not picks:
+        return None
+    wd = root / "worst"
+    fdir = wd / "_frames"
+    fdir.mkdir(parents=True, exist_ok=True)
+    in_dir = Path(a.in_dir)
+    for f in picks:
+        link = fdir / f
+        if not link.exists():
+            try:
+                link.symlink_to(in_dir / f, target_is_directory=True)
+            except OSError:
+                return None
+    cmd = [PY["pose"], "-m", "spatial_vision.stages.refine_contour",
+           "--in", fdir, "--pose-dir", root / "fp_ns2", "--pose-name", "pose_coarse.json",
+           "--obj", a.obj, "--mesh", "top_flange.ply", "--outer-only",
+           "--gate-deg", a.gate_deg, "--debug", "--out", wd / "A1_debug"]
+    if a.fix_z:
+        cmd.append("--fix-z")
+    rc = subprocess.call([str(c) for c in cmd], cwd=VISION,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return wd if rc == 0 else None
+
+
+def next_steps(v: dict, diag: dict, a) -> list[str]:
+    """**다음에 무엇을 시도할지** — 비용(촬영 횟수) 순으로 정렬해서 낸다.
+
+    `verdicts()` 는 *진단*을 준다. 여기서는 **행동**을 준다. 🔴 이 환경은 **로봇이 없고 손 촬영**이라
+    «촬영 0» 과 «촬영 2» 의 차이가 크다 — 그래서 정렬 기준이 «중요도» 가 아니라 **«비용»** 이다.
+
+    ⚠️ 여기 규칙은 **지금까지 sim 에서 본 실패 유형**만 안다. 실물에서 새로운 증상이 나오면
+       그건 이 목록에 없다 — **목록이 비었다고 «문제 없음» 이 아니다.**
+    """
+    med, out = diag.get("median", {}), []
+    a1, a3 = v.get("A1", {}), v.get("A3", {})
+
+    if not a.true_distance_mm and med.get("z_mm"):
+        out.append(("촬영 0 · 인자만", "`--true-distance-mm <줄자값>` 을 주고 `--report-only` 로 재리포트 — "
+                    "**FP 와 depth 중 어느 쪽이 틀렸는지**가 갈린다. 기준점은 flange 상면 중심."))
+    g = {k: v[k].get("gated_pct") for k in ("A1", "A2a", "A2b") if k in v}
+    if len(g) == 3 and all(x is not None for x in g.values()) and g["A1"] > 40:
+        out.append(("촬영 0 · 플래그만", f"A1 후퇴율이 {g['A1']}% 로 높다 — `--fix-z` 를 켜고/끄고 "
+                    "각각 돌려 비교한다(§35-2j: Z 를 묶으면 횡 축퇴가 끊긴다)."))
+    d = med.get("z_minus_depth_mm")
+    if d is not None and abs(d) > 3.0:
+        out.append(("촬영 1", "물체를 **화면 반대쪽**에 두고 한 장 더 — 횡 편향의 **부호가 뒤집히면 "
+                    "Z 오차**이고 그대로면 진짜 횡방향 문제(캘리브레이션·원점 규약)다."))
+    rms = med.get("plane_rms_mm")
+    if rms is not None and rms > 1.0:
+        out.append(("촬영 0 · 육안", f"flange 평면 잔차 {rms:.2f}mm — `st/frame_*/valid.png` 와 진단 시트 "
+                    "depth 패널을 본다. **열린 항목 #1**(반투명 본체 관통) 판정."))
+    if a1.get("lr_ddx") is not None and a3.get("lr_ddx") is not None \
+            and a1["lr_ddx"] > a3["lr_ddx"] * 1.1:
+        out.append(("촬영 0 · 육안", "정합이 좌우 일관성을 **악화**시켰다 — 실물 flange 최외곽에 "
+                    "**융기가 있는지 눈으로 확인**한다(§29 최악 축, 게이트가 못 막는다). "
+                    "융기가 CAD 와 다르면 **정합을 끄는 편이 안전**하다."))
+    sg = a1.get("lr_ddx_signed")
+    if sg is not None and a1.get("lr_ddx") and abs(sg) > 0.7 * a1["lr_ddx"]:
+        out.append(("촬영 0 · 확인", f"좌우 Δdx 부호가 한쪽으로 쏠렸다({sg:+.2f}px) — **계통 편향**이다. "
+                    "`cam.json` 의 `disto` 가 전부 0 인지(= rectified 인지), 해상도가 프로파일과 "
+                    "같은지부터 확인한다. **게이트·refine 어느 것도 이 축을 못 고친다.**"))
+    if diag.get("n_frames", 0) < 20:
+        out.append(("촬영 1 (연속)", f"프레임 {diag.get('n_frames')}장 → **20~40장 연속 촬영**. "
+                    "꼬리가 보이고(교훈 #58) **반복도**(sim 에 대응물 없는 지표)까지 공짜로 나온다."))
+    out.append(("촬영 2", "**§7.5c 상대 GT** — 물체를 자로 잰 만큼(≥100mm) 밀고 두 번 찍는다. "
+                "**계통 편향(scale·offset)을 real 에서 잡는 유일한 수단**이고 hand-eye 가 필요 없다. "
+                "⚠️ 회전과 평행이동을 섞지 않는다."))
+    return [f"**[{cost}]** {what}" for cost, what in out]
+
+
 def report(a) -> int:
     root = Path(a.out)
     in_dir = Path(a.in_dir)
@@ -517,8 +1037,16 @@ def report(a) -> int:
 
     L = []
     L.append(f"# A그룹 결과 — `{in_dir}`\n")
-    L.append(f"프레임 {diag['n_frames']}장 · obj `{a.obj}` · 참조 "
-             f"`{a.refs or REFS_BY_PRESET[a.preset][0]}` · 게이트 {a.gate_deg}°\n")
+    L.append(f"**{time.strftime('%Y-%m-%d %H:%M:%S')}** · 프레임 {diag['n_frames']}장 · "
+             f"obj `{a.obj}` · 참조 `{a.refs or REFS_BY_PRESET[a.preset][0]}` "
+             f"(preset `{a.preset}`, n-refs {a.n_refs}, {a.refs_mode}) · 게이트 {a.gate_deg}°"
+             + (f" · `--fix-z`" if a.fix_z else "")
+             + (f" · 실측거리 {a.true_distance_mm:.0f}mm" if a.true_distance_mm else "") + "\n")
+    if a.note:
+        L.append(f"> **메모** — {a.note}\n")
+    L.append(f"설정 전체는 `{root}/run_meta.json` 에 있다. "
+             f"런 여러 개를 비교하려면 `envs/pose/bin/python tools/compare_runs.py "
+             f"{root} <다른런> ...`\n")
     L.append("🔴 **실환경에는 GT 가 없다** — 아래는 전부 GT-free 지표다. "
              "R/t 절대 오차는 원리적으로 못 낸다(`PIPELINE_CATALOG §7.5`).\n")
 
@@ -530,7 +1058,22 @@ def report(a) -> int:
         L.append(f"| flange 등가지름 | **{m['flange_dia_px']:.0f}px** | "
                  f"목표 {TARGET_FLANGE_PX:.0f}px (§34-9) |")
     if "z_mm" in m:
-        L.append(f"| FP 추정 거리 | **{m['z_mm']:.0f}mm** | 최적 220~300mm (§34-9) |")
+        L.append(f"| FP 추정 거리 (z) | **{m['z_mm']:.0f}mm** | 최적 220~300mm (§34-9) |")
+    if "depth_plane_mm" in m:
+        L.append(f"| stereo depth (flange **평면적합**) | **{m['depth_plane_mm']:.0f}mm** | "
+                 f"FP z 와 **독립**인 거리 관측 |")
+    if "plane_rms_mm" in m:
+        L.append(f"| flange 평면 잔차 rms | **{m['plane_rms_mm']:.2f}mm** | "
+                 f"🔴 스테레오가 표면을 뚫었나 (sim 기준선 0.37mm) |")
+    if "z_minus_depth_mm" in m:
+        L.append(f"| 그 차 (FP − depth) | **{m['z_minus_depth_mm']:+.1f}mm** | "
+                 f"±3mm 안이면 일관 |")
+    if a.true_distance_mm and "z_mm" in m:
+        L.append(f"| 줄자 실측 | **{a.true_distance_mm:.0f}mm** | 기준점 = flange **상면 중심** |")
+    if "lat_mm" in m:
+        L.append(f"| 광축 이탈 (횡) | **{m['lat_mm']:.0f}mm** "
+                 f"(x {m.get('tx_mm', 0):+.0f} / y {m.get('ty_mm', 0):+.0f}) | "
+                 f"클수록 Z 오차가 횡으로 샌다 |")
     for k, lab, ref in (("valid_all", "depth 유효율 (전체)", "—"),
                         ("valid_flange", "depth 유효율 (flange)", "검정 불투명 — 높아야 정상"),
                         ("valid_ring", "depth 유효율 (주변 링)", "🔴 **반투명 본체 판정**")):
@@ -539,28 +1082,126 @@ def report(a) -> int:
     L.append("")
 
     L.append("## 변형 비교 (GT-free)\n")
-    L.append("| 변형 | 게이트 후퇴 | 대응점 | rms px | 이동 ° 중앙/최대 | 좌우 \\|Δdx\\| px | 좌우 dz mm |")
-    L.append("|---|---|---|---|---|---|---|")
+    L.append("| 변형 | 게이트 후퇴 | 대응점 | rms px | 이동 ° 중앙/최대 | 좌우 \\|Δdx\\| px "
+             "| 좌우 Δdx **부호** | 좌우 dz mm |")
+    L.append("|---|---|---|---|---|---|---|---|")
     # ⚠️ ISM 경로도 **같은 표**에 넣는다 — 따로 내면 나란히 비교가 안 된다.
     for sid in ["A3", "A1", "A2a", "A2b", "A4"] + (["I3", "I1"] if a.ism else []):
         r = v.get(sid, {})
         gp = f"{r['gated']}/{r['n']} ({r['gated_pct']}%)" if "gated" in r else "—"
         mv = f"{r['moved_deg_med']:.2f} / {r['moved_deg_max']:.2f}" if "moved_deg_med" in r else "—"
+        sg = r.get("lr_ddx_signed")
         L.append(f"| {labels[sid]} | {gp} | {r.get('n_corr', '—')} | "
                  f"{r.get('rms_px', '—')} | {mv} | "
-                 f"**{r.get('lr_ddx', '—')}** | {r.get('lr_dz', '—')} |")
+                 f"**{r.get('lr_ddx', '—')}** | {f'{sg:+.2f}' if sg is not None else '—'} | "
+                 f"{r.get('lr_dz', '—')} |")
     L.append("")
     L.append("- **게이트 후퇴** = 정합이 초기값에서 1.5° 넘게 움직여 결과를 버린 프레임 수. "
              "높으면 «정합이 폭주했거나 CAD 가 실물과 다르다».")
     L.append("- **좌우 |Δdx|** = 왼쪽만 보고 정합한 pose 를 오른쪽에 투영했을 때 남는 어긋남. "
              "**작을수록 좋다.** 절대값이 아니라 변형 간 차이로만 읽는다.")
+    L.append("- 🔴 **좌우 Δdx 부호** = 같은 값의 **부호 있는** 중앙값. `|Δdx|` 는 «얼마나» 만 "
+             "말하고 «어느 쪽으로» 를 못 말한다. **부호가 한쪽으로 쏠려 있으면 계통 편향**이고 "
+             "그건 게이트로 못 막는 축이다(§29·§35-2i). 0 근처에서 왔다갔다 하면 랜덤 오차다.")
     L.append("- 좌우 **dz** 는 그 어긋남을 깊이로 환산한 값 — 기준선 편향이 있어 "
              "0 이 아닌 게 정상이다.\n")
 
     L.append("## 판정\n")
+    for s in distance_verdicts(diag, a.true_distance_mm):
+        L.append(f"- {s}")
     for s in verdicts(v, diag, ism=a.ism):
         L.append(f"- {s}")
     L.append("")
+
+    # ── (a) sim 기준선 대조 ───────────────────────────────────────────────────
+    L.append("## 이 값이 상이한가 — sim 기준선 대조\n")
+    L.append("| 항목 | sim 대역 | **이번 런** | | 뜻 |")
+    L.append("|---|---|---|---|---|")
+    n_out = 0
+    for lab, lo, hi, unit, val, note in baseline_rows(diag, v):
+        if val is None:
+            L.append(f"| {lab} | {lo}~{hi}{unit} | — | ⚪ | {note} |")
+            continue
+        inside = lo <= val <= hi
+        n_out += not inside
+        mark = "✅" if inside else ("🔼" if val > hi else "🔽")
+        L.append(f"| {lab} | {lo}~{hi}{unit} | **{val:g}{unit}** | {mark} | {note} |")
+    L.append("")
+    L.append(f"- 🔴 **이 표는 «정상 범위» 가 아니라 «sim 에서 잰 값» 이다.** 벗어남({n_out}건)이 "
+             f"곧 고장이 아니다 — **도메인 갭일 수도 있다.** 표는 판정을 대신하지 않고 "
+             f"**비교 대상**을 준다.")
+    L.append("- 출처: `e2e_A`·`fakereal_oA`(0.22~0.30m) · `fakereal30oA`(0.28~0.35m), 각 n=20, "
+             "몸체 orange. **조건 2개에서만 잰 값**이라 대역이 좁다 — "
+             "**첫 실물 런 이후 real 값으로 갱신할 것**(`tools/run_group_a.py` 의 `SIM_BASELINE_*`).")
+    L.append("- ⚠️ 실물에서 **가장 먼저 벌어질 값은 `flange 평면 잔차`** 다(스테레오 관통 품질). "
+             "sim 은 0.37mm 인데 실물은 그보다 클 것이 당연하고, **얼마나** 큰지가 정보다.\n")
+
+    # ── (b) 프레임 이상치 (분포 기준) ──────────────────────────────────────────
+    fo = frame_outliers(root, diag)
+    bimodal = fo.pop("_bimodal", [])
+    L.append("## 이상 프레임 (분포 기준)\n")
+    if "_note" in fo:
+        L.append(f"⚪ {fo['_note']}\n")
+    elif not fo:
+        L.append("✅ **이상치 없다** — 어떤 프레임도 나머지와 통계적으로 벗어나지 않는다"
+                 "(강건 z ≥ 3.5 없음). 🔴 단 **«다 같이 틀린» 경우는 이 검사가 못 잡는다.**\n")
+    else:
+        L.append("| 프레임 | 지표 | z | 이 프레임 | 전체 중앙 |")
+        L.append("|---|---|---|---|---|")
+        for f, items in fo.items():
+            for lab, z, x, m in items:
+                L.append(f"| `{f}` | {lab} | **{z:.1f}** | {x:g} | {m:g} |")
+        L.append("")
+    if bimodal:
+        L.append("### ⚠️ 이상치가 아니라 **분포가 갈라진** 지표\n")
+        L.append("| 지표 | 벗어난 프레임 | 중앙 | 최소~최대 |")
+        L.append("|---|---|---|---|")
+        for lab, nc, nt, m, lo, hi in bimodal:
+            L.append(f"| {lab} | **{nc}/{nt}** | {m:g} | {lo:g} ~ {hi:g} |")
+        L.append("")
+        L.append("- 🔴 **«소수의 사고» 가 아니라 «상당수가 다르게 동작한다» 는 뜻이다.** "
+                 "프레임 몇 장을 열어 보는 것으로는 안 풀린다 — **자세·거리·조명 같은 조건 축**을 "
+                 "의심하고 `stats/metrics_long.csv` 에서 그 축과의 상관을 본다.")
+        L.append("- ⚠️ 이상치 표에서 **일부러 뺐다** — 25% 넘게 걸리는 지표를 이상치로 보고하면 "
+                 "«프레임 몇 장 문제» 로 오독하게 된다.\n")
+    L.append("- ★ **위 «여기부터 보라» 와 다른 도구다** — 저기는 **순위**(정상인 런에서도 뭔가 "
+             "나온다), 여기는 **분포**(아무것도 안 나오는 게 정상이고 **나오면 그 자체가 신호**다).")
+    L.append("- ★ **기준선이 필요 없다** — 런 자기 자신이 기준이라 **도메인 갭에 면역**이다. "
+             "sim 값과 아무리 달라도 실물 첫 런부터 그대로 작동한다.")
+    L.append("- ⚠️ **이상치 = «pose 가 틀렸다» 가 아니다.** §35-2c 에서 분할이 깨졌는데 "
+             "pose 는 정상인 프레임이 실제로 있었다. **어느 지표가 튀었는지**를 보고 상류를 연다.\n")
+
+    L.append("## 다음에 무엇을 할까 (비용 순)\n")
+    L.append("🔴 이 환경은 **로봇이 없고 손 촬영**이라 «촬영 0» 과 «촬영 2» 의 차이가 크다. "
+             "그래서 중요도가 아니라 **비용 순**이다.\n")
+    for i, s in enumerate(next_steps(v, diag, a), 1):
+        L.append(f"{i}. {s}")
+    L.append("\n⚠️ 이 목록은 **지금까지 sim 에서 본 실패 유형만** 안다. "
+             "새로운 증상은 여기 없다 — **목록이 짧다고 «문제 없음» 이 아니다.**\n")
+
+    # ── 「여기부터 보라」 ─────────────────────────────────────────────────────
+    picks = worst_frames(root, diag, v)
+    if picks:
+        L.append("## 여기부터 보라 — 지표별 최악 프레임\n")
+        L.append("| 프레임 | 걸린 지표 |")
+        L.append("|---|---|")
+        for f, reasons in picks.items():
+            L.append(f"| `{f}` | " + " · ".join(w for w, _ in reasons) + " |")
+        wd = make_worst_dir(a, root, picks)
+        if wd:
+            L.append(f"\n★ 이 프레임들만 `refine_contour --debug` 로 다시 돌렸다 → "
+                     f"**`{wd}/A1_debug/frame_*/contour_debug.png`**")
+            L.append("  - 노랑=모델 실루엣 샘플 · 빨강/파랑=찾아낸 관측 edge 까지의 잔차(밖/안) "
+                     "· 초록=GT(실물엔 없다). **범례가 이미지에 찍혀 있다** — "
+                     "`viz.overlay_pose` 와 색 규약이 달라서다.")
+            L.append("  - 🔴 **이 그림이 «Sobel 이 물체 경계를 잡았나, 융기 능선을 잡았나, "
+                     "그림자를 잡았나» 를 보는 유일한 수단이다.** 검정 몸체에서 정합기가 "
+                     "경계 안쪽 능선으로 끌려가는 계통 편향(§35-2i)을 실물에서 대리 관측하는 통로다.")
+        else:
+            L.append(f"\n⚠️ `{root}/worst/` 생성 실패 — 수동으로는 "
+                     f"`refine_contour ... --debug` 로 다시 돌리면 된다.")
+        L.append("\n⚠️ **순위 기반이지 임계값 기반이 아니다** — 정상인 런에서도 «상대적으로 가장 "
+                 "나쁜» 장은 나온다. *«이상이 있다»* 가 아니라 *«본다면 여기부터»* 다.\n")
 
     L.append("## 눈으로 볼 것\n")
     L.append(f"- 🔴 **진단 시트 — `{root}/diag/diag_sheet.png`** (프레임마다: `{root}/diag/diag_frame_*.png`)")
@@ -595,8 +1236,11 @@ def report(a) -> int:
     (root / "report.md").write_text(txt)
     (root / "report.json").write_text(json.dumps(
         {"in": str(in_dir), "obj": a.obj, "gate_deg": a.gate_deg,
-         "refs": a.refs or REFS_BY_PRESET[a.preset][0],
-         "capture": diag, "variants": v}, indent=2, ensure_ascii=False))
+         "datetime_local": time.strftime("%Y-%m-%d %H:%M:%S"), "note": a.note,
+         "preset": a.preset, "refs": a.refs or REFS_BY_PRESET[a.preset][0],
+         "true_distance_mm": a.true_distance_mm,
+         "capture": diag, "variants": v}, indent=2, ensure_ascii=False),
+        encoding="utf-8")
     print("\n" + txt)
     print(f"→ {root/'report.md'} · {root/'report.json'}")
     return 0
@@ -604,8 +1248,10 @@ def report(a) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="A그룹 원샷 러너 (근접 촬영 1벌 → A1~A4)")
-    ap.add_argument("--in", dest="in_dir", required=True, help="<dir>/frame_XXXX/{left,right,cam}")
-    ap.add_argument("--out", required=True)
+    # ⚠️ `--list-presets` 는 «디스크에 뭐가 있나» 만 보는 조회 명령이라 입출력이 필요 없다.
+    #    required=True 로 두면 목록을 보려고 더미 경로를 지어내야 한다 — 아래에서 직접 검사한다.
+    ap.add_argument("--in", dest="in_dir", help="<dir>/frame_XXXX/{left,right,cam}")
+    ap.add_argument("--out")
     ap.add_argument("--obj", default="assets/obj/foup_300_semi_r2")
     ap.add_argument("--preset", default="n25", choices=list(REFS_BY_PRESET),
                     help="촬영 거리대(cm) + 몸체 외관 → SAM3 참조. "
@@ -630,6 +1276,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--gate-deg", type=float, default=1.5)
     ap.add_argument("--fix-z", action="store_true",
                     help="§23 — depth 가 깨끗하면 켠다. 실물 depth 품질을 모르므로 기본은 끔")
+    # ── 실험 노트 ─────────────────────────────────────────────────────────────
+    #   🔴 실물은 «한 번에» 안 된다 — 거리·조명·참조·플래그를 바꿔 가며 여러 번 돌린다.
+    #      무엇을 바꿨는지가 안 남으면 20번째 런에서 «그 좋았던 게 어느 조합이었지» 가 된다.
+    ap.add_argument("--note", default=None,
+                    help="이 런의 조건 메모 (조명·노출·물체 배치·몇 번째 시도인지). "
+                         "run_meta.json 에 그대로 남고 tools/compare_runs.py 가 함께 보여준다")
+    ap.add_argument("--true-distance-mm", type=float, default=None,
+                    help="줄자로 잰 **카메라 ↔ flange 상면** 거리(mm). **선택**이다 — "
+                         "안 주면 FP 추정 z 와 stereo depth 중앙값끼리만 비교한다. "
+                         "주면 그 둘이 실측과 각각 얼마나 벗어나는지까지 나온다 → "
+                         "**계통 편향(scale·offset)을 real 에서 잡는 가장 싼 수단**")
     ap.add_argument("--overlay-frames", type=int, default=4, help="오버레이 시트에 넣을 프레임 수")
     ap.add_argument("--diag-all", action="store_true",
                     help="진단 시트를 **모든 프레임**에 대해 개별 장으로 쓴다 (기본은 시트에 든 것만)")
@@ -649,6 +1306,10 @@ def main(argv: list[str] | None = None) -> int:
             ok = (VISION / a.obj / name).is_dir()
             print(f"{k:14s}{name:44s}{'✅' if ok else '❌':5s} {desc}")
         return 0
+
+    missing = [n for n, val in (("--in", a.in_dir), ("--out", a.out)) if not val]
+    if missing:
+        ap.error(f"다음 인자가 필요하다: {', '.join(missing)}  (목록만 보려면 --list-presets)")
 
     # ★ 혼합 세트는 **참조마다 독립 질의**여야 한다 — `chain` 은 박스가 ref_0 에만 걸려
     #   («혼합» 이 아니라 «ref_0 세트») 가 된다. 조용히 틀리느니 여기서 바꾸고 알린다.
@@ -705,6 +1366,7 @@ def main(argv: list[str] | None = None) -> int:
             print(msg.replace("🔴", "⚠️ (--allow-cpu)"), file=sys.stderr)
 
     if a.report_only:
+        write_run_meta(a, frames)              # 리포트만 다시 낼 때도 메타는 갱신한다
         return report(a)
 
     steps = build_steps(a)
@@ -715,9 +1377,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"❌ --only 에 맞는 스텝이 없다: {a.only}", file=sys.stderr)
             return 2
 
-    print(f"== A그룹 | 프레임 {len(frames)}장 | obj {a.obj} | "
-          f"참조 {a.refs or REFS_BY_PRESET[a.preset][0]} | 게이트 {a.gate_deg}°")
+    print(f"== A그룹 | {time.strftime('%Y-%m-%d %H:%M:%S')} | 프레임 {len(frames)}장 | "
+          f"obj {a.obj} | 참조 {a.refs or REFS_BY_PRESET[a.preset][0]} | 게이트 {a.gate_deg}°"
+          + (f"\n   메모: {a.note}" if a.note else ""))
     t0 = time.time()
+    # ★ **런 시작 시점에 먼저 쓴다** — 중간에 죽어도 «무엇을 돌리려 했는지» 는 남아야 한다.
+    if not a.dry_run:
+        write_run_meta(a, frames)
     for s in steps:
         if s.done(frames) and not a.force:
             print(f"\n[{s.sid}] {s.desc}  — 산출물 있음, 건너뜀 (--force 로 재실행)")
@@ -732,7 +1398,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"❌ [{s.sid}] 실패 (rc={rc}) — 여기서 멈춘다", file=sys.stderr)
             return rc
     print(f"\n== 전체 {time.time()-t0:.1f}s")
-    return 0 if a.dry_run else report(a)
+    if a.dry_run:
+        return 0
+    write_run_meta(a, frames, elapsed=time.time() - t0)      # 소요 시간까지 채워 다시 쓴다
+    return report(a)
 
 
 if __name__ == "__main__":

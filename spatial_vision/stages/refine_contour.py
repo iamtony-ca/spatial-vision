@@ -49,6 +49,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+
+from spatial_vision.contracts import rotation_angle_deg
 import trimesh
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
@@ -64,8 +66,11 @@ def load_pose_mm(p: Path) -> np.ndarray | None:
     return T
 
 
+# 🔴 `arccos((tr−1)/2)` 는 항등 근처에서 오차를 **제곱근으로 증폭**한다 — 저장된 R 이
+#    정확히 직교가 아니라(9자리 반올림) **자기 자신과 비교해도 0.03° 가 나왔다**
+#    (실측 p90 0.028° · 최대 0.049°, 2026-08-19). 정본은 `contracts.rotation_angle_deg`.
 def rot_deg(R1: np.ndarray, R2: np.ndarray) -> float:
-    return float(np.degrees(np.arccos(np.clip((np.trace(R1.T @ R2) - 1.0) / 2.0, -1.0, 1.0))))
+    return rotation_angle_deg(R1, R2)
 
 
 def pose_json(T: np.ndarray, stage: str, extra: dict | None = None) -> dict:

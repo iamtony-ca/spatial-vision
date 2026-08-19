@@ -172,6 +172,31 @@ def disparity_to_depth_mm(
     return depth
 
 
+def rotation_angle_deg(R1: np.ndarray, R2: np.ndarray | None = None) -> float:
+    """두 회전 사이의 **측지 각도**(도). `R2` 를 생략하면 `R1` 자체의 회전각.
+
+    🔴 **`arccos((tr−1)/2)` 를 쓰면 안 된다** (2026-08-19 측정). 그 식은 항등 근처에서
+    **오차를 제곱근으로 증폭**한다: 저장된 R 은 9자리 반올림·`dR@R0` 누적 때문에 정확히
+    직교가 아니고(실측 `|RᵀR−I| ~ 3e-7`), 그러면 `cos θ = 1 − ε` 에서 `θ ≈ √(2ε)` 가 되어
+    **같은 행렬을 자기 자신과 비교해도 0.03° 가 나온다**(실측 p90 0.028° · 최대 0.049°).
+
+    이 잡음은 일상적인 비교(0.2~0.5°)에는 무해하지만 다음에서 **결론을 바꾼다**:
+      · 결정론 검사 · GT 를 초기값으로 준 «안 움직이는가» 검증(교훈 #48)
+      · **0.05° 미만을 주장하는 모든 수치**
+
+    대신 `θ = atan2(sin θ, cos θ)` 를 쓴다 — `sin θ` 는 반대칭 성분에서 직접 나오므로
+    항등 근처에서 **1차로** 정확하다. 자기 비교가 **정확히 0** 이고 0.001°·179.9° 양 끝에서
+    기존 식과 일치한다. scipy 가 필요 없어 **모든 venv 에서 쓸 수 있다.**
+    """
+    R = np.asarray(R1, dtype=np.float64)
+    if R2 is not None:
+        R = R.T @ np.asarray(R2, dtype=np.float64)
+    s = 0.5 * np.sqrt((R[2, 1] - R[1, 2]) ** 2 + (R[0, 2] - R[2, 0]) ** 2
+                      + (R[1, 0] - R[0, 1]) ** 2)          # sin θ
+    c = (np.trace(R) - 1.0) / 2.0                          # cos θ
+    return float(np.degrees(np.arctan2(s, c)))
+
+
 def select_index(masks: "np.ndarray", scores=None, rule: str = "score",
                  min_area_frac: float = 0.3, score_frac: float = 0.9) -> int:
     """후보 여러 개 중 타깃 하나를 고른다.

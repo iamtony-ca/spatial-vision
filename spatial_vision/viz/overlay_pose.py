@@ -41,6 +41,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+
+from spatial_vision.contracts import rotation_angle_deg
 import trimesh
 
 MASK_CANDIDATES = ("mask_band.png", "mask_flange_proj.png", "mask_flange.png")
@@ -69,9 +71,11 @@ def silhouette(mesh: trimesh.Trimesh, T: np.ndarray, K: np.ndarray, hw) -> np.nd
     return m
 
 
+# 🔴 `arccos((tr−1)/2)` 는 항등 근처에서 오차를 **제곱근으로 증폭**한다 — 저장된 R 이
+#    정확히 직교가 아니라(9자리 반올림) **자기 자신과 비교해도 0.03° 가 나왔다**
+#    (실측 p90 0.028° · 최대 0.049°, 2026-08-19). 정본은 `contracts.rotation_angle_deg`.
 def rot_deg(A: np.ndarray, B: np.ndarray) -> float:
-    c = (np.trace(A[:3, :3].T @ B[:3, :3]) - 1.0) / 2.0
-    return float(np.degrees(np.arccos(np.clip(c, -1.0, 1.0))))
+    return rotation_angle_deg(A[:3, :3], B[:3, :3])
 
 
 def draw_axes(img, T, K, mm: float) -> None:

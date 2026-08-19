@@ -359,10 +359,96 @@ python3 -m spatial_vision.stages.capture_real \
     --frames 10 --on-key --note "0.25m 근접"
 # → runs/real01_near/frame_XXXX/{left.png, right.png, cam.json}  ← 파이프라인 입력은 이게 전부다
 
+# [Jetson → 5090] 🔴 **이관.** 파이프라인 입력은 프레임당 3파일뿐이라 통째로 옮기면 된다
+#   (1920×1200 PNG 쌍 ≈ 프레임당 5~8MB → 20프레임 ≈ 150MB)
+rsync -avP runs/real01_near/ <5090>:/isaac-sim/volume/spatial_manipulation_ws/src/vision/runs/real01_near/
+
+# [5090] 옮겨진 게 온전한지 먼저 — **잘린 PNG 는 조용히 틀린 결과를 만든다**
+find runs/real01_near -name '*.png' | wc -l      # = 프레임 수 × 2
+envs/pose/bin/python -c "
+import cv2,glob,sys
+bad=[p for p in glob.glob('runs/real01_near/frame_*/*.png') if cv2.imread(p) is None]
+print('🔴 못 읽는 파일:', bad) if bad else print('✅ PNG', len(glob.glob('runs/real01_near/frame_*/*.png')), '장 전부 정상')"
+
 # [5090] ★ 손으로 잇지 말고 **A그룹 러너**를 쓴다 — 4개 venv 를 알아서 오가고
 #        GT-free 리포트(report.md)까지 낸다. 멱등이라 다시 돌려도 없는 것만 채운다.
-envs/pose/bin/python tools/run_group_a.py --in runs/real01_near --out runs/real01_A --preset n25
+envs/pose/bin/python tools/run_group_a.py --list-presets     # ① 참조 세트가 있는지 먼저 (인자 불필요)
+envs/pose/bin/python tools/run_group_a.py \
+    --in runs/real01_near --out runs/real01_A --preset n25orange --ism \
+    --note "형광등 2등, 정면, 1차 시도" --true-distance-mm 250    # ② 둘 다 선택 인자
+# 여러 번 돌린 뒤 — 설정 diff 를 먼저 내고 지표를 나란히 놓는다 (누적 실험 노트)
+envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
 ```
+
+★ `--preset` 은 **거리대 × 몸체 외관**이다(`n30orange` 식). 🔴 참조가 거리 종속이라 틀리면
+조용히 무너진다 — `--list-presets` 로 먼저 확인한다. `--ism` 은 ISM 대조군(추가 촬영 0).
+★ `--note` 는 `run_meta.json` 에 남아 `compare_runs.py` 가 함께 보여준다. `--true-distance-mm`
+(줄자값)을 주면 **FP 추정 z 와 stereo depth 중 어느 쪽이 틀렸는지**까지 갈린다 —
+안 줘도 둘끼리는 비교된다(`RESULTS.md §35-2l`).
+
+### 8.1 ★ **이미 이미지가 PC 에 있을 때 — 복붙 순서 5줄**
+
+🔴 **먼저 갈림길 하나** — 이관해 온 것이 무엇이냐에 따라 ②를 **건너뛴다**:
+
+| 옮겨 온 것 | ②(변환) | 왜 |
+|---|---|---|
+| `capture_real` 산출 디렉토리(`frame_XXXX/{left,right,cam.json}`) | ❌ **불필요** | 이미 우리 규약이다. **③으로 바로 간다** |
+| ZED Explorer·`.svo` 추출 등 **임의 파일명 PNG 쌍** | ✅ 필요 | 아래 루프로 프레임 디렉토리를 만든다 |
+
+촬영이 끝나 `left/right` PNG 쌍이 손에 있는 경우(파일명은 아무래도 좋다). **이게 실물 최단 경로다.**
+
+```bash
+cd /isaac-sim/volume/spatial_manipulation_ws/src/vision
+source envs/env.sh                                   # ① 🔴 빼먹으면 ONNX 가 조용히 CPU 로 떨어진다
+
+# ② PNG 쌍 → 프레임 디렉토리 (파일명 규칙만 본인 것으로 바꾼다)
+i=0
+for L in /path/to/shots/*_left.png; do
+    R="${L/_left/_right}"                            # ← 우측 파일명 규칙
+    printf -v FR "frame_%04d" $i
+    python3 tools/make_frame_from_zed.py --left "$L" --right "$R" \
+        --cam assets/cam/zedx_s48560070_hd1200.json --out runs/real01/$FR || break
+    i=$((i+1))
+done
+
+envs/pose/bin/python tools/run_group_a.py --list-presets      # ③ 참조 세트 확인 (인자 불필요)
+
+# ④ 전 체인 — stereo·SAM3·FP(±stage2)·정합 4변형·ISM 대조군·리포트까지 한 번에
+envs/pose/bin/python tools/run_group_a.py \
+    --in runs/real01 --out runs/real01_A --preset n25orange --ism \
+    --note "형광등 2등, 0.28m, 1차" --true-distance-mm 280
+
+# ⑤ 두 번째 런부터 — 설정 diff 를 먼저 내고 지표를 나란히 (누적 실험 노트)
+envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
+```
+
+**소요**: 20프레임에 **4~5분**(ONNX·SAM3·FP·ISM 콜드 스타트 전부 포함, `--ism` 없으면 절반).
+멱등이라 다시 돌려도 없는 것만 채운다(`--force` 로 강제, `--only st,A1` 로 부분 실행).
+
+🔴 **③을 건너뛰지 말 것** — `--preset` 은 **촬영 거리대 × 몸체 외관**이고(`n30orange` 식) SAM3 참조가
+거리 종속이라 틀리면 **조용히 무너진다**(원거리 참조로 근접 질의 시 IoU 0.044 전례).
+없는 세트를 주면 러너가 **종료코드 2 로 죽는다** — 조용한 실패보다 낫다.
+⚠️ `--note`·`--true-distance-mm`(줄자값)은 **선택**이지만 둘 다 주는 게 좋다. 전자는 실험 노트에
+남고, 후자는 **FP 추정 z 와 stereo depth 중 어느 쪽이 틀렸는지**까지 갈라 준다.
+⚠️ 입력은 **rectified · PNG 무손실** 이어야 한다. ZED SDK 의 `sl.VIEW.LEFT/RIGHT` 가 정류본이고
+`*_UNRECTIFIED` 는 `k1 0.543` 이 살아 있어 `cam.json`(왜곡항 0)과 안 맞는다.
+🔴 `make_frame_from_zed.py` 는 **정류를 하지 않는다** — 이미 정류된 것을 받는다고 **가정**한다.
+
+**나온 결과를 읽는 순서** (`runs/real01_A/report.md`):
+
+| 순서 | 볼 것 | 왜 |
+|---|---|---|
+| 1 | `## 촬영 진단` + `## 판정` 의 📏 눈금 | **이 런에서 10mm 가 몇 px 인가** — 오버레이를 정량적으로 보게 된다 |
+| 2 | 🔴 `overlay_sheet.png` | **GT 가 없으니 «맞는가» 를 보는 유일한 수단.** 지표를 아무리 봐도 «다 같이 틀린» 경우는 여기서만 보인다 |
+| 3 | `## 이 값이 상이한가` | sim 대역과 비교. ⚠️ 벗어남이 곧 고장이 아니다(도메인 갭일 수 있다) |
+| 4 | `## 이상 프레임` | 기준선 불필요 — **런 자기 자신이 기준**이라 도메인 갭에 면역 |
+| 5 | `## 여기부터 보라` → `worst/A1_debug/*/contour_debug.png` | Sobel 이 **물체 경계**를 잡았나, 융기 능선·그림자를 잡았나 |
+| 6 | `## 다음에 무엇을 할까` | **촬영 횟수 순** 행동 목록 |
+| 7 | `diag/diag_sheet.png` · `diag_trends.png` | «어디서 깨졌는가»(분할·depth·노출) |
+
+증상별 처방 지도는 **`PIPELINE_CATALOG.md §9.1(e)`** 다.
+
+---
 
 ⚠️ Jetson 에는 우리 venv 가 없다. `capture_real` 은 **repo import 가 0** 이라 **파일 하나만 복사해도**
 돌아간다. 필수는 `pyzed`·`numpy` 뿐이고 `cv2` 는 있으면 쓰고 없으면 ZED SDK 로 저장한다.

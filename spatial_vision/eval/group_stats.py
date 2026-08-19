@@ -40,6 +40,8 @@ from pathlib import Path
 
 import numpy as np
 
+from spatial_vision.contracts import rotation_angle_deg
+
 DEFAULT_VARIANTS = ["A1", "A2a", "A2b", "A4"]
 LABELS = {"A1": "A1 hole-excl (deploy)", "A2a": "A2a hole-contour", "A2b": "A2b hole-center",
           "A3": "A3 no-refine (FP)", "A4": "A4 refined-init"}
@@ -93,9 +95,11 @@ def mean_rotation(Rs):
         [2 * (x * z - y * w0), 2 * (y * z + x * w0), 1 - 2 * (x * x + y * y)]])
 
 
+# 🔴 `arccos((tr−1)/2)` 는 항등 근처에서 오차를 **제곱근으로 증폭**한다 — 저장된 R 이
+#    정확히 직교가 아니라(9자리 반올림) **자기 자신과 비교해도 0.03° 가 나왔다**
+#    (실측 p90 0.028° · 최대 0.049°, 2026-08-19). 정본은 `contracts.rotation_angle_deg`.
 def ang_deg(A, B):
-    c = (np.trace(A.T @ B) - 1.0) / 2.0
-    return float(np.degrees(np.arccos(np.clip(c, -1.0, 1.0))))
+    return rotation_angle_deg(A, B)
 
 
 # ─────────────────────────────────────────────────────────── 수집

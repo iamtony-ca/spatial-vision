@@ -147,20 +147,38 @@ spatial_manipulation_ws/src/
     │       ├── keypoints.json      #   rim/hole 기반 앵커점
     │       └── meta.json           #   단위·원점·bbox·표준부 치수
     ├── spatial_vision/             # 순수 파이썬 패키지 (얇은 오케스트레이션 계층)
-    │   ├── contracts.py            # StereoFrame / DepthMap / MaskSet / Pose6D + npz·json IO
-    │   ├── pipeline.py             # config → 스테이지 DAG → subprocess 실행
+    │   ├── contracts.py            # 스테이지 경계의 **유일한 공유 코드** (numpy+opencv 만 의존)
+    │   │                           #   CameraParams · depth PNG IO · write_stereo_frame
+    │   │                           #   disparity_to_depth_mm · select_index · rotation_angle_deg
+    │   ├── pipeline.py             # ⬜ **아직 없다** — config → 스테이지 DAG → subprocess 실행.
+    │   │                           #   콜드 스타트 40초 때문에 **배포 선결과제**로 승격됐다(§34-12b)
     │   ├── stages/
     │   │   ├── capture_sim.py      # ✅ Isaac 스테레오 rig 캡처 (isaac python)
-    │   │   ├── scene_random.py      # ✅ 조명·distractor·occluder randomizer (M2 확장)
+    │   │   ├── scene_random.py     # ✅ 조명·distractor·occluder randomizer (M2 확장)
     │   │   ├── capture_real.py     # ✅ ZED X (Jetson·pyzed). rectified L/R + cam.json 만 낸다
     │   │   ├── stereo_torch.py     # ✅ FoundationStereo PyTorch (research only)
     │   │   ├── stereo_onnx.py      # ✅ NGC ONNX (상업 가능)
     │   │   ├── segment_sam6d.py    # ✅ SAM6D ISM 래퍼 (M4)
     │   │   ├── segment_sam3.py     # ✅ SAM3 — 텍스트 / 같은이미지박스 / **exemplar 참조** 3경로 (M4)
-    │   │   └── pose_fp.py          # ✅ FoundationPose 2-stage (M5)
-    │   ├── cad/                    # ✅ prepare_obj / verify_obj / build_usd (M1) / build_sam3_refs (M4)
-    │   ├── eval/                   # ✅ verify_stereo(M2) / eval_depth(M3) / eval_seg(M4) / eval_pose(M5)
-    │   └── viz/
+    │   │   ├── pose_fp.py          # ✅ FoundationPose 2-stage (M5)
+    │   │   └── refine_contour.py   # ✅ **원본 해상도 테두리 정합 + 이동량 게이트** (M5b, §23·§26)
+    │   ├── cad/                    # ✅ prepare_obj / verify_obj / **verify_semi**(SEMI 규격 검사) /
+    │   │                           #   build_usd / build_semi_flange / build_rim_obj / build_hybrid_obj /
+    │   │                           #   perturb_mesh / render_band_masks / measure_symmetry /
+    │   │                           #   build_sam3_refs(후보 생성) / select_sam3_refs(§19 선정) / mix_sam3_refs
+    │   ├── eval/                   # ✅ verify_stereo(M2) / eval_depth(M3) / eval_seg(M4) / eval_pose(M5) /
+    │   │                           #   fuse_pose(G 계열 초기값) / **lr_consistency**(좌우 투영, GT-free) /
+    │   │                           #   **group_stats**(프레임×변형 표·그래프) / perturb_depth / perturb_image /
+    │   │                           #   depth_budget / verify_randomization
+    │   └── viz/                    # ✅ overlay_pose(GT 없이도 동작) / diag_sheet(6패널) /
+    │                               #   ref_sheet(SAM3 참조) / dim_sheet(치수 도면) / render_mesh
+    ├── tools/                      # 실환경 진입점·오케스트레이션 (패키지 밖 단독 스크립트)
+    │   ├── make_frame_from_zed.py  # ✅ 실카메라 L/R + 프로파일 → 프레임 디렉토리 (입력은 3파일뿐)
+    │   ├── run_group_a.py          # ✅ **A그룹 원샷 러너** — 4 venv 를 subprocess 로 오가며 A1~A4(+I그룹)
+    │   │                           #   + GT-free 리포트·진단시트·오버레이·통계·run_meta 까지 낸다
+    │   ├── compare_runs.py         # ✅ 런 N개 비교 (설정 diff 먼저 → 지표) + 누적 실험 노트
+    │   ├── get_zed_info.py         # ✅ ZED X 실측 intrinsic 덤프
+    │   └── zedx_check_pp_convention.py  # ⬜ cx/cy 반픽셀 규약 확인 (미실행)
     ├── third_party/                # git clone (submodule 아님 — 커밋 SHA 를 lock 파일에 기록)
     │   ├── FoundationStereo/  FoundationPose/  SAM-6D/  sam3/
     ├── weights/                    # 체크포인트 (gitignore)
