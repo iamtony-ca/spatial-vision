@@ -174,14 +174,14 @@ def segment_frame(model, device, rgb_path: Path, depth_mm: np.ndarray, K: np.nda
         print(f"    ⚠️ 퇴화 제안 {n_proposals - len(keep)}개 제외 (폭 또는 높이 0) "
               f"→ {len(keep)}개", flush=True)
     if len(keep) == 0:
-        return None, 0.0, None, n_proposals
+        return None, 0.0, None, n_proposals, select
     detections.filter(keep)
 
     q_desc, q_appe = model.descriptor_model.forward(np.array(rgb), detections)
 
     idx_sel, pred_idx_obj, semantic_score, best_template = model.compute_semantic_score(q_desc)
     if len(idx_sel) == 0:
-        return None, 0.0, None, n_proposals
+        return None, 0.0, None, n_proposals, select
     detections.filter(idx_sel)
     q_appe = q_appe[idx_sel, :]
 
@@ -202,9 +202,18 @@ def segment_frame(model, device, rgb_path: Path, depth_mm: np.ndarray, K: np.nda
 
     M = detections.masks.detach().cpu().numpy().astype(bool)
     S = final.detach().cpu().numpy()
+    used = select
     if select == "exemplar":
         if ref_mask is None or not ref_mask.any():
-            # 참조가 없으면 조용히 다른 규칙으로 넘어가지 않는다 — 어떤 규칙이 쓰였는지 모호해진다.
+            # 🔴 **조용히 넘어가면 안 된다.** 주석은 그렇게 적혀 있었는데 코드는 말없이 `score` 로
+            #    후퇴하고 있었다(2026-08-20 실물에서 드러남). 그 결과 «exemplar 로 골랐다» 고
+            #    믿게 되는데 실제로는 ISM 점수가 골랐고, **광각·원거리에서 배경을 집는다**
+            #    (§34-10 오선택 14/120). 사용자가 «mask_full 은 멀쩡한데 50cm 에서 가장자리
+            #    물체를 잡는다» 를 본 것이 정확히 이 경로다.
+            #    → 후퇴는 그대로 하되 **반드시 알린다**(교훈 #21: 폴백은 «있다» 보다 «조용하다» 가 위험).
+            used = "score(exemplar 비어서 후퇴)"
+            print(f"    ⚠️ exemplar 마스크가 비었다 → **`score` 규칙으로 후퇴**한다. "
+                  f"이 프레임의 선택은 SAM3 와 무관하며 배경을 집을 수 있다", flush=True)
             best = select_index(M, S, "score", min_area_frac)
         else:
             inter = (M & ref_mask[None]).sum(axis=(1, 2)).astype(np.float64)
@@ -214,7 +223,7 @@ def segment_frame(model, device, rgb_path: Path, depth_mm: np.ndarray, K: np.nda
         best = select_index(M, S, select, min_area_frac)
     mask = detections.masks[best].detach().cpu().numpy().astype(bool)
     box = detections.boxes[best].detach().cpu().numpy().tolist()
-    return mask, float(final[best]), box, n_proposals
+    return mask, float(final[best]), box, n_proposals, used
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -270,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
             ref_mask = (rm > 127) if rm is not None else None
 
         ts = time.time()
-        mask, score, box, n_prop = segment_frame(model, device, f / "left.png", depth_mm, K,
+        mask, score, box, n_prop, sel_used = segment_frame(model, device, f / "left.png", depth_mm, K,
                                                  args.select, args.select_min_area_frac, ref_mask)
         dt = (time.time() - ts) * 1000
         t_frames.append(dt)
@@ -282,8 +291,12 @@ def main(argv: list[str] | None = None) -> int:
                     (np.zeros(depth_mm.shape, np.uint8) if mask is None else (mask * 255).astype(np.uint8)))
         (od / f"det_{args.target}.json").write_text(json.dumps(
             {"score": score, "bbox": box, "area_px": area, "n_proposals": n_prop,
+             # ★ **어떤 선택 규칙이 실제로 쓰였는가** — exemplar 가 비면 score 로 후퇴하므로
+             #   기록해 두지 않으면 «exemplar 로 골랐다» 고 오해하게 된다.
+             "select_used": sel_used,
              "found": mask is not None}, indent=2))
-        results.append({"frame": f.name, "score": score, "area_px": area, "n_proposals": n_prop})
+        results.append({"frame": f.name, "score": score, "area_px": area,
+                        "n_proposals": n_prop, "select_used": sel_used})
         print(f"  {f.name}: {dt:7.0f}ms  score {score:.3f}  area {area:6d}px  proposals {n_prop}")
 
     meta = {

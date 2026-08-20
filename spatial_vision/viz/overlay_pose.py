@@ -276,10 +276,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.per_frame_dir:
         pfd = Path(args.per_frame_dir)
         pfd.mkdir(parents=True, exist_ok=True)
-        head = label_bar("  |  ".join(f"{lab:^18}" for _, _, lab in preds), W, 28, (0, 255, 255))
+        # ⚠️ **프레임별 이미지의 폭은 `W` 가 아니다** — `W` 는 시트 격자용(`ncol × tile`)이고
+        #    여기 한 줄은 **예측 개수 × tile** 이다. 예측이 하나면 둘이 어긋나 concat 이 터진다.
+        Wf = len(preds) * args.tile
+        head = label_bar("  |  ".join(f"{lab:^18}" for _, _, lab in preds), Wf, 28, (0, 255, 255))
         for fname, tiles in rows:
             cv2.imwrite(str(pfd / f"overlay_{fname}.png"),
-                        np.concatenate([label_bar(legend, W, 30), head,
+                        np.concatenate([label_bar(legend, Wf, 30), head,
                                         np.concatenate(tiles, 1)], 0))
         print(f"→ {pfd}/overlay_frame_*.png  ({len(rows)}장)")
     return 0

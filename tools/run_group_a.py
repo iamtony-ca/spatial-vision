@@ -45,6 +45,25 @@
     ⚠️ ISM 템플릿(`ism_full/`)은 CAD 렌더라 **거리 무관**이다. SAM3 참조와 정반대로
        거리대마다 다시 만들 필요가 없다.
 
+★ `--sam3-text` — SAM3 를 **참조 없이 낱말로** 돌리는 경로(T그룹). **추가 촬영 0.**
+
+    seg_txt   segment_sam3 --target full --prompt "…" --confidence 0.05 --select center
+    fp_txt    pose_fp --primary full --no-stage2 --masks seg_txt
+    T1        refine_contour --outer-only                  ← A1·I1 과 정합 조건 동일
+    T3        정합 off (= fp_txt/pose_coarse.json)         ← T1 의 이득 분모
+
+    🔴 **실물에서 실제로 통과한 원거리 경로가 이쪽이었다**(§35-2m). exemplar 는 «참조 사진과
+       닮았는가» 를 묻고 텍스트는 «낱말에 맞는가» 를 묻는다 — **참조 자산의 도메인 갭이 없다.**
+    🔴 **프롬프트를 실물 몸체에 맞춘다.** 기본 `"black plastic box"` 는 sim 검정 몸체 기준이다.
+       반투명 주황이면 `--text-prompt "orange plastic box"`, 투명이면 `"clear plastic box"`.
+    ⚠️ **미검출은 마스크 품질이 아니라 임계값 문제**다(§35-2m-2): 50cm 에서 conf 0.15 → 17/20,
+       0.05 → **20/20** 인데 IoU 중앙은 0.986 으로 불변이고 오선택도 0 이었다. 그래서 기본이 0.05 다.
+    ⚠️ `--select center` 는 «카메라가 타깃을 겨눈다» 는 씬 규약에 기댄다(교훈 #15) — sim 은 그렇게
+       생성돼 **자기순환**이다. 실물에서는 배경을 집을 수 있으니 **오버레이로 확인**하고,
+       필요하면 `--text-select score` 로 바꾼다.
+    ⚠️ T1 도 `--primary full` 이다 — 텍스트로 `flange` 를 따로 뽑으면 안 된다(§M4: SAM3 의 결손이
+       flange 에 몰린다, recall 0.844 vs body 0.968). **A1↔I1↔T1 은 pose 메쉬가 A 만 다르다.**
+
 🔴 실환경에는 GT 가 없다 — 리포트는 **GT-free 지표만** 낸다
     ① **게이트 후퇴율**  — 폭주 여부. 홀 전략 셋을 비교하면 *"CAD 홀이 실물과 맞는가"* 가 나온다(§28-5)
     ② **좌우 투영 일관성** — 왼쪽만 보고 정합한 pose 를 오른쪽에 투영해 채점. A3 판정의 유일한 근거
@@ -160,11 +179,60 @@ class Step:
         #    set -e 로 뒤의 venv 를 통째로 날렸다). optional 은 실패해도 다음으로 간다.
         self.optional = optional
 
+    def resolve(self) -> list:
+        """★ `cmd` 가 함수면 **실행 직전에** 부른다.
+
+        진단 스테이지(`ov`·`diag`)는 «어느 팔이 실제로 pose 를 냈는가» 에 따라 가리킬 곳이
+        달라진다. 스텝 목록은 런 시작 시점에 만들어지므로 그때는 아직 아무것도 없다.
+        → 앞 스텝이 끝난 뒤에 결정하도록 미룬다."""
+        self.cmd = self.cmd() if callable(self.cmd) else self.cmd
+        return self.cmd
+
     def done(self, frames: list[Path]) -> bool:
         if self.per_frame:
             return bool(frames) and all((self.out / f.name / self.sentinel).exists()
                                         for f in frames)
         return (self.out / self.sentinel).exists()
+
+
+def _n_pose(d: Path) -> int:
+    """그 디렉토리가 실제로 낸 pose 개수. 정합 팔은 `pose_refined.json`,
+    FP 팔은 `pose_coarse.json` 이라 **둘 다** 센다."""
+    d = Path(d)
+    return len(list(d.glob("frame_*/pose_refined.json"))) or \
+        len(list(d.glob("frame_*/pose_coarse.json")))
+
+
+def _live_preds(cands: list[str]) -> list[str]:
+    """`dir` 또는 `dir:name` 목록에서 **pose 가 실제로 있는 것만** 남긴다.
+    전부 비면 원본을 그대로 돌려준다 — 그래야 «왜 비었나» 가 오류 메시지로 드러난다."""
+    live = [c for c in cands if _n_pose(c.split(":")[0])]
+    if live and len(live) != len(cands):
+        drop = [Path(c.split(":")[0]).name for c in cands if c not in live]
+        print(f"    ⚠️ pose 가 없는 팔은 뺀다: {', '.join(drop)}", flush=True)
+    return live or cands
+
+
+def _live_pose_dir(cands: list[Path]) -> Path:
+    """진단 시트의 6번 패널이 가리킬 곳 — **pose 를 낸 첫 팔**."""
+    for d in cands:
+        if _n_pose(d):
+            if d != cands[0]:
+                print(f"    ⚠️ `{cands[0].name}` 에 pose 가 없다 → 진단 시트는 "
+                      f"**`{d.name}`** 을 가리킨다", flush=True)
+            return d
+    return cands[0]
+
+
+def _live_seg(cands: list[Path], mask_name: str, fallback: Path) -> Path:
+    """마스크 패널이 가리킬 분할 산출물 — **마스크가 실제로 있는 첫 것**."""
+    for d in cands:
+        if list(Path(d).glob(f"frame_*/{mask_name}")):
+            if d != cands[0]:
+                print(f"    ⚠️ `{Path(cands[0]).name}` 에 {mask_name} 이 없다 → "
+                      f"**`{Path(d).name}`** 을 쓴다", flush=True)
+            return d
+    return fallback
 
 
 def build_steps(a) -> list[Step]:
@@ -240,6 +308,31 @@ def build_steps(a) -> list[Step]:
                  ism_fp, "meta_pose.json"),
         ]
 
+    # ── SAM3 «텍스트» 경로 (T그룹) — 참조 자산 비의존 ──────────────────────────────────────────
+    # 🔴 A그룹(exemplar)과 **같은 모델·다른 조건부**다. A 는 참조 이미지에, T 는 낱말에 건다.
+    #    실물에서 실제로 통과한 원거리 경로가 이쪽이었다(§35-2m) — 참조의 도메인 갭을 우회한다.
+    # ⚠️ `--select center` 는 «카메라가 타깃을 겨눈다» 는 씬 규약에 기댄다(교훈 #15).
+    #    실물에서 배경·파편을 집을 수 있으므로 **오버레이로 반드시 확인**한다. `--text-select` 로 바꾼다.
+    if a.sam3_text:
+        seg_t, txt_fp = o / "seg_txt", o / "fp_txt"
+        steps += [
+            Step("seg_txt", f"segment full (SAM3 텍스트 “{a.text_prompt}” · 참조 비의존)",
+                 [PY["sam3"], "-m", "spatial_vision.stages.segment_sam3",
+                  "--in", a.in_dir, "--out", seg_t, "--target", "full",
+                  "--prompt", a.text_prompt, "--confidence", a.text_conf,
+                  "--select", a.text_select],
+                 seg_t, "meta_segment_full.json"),
+            # 🔴 `--primary full` 이다 — 텍스트로는 `flange` 를 따로 못 뽑는다(§ M4: SAM3 의 결손이
+            #    flange 에 몰린다, recall 0.844 vs body 0.968). I그룹과 같은 이유로 `full` 만 쓴다.
+            Step("fp_txt", "FoundationPose (텍스트 마스크 · --primary full)",
+                 [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
+                  "--in", a.in_dir, "--out", txt_fp, "--no-stage2",
+                  "--obj", obj, "--masks", seg_t, "--depth", "stereo", "--depth-dir", st,
+                  "--primary", "full", "--flange-mask-from", "pose",
+                  "--input-scale", a.input_scale],
+                 txt_fp, "meta_pose.json"),
+        ]
+
     # (id, 설명, 초기 pose 디렉토리, 초기 pose 파일명, 추가 플래그)
     arms = [
         ("A1", "홀 제외  --outer-only            ← 배포본 [A]/P9", ns2, "pose_coarse.json",
@@ -255,6 +348,9 @@ def build_steps(a) -> list[Step]:
     if a.ism:
         arms.append(("I1", "ISM 초기값 + 정합       ← A1 의 CAD-only 대조군",
                      o / "fp_ism", "pose_coarse.json", ["--outer-only"]))
+    if a.sam3_text:
+        arms.append(("T1", "텍스트 초기값 + 정합    ← 참조 비의존 대조군",
+                     o / "fp_txt", "pose_coarse.json", ["--outer-only"]))
     for sid, desc, pdir, pname, extra in arms:
         d = Path(a.out) / sid
         steps.append(Step(sid, desc,
@@ -269,6 +365,8 @@ def build_steps(a) -> list[Step]:
     lr = [("A3", ns2, "pose_coarse.json")]
     if a.ism:
         lr.append(("I3", o / "fp_ism", "pose_coarse.json"))
+    if a.sam3_text:
+        lr.append(("T3", o / "fp_txt", "pose_coarse.json"))
     lr += [(sid, Path(a.out) / sid, "pose_refined.json") for sid, *_ in arms]
     for sid, pdir, pname in lr:
         steps.append(Step(f"lr_{sid}", f"좌우 투영 일관성 · {sid}",
@@ -281,27 +379,37 @@ def build_steps(a) -> list[Step]:
     # 🔴 **육안 검사 시트 — 실환경에서 이게 유일한 «맞는가» 판정 수단이다.**
     #    GT 가 없으니 R/t 오차를 못 낸다. 남는 것은 *"투영 실루엣이 사진의 진짜 테두리에 붙는가"* 이고
     #    그건 겹쳐 그려야만 보인다. 변형 다섯을 **같은 크롭**으로 나란히 놓아 서로 어긋나는지도 본다.
-    ov = [f"{ns2}:pose_coarse.json"] + [str(Path(a.out) / sid) for sid, *_ in arms]
+    #    🔴 **없는 팔을 넘기면 시트 전체가 「없음」으로 나온다** — SAM3 flange 가 비면 A1~A4 가
+    #    아예 안 만들어지는데, 같은 런의 `I1` 에는 멀쩡한 pose 가 있다. 그걸 못 보고 «pose 실패»
+    #    로 오진한 전례가 있다 → **실행 직전에 실제로 pose 를 낸 팔만** 넘긴다.
+    ov_cands = [f"{ns2}:pose_coarse.json"] + [str(Path(a.out) / sid) for sid, *_ in arms]
     steps.append(Step("ov", "오버레이 시트 (육안 검사)",
-                      [PY["pose"], "-m", "spatial_vision.viz.overlay_pose",
-                       "--capture", a.in_dir, "--obj", obj, "--mesh", "top_flange.ply",
-                       "--frames", a.overlay_frames, "--tile", 380,
-                       "--mask-alpha", a.overlay_mask_alpha,
-                       "--per-frame-dir", o / "overlay",
-                       "--out", o / "overlay_sheet.png"]
-                      + sum((["--pred", p] for p in ov), []),
+                      lambda: [PY["pose"], "-m", "spatial_vision.viz.overlay_pose",
+                               "--capture", a.in_dir, "--obj", obj, "--mesh", "top_flange.ply",
+                               "--frames", a.overlay_frames, "--tile", 380,
+                               "--mask-alpha", a.overlay_mask_alpha,
+                               "--per-frame-dir", o / "overlay",
+                               "--out", o / "overlay_sheet.png"]
+                              + sum((["--pred", p] for p in _live_preds(ov_cands)), []),
                       o, "overlay_sheet.png", optional=True))
 
     # 🔵 단계별 산출물 6패널 — «맞는가»(ov) 가 아니라 **«어디서 깨졌는가»** 를 본다.
     #    분할 0 · depth 미관통 · 노출 이상은 여기서만 갈린다.
+    #    🔴 `--pose-dir` 를 `A1` 로 박아 두면 SAM3 flange 가 빈 런에서 6번 패널이 「없음」이 된다
+    #    — `I1` 에 pose 가 있어도 그렇다. 마스크 패널도 마찬가지로 살아 있는 분할을 가리킨다.
+    arm_ids = [sid for sid, *_ in arms]
     steps.append(Step("diag", "진단 시트 (원본·마스크 2종·depth·valid·pose)",
-                      [PY["pose"], "-m", "spatial_vision.viz.diag_sheet",
-                       "--in", a.in_dir, "--out", o / "diag",
-                       "--seg-full", o / "seg_full", "--seg-flange", seg,
-                       "--depth-dir", st, "--pose-dir", Path(a.out) / "A1",
-                       "--obj", obj, "--frames", a.overlay_frames, "--width", 380,
-                       "--gate-deg", a.gate_deg]
-                      + (["--all"] if a.diag_all else []),
+                      lambda: [PY["pose"], "-m", "spatial_vision.viz.diag_sheet",
+                               "--in", a.in_dir, "--out", o / "diag",
+                               "--seg-full", _live_seg([o / "seg_full", o / "seg_ism",
+                                                        o / "seg_txt"],
+                                                       "mask_full.png", o / "seg_full"),
+                               "--seg-flange", seg,
+                               "--depth-dir", st,
+                               "--pose-dir", _live_pose_dir([Path(a.out) / s for s in arm_ids]),
+                               "--obj", obj, "--frames", a.overlay_frames, "--width", 380,
+                               "--gate-deg", a.gate_deg]
+                              + (["--all"] if a.diag_all else []),
                       o / "diag", "diag_sheet.png", optional=True))
 
     # 🔵 통계 — 흩어진 JSON 을 **한 표**로 합치고 분포 그래프·CSV 를 낸다.
@@ -746,6 +854,28 @@ def verdicts(v: dict[str, dict], diag: dict, ism: bool = False) -> list[str]:
                    + ("깨끗·정확 조건의 기본값 그대로다."
                       if c <= r else "refined 가 이긴다는 것은 **CAD 불일치 신호**다(§32 표)."))
 
+    # ★★★★ **정합 on/off 를 GT 없이 정하는 값** (§35-2m-6). 네 조건(28/50cm × black·orange·clear)에서
+    #   6.2 / 17.5 / 1.7 / 1.8mm 로 깨끗하게 갈렸다. «거리» 가 아니라 «정합기가 신호를 찾았나» 를 잰다.
+    #   🔴 `--gate-deg` 는 회전만 보므로 **t 로만 새는 계통 편향을 못 잡는다** — 그래서 이 값이 따로 필요하다.
+    for sid in ("A1", "I1", "T1"):
+        mm = v.get(sid, {}).get("moved_mm_med")
+        if mm is None:
+            continue
+        if mm >= 10:
+            out.append(f"🔴 **{sid} 정합을 쓰지 말 것 — 이동량 t 중앙 {mm:.1f}mm (≥10mm)**. "
+                       f"정합기가 외곽 경계를 못 찾고 엉뚱한 에지로 수렴한 것이다. "
+                       f"**게이트가 못 막는다**(회전만 보는데 이 실패는 t 로만 샌다). "
+                       f"흔한 원인은 **몸체와 flange 가 같은 검정**이라 외곽에 밝기 경계가 없는 것(§35-2i) "
+                       f"— 오버레이에서 초록 윤곽이 «융기 능선» 에 붙었는지 확인할 것. "
+                       f"→ 이 런의 결론은 **{sid[0]}3**(정합 전)으로 낸다.")
+        elif mm >= 5:
+            out.append(f"⚠️ **{sid} 이동량 t 중앙 {mm:.1f}mm** — 경계 구간(5~10mm)이다. "
+                       f"정합이 중립일 가능성이 높다. **{sid} 와 {sid[0]}3 의 좌우 일관성을 비교**하고 "
+                       f"오버레이를 눈으로 볼 것.")
+        else:
+            out.append(f"✅ **{sid} 이동량 t 중앙 {mm:.1f}mm** — 정합기가 외곽 신호를 찾았다. "
+                       f"이 대역에서는 정합이 R 을 1.5~2.0배 개선한다(§35-2m-6).")
+
     a3, a1 = v.get("A3", {}).get("lr_ddx"), v.get("A1", {}).get("lr_ddx")
     if a3 is not None and a1 is not None:
         if diag.get("n_frames", 0) < 10:
@@ -1026,14 +1156,18 @@ def report(a) -> int:
     root = Path(a.out)
     in_dir = Path(a.in_dir)
     diag = capture_diag(in_dir, root / "st", root / "seg", root / "fp_ns2")
-    ids = ["A1", "A2a", "A2b", "A4"] + (["I1"] if a.ism else [])
+    ids = ["A1", "A2a", "A2b", "A4"] + (["I1"] if a.ism else []) \
+        + (["T1"] if a.sam3_text else [])
     v = {sid: read_variant(root, sid) for sid in ids}
     v["A3"] = read_variant(root, "A3")                       # 정합 없음 — lr 만 있다
     if a.ism:
         v["I3"] = read_variant(root, "I3")                   # ISM 경로의 정합 전 (I1 의 분모)
+    if a.sam3_text:
+        v["T3"] = read_variant(root, "T3")                   # 텍스트 경로의 정합 전 (T1 의 분모)
     labels = {"A1": "A1 홀 제외 (배포본)", "A2a": "A2a 홀 윤곽 (규격부)",
               "A2b": "A2b 홀 중심", "A3": "A3 정합 off (FP 단독)", "A4": "A4 refine 초기값",
-              "I1": "I1 ISM 초기값 + 정합 (CAD only)", "I3": "I3 ISM 정합 off"}
+              "I1": "I1 ISM 초기값 + 정합 (CAD only)", "I3": "I3 ISM 정합 off",
+              "T1": "T1 텍스트 초기값 + 정합 (참조 비의존)", "T3": "T3 텍스트 정합 off"}
 
     L = []
     L.append(f"# A그룹 결과 — `{in_dir}`\n")
@@ -1082,17 +1216,22 @@ def report(a) -> int:
     L.append("")
 
     L.append("## 변형 비교 (GT-free)\n")
-    L.append("| 변형 | 게이트 후퇴 | 대응점 | rms px | 이동 ° 중앙/최대 | 좌우 \\|Δdx\\| px "
-             "| 좌우 Δdx **부호** | 좌우 dz mm |")
-    L.append("|---|---|---|---|---|---|---|---|")
+    # ★ `이동 mm 중앙` 이 **정합 on/off 판정값**이다(§35-2m-6): ≥10mm 면 정합기가 신호를 못 찾은 것.
+    #   `이동 °` 와 달리 게이트 축이 아니라서 «게이트가 못 잡는 t 편향» 까지 드러난다.
+    L.append("| 변형 | 게이트 후퇴 | 대응점 | rms px | 이동 ° 중앙/최대 | **이동 mm 중앙** "
+             "| 좌우 \\|Δdx\\| px | 좌우 Δdx **부호** | 좌우 dz mm |")
+    L.append("|---|---|---|---|---|---|---|---|---|")
     # ⚠️ ISM 경로도 **같은 표**에 넣는다 — 따로 내면 나란히 비교가 안 된다.
-    for sid in ["A3", "A1", "A2a", "A2b", "A4"] + (["I3", "I1"] if a.ism else []):
+    for sid in ["A3", "A1", "A2a", "A2b", "A4"] + (["I3", "I1"] if a.ism else []) \
+            + (["T3", "T1"] if a.sam3_text else []):
         r = v.get(sid, {})
         gp = f"{r['gated']}/{r['n']} ({r['gated_pct']}%)" if "gated" in r else "—"
         mv = f"{r['moved_deg_med']:.2f} / {r['moved_deg_max']:.2f}" if "moved_deg_med" in r else "—"
         sg = r.get("lr_ddx_signed")
+        mm = r.get("moved_mm_med")
+        mms = f"**{mm:.2f}**{' 🔴' if mm >= 10 else ''}" if mm is not None else "—"
         L.append(f"| {labels[sid]} | {gp} | {r.get('n_corr', '—')} | "
-                 f"{r.get('rms_px', '—')} | {mv} | "
+                 f"{r.get('rms_px', '—')} | {mv} | {mms} | "
                  f"**{r.get('lr_ddx', '—')}** | {f'{sg:+.2f}' if sg is not None else '—'} | "
                  f"{r.get('lr_dz', '—')} |")
     L.append("")
@@ -1271,6 +1410,17 @@ def main(argv: list[str] | None = None) -> int:
     #   진단용 `seg_full` 처럼 SAM3 마스크를 exemplar 로 받지 않는다.
     ap.add_argument("--ism", action="store_true",
                     help="SAM-6D ISM 경로(ISM 경로)를 함께 돌린다 — CAD 템플릿 단독, SAM3 비의존")
+    # ★ T그룹 — SAM3 를 **참조 없이 낱말로** 돌리는 팔. 참조 자산의 도메인 갭을 우회한다.
+    #   🔴 프롬프트는 **실물 몸체 외관에 맞춰야** 한다. 기본값은 sim 검정 몸체 기준이다.
+    ap.add_argument("--sam3-text", action="store_true",
+                    help="SAM3 텍스트 프롬프트 경로(T그룹)를 함께 돌린다 — 참조 자산 비의존")
+    ap.add_argument("--text-prompt", default="black plastic box",
+                    help="T그룹 프롬프트. 🔴 실물 몸체 색에 맞출 것 "
+                         "(예: \"orange plastic box\" · \"clear plastic box\")")
+    ap.add_argument("--text-conf", type=float, default=0.05,
+                    help="T그룹 검출 임계값. §35-2m-2 — 0.05 가 검출률만 올리고 오선택은 안 늘렸다")
+    ap.add_argument("--text-select", default="center", choices=["center", "score", "largest"],
+                    help="⚠️ center 는 «카메라가 타깃을 겨눈다» 는 규약에 기댄다(교훈 #15)")
     ap.add_argument("--stereo-scale", type=float, default=0.5)
     ap.add_argument("--input-scale", type=float, default=0.5, help="🔴 1.0 은 OOM (§34-12)")
     ap.add_argument("--gate-deg", type=float, default=1.5)
@@ -1389,7 +1539,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"\n[{s.sid}] {s.desc}  — 산출물 있음, 건너뜀 (--force 로 재실행)")
             continue
         print(f"\n[{s.sid}] {s.desc}")
-        rc = sh(s.cmd, a.dry_run)
+        rc = sh(s.resolve(), a.dry_run)
         if rc != 0:
             if s.optional:
                 print(f"⚠️ [{s.sid}] 실패 (rc={rc}) — **넘어간다**(진단용). "
