@@ -1072,8 +1072,9 @@ A2~A4 대조군은 추가 촬영 0 이다 → §9.1★c.
 ```bash
 python3 tools/make_frame_from_zed.py --left L.png --right R.png \
     --cam assets/cam/zedx_s48560070_hd1200.json --out runs/real01/frame_0000
-envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A --preset n25 \
-    --note "형광등 2등, FOUP 정면, 1차 시도" --true-distance-mm 280      # 둘 다 선택
+envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
+    --preset n30black --ism --sam3-text --text-prompt "black plastic box" \
+    --note "형광등 2등, FOUP 정면, 1차 시도" --true-distance-mm 280      # 뒤 둘은 선택
 # 여러 번 돌린 뒤 — 설정 diff 를 먼저 내고 지표를 나란히 놓는다
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
 ```
@@ -1105,6 +1106,18 @@ envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index
 | **A4** | **FP `refine` on/off** | `--no-stage2` 유무 | coarse 0.510 / refined 0.656 | **0** | 후퇴율 낮은 쪽 채택(§32 판정 절차). 급등 = CAD 불일치 |
 | **A5** | **근접 거리 3점** | 0.22~0.30 / 0.28~0.35 / 0.35~0.45m | 419 / 343 / 264px · R 0.220/0.291/0.384 | **각 1** | sim 최적점 재현 + **손이 닿는 거리** 확인. 🔴 **후퇴율로 판정하면 안 된다**(위 9.1★b) — 좌우 일관성 + 오버레이 육안으로 본다 |
 | **I1·I3** | **ISM 경로 대조군** (CAD 템플릿 단독) | `run_group_a.py --ism` | `black` n25 12/20 → **n30 17/20** (§35-2h) | **0** | `A1` 과 z 가 크게 어긋나면 한쪽이 틀린 것이다. **거리대에 민감**하니 A5 와 같이 읽는다 |
+| **T1·T3** | **텍스트 경로 대조군** (참조 자산 비의존) | `--sam3-text --text-prompt "…"` | 50cm `black` T3 ≈ I3 (R 0.470↔0.452) (§35-2m-5) | **0** | **참조의 도메인 갭을 우회한다.** A 가 무너지고 T 가 살면 원인은 «참조» 지 «SAM3» 가 아니다 |
+
+🔴🔴 **A 계열이 전부 비어도 막다른 길이 아니다** (§35-2m). A 는 `pose_fp --primary flange` 라
+**`mask_flange` 가 필수**인데, **I·T 는 `--primary full`** 이라 그 마스크를 아예 안 쓴다.
+검정 몸체에서 flange exemplar 가 비는 일이 실제로 있었고, 그때 pose 는 `I1`/`T1` 에서 나왔다.
+⚠️ 대신 **`--primary full` 은 t 가 구조적으로 3배 나쁘다**(§22: 4.34 vs 1.38 mm/px) — 바꿔 쓸 값이 아니다.
+★ 실행 직후 한 줄: `ls runs/<out>/{A1,I1,T1}/frame_*/pose_refined.json | wc -l`
+
+★★★★ **정합 on/off 는 «이동량 t 중앙» 으로 정한다** (§35-2m-6, 러너 리포트가 자동 판정).
+**≥10mm 면 정합을 쓰지 않고 `A3`/`I3`/`T3`(정합 전)를 결론으로 낸다.** 네 조건에서 깨끗하게 갈렸다:
+28cm black 6.2 / 50cm black **17.5**(해로움) / 50cm orange 1.7 / 50cm clear 1.8(이득).
+🔴 **게이트(`--gate-deg`)로는 못 잡는다** — 게이트는 회전만 보는데 이 실패는 **t 로만 샌다.**
 
 🔴 **A5 는 거리마다 SAM3 참조가 다르다** — 참조는 **배포 거리에서** 만들어야 한다(원거리 참조로 근접
 질의 시 IoU 0.044). 자산은 **거리 6대역 × 몸체 외관 4 = 24세트**가 있다
@@ -1124,7 +1137,7 @@ n30 도 18/20 이 잘렸다. `flange` 경로는 무영향이지만 **ISM(`full` 
 |---|---|---|---|---|---|
 | **B1** | **원거리 분할 백엔드** | ISM / SAM3 `n-refs 3` / `n-refs 5` | 오선택 14 / **8** / 5 · 1.50/0.93/1.53s | **1** | 광각에서 뒤집힌 결론(§34-10)이 실물에서도 유지되는지. **무료 대조군** |
 | **B2** | **P0 — 원거리 `full` coarse 바닥선** | 0.55~0.70m 단일 | 0.549 / 1.713 / 118 | **0** | 여기가 무너지면 depth 문제지 파이프라인 문제가 아니다 |
-| **B3** | **원거리에 정합 적용** | `refine_contour` 를 far 에 | **악화(32/40)** | **0** | *"정합은 근접 전용"* 의 반증 대조군 |
+| **B3** | **원거리에 정합 적용** | `refine_contour` 를 far 에 | ⚠️ **조건부다** — 50cm 에서 `black` 20→11/20(악화)인데 `orange`·`clear` 는 R ×1.5~2.0 **개선**(§35-2m-6) | **0** | *"정합은 근접 전용"* 은 **몸체 대비에 딸린 결론**이었다. **이동량 t 중앙**으로 판정한다(≥10mm 면 끈다) |
 
 #### (c) 후순위 — 1 사이클에 촬영 2회 이상
 
@@ -1223,7 +1236,7 @@ Top-5 와 **경쟁하지 않고 얹힌다** — 추가 캡처 없이 근접 추�
 
 | 왜 후보인가 | 조건·한계 |
 |---|---|
-| §22 의 160×160 천장을 우회한다(원본 0.36mm/px) | **근접 전용** — 원거리에서는 악화(32/40) |
+| §22 의 160×160 천장을 우회한다(원본 0.36mm/px) | ⚠️ «근접 전용» 은 **조건부다**(§35-2m-6) — 원거리 악화는 **검정 몸체**에서만이고 주황·투명은 50cm 에서도 이득. 판정은 **이동량 t 중앙 ≥10mm** |
 | 상관 depth 오차에 **거의 면역**(`--fix-z` 를 뺄 것) | **초기값 필요** — 90° 뒤집힘은 못 고친다 → 원거리 coarse 안전망 유지 |
 | GT 불필요 · 표준부만 · research-only 의존 없음 | 남은 실패는 **정면 시점 tilt 축퇴**(§25) |
 

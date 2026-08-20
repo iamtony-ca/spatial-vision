@@ -174,7 +174,8 @@ spatial_manipulation_ws/src/
     │                               #   ref_sheet(SAM3 참조) / dim_sheet(치수 도면) / render_mesh
     ├── tools/                      # 실환경 진입점·오케스트레이션 (패키지 밖 단독 스크립트)
     │   ├── make_frame_from_zed.py  # ✅ 실카메라 L/R + 프로파일 → 프레임 디렉토리 (입력은 3파일뿐)
-    │   ├── run_group_a.py          # ✅ **A그룹 원샷 러너** — 4 venv 를 subprocess 로 오가며 A1~A4(+I그룹)
+    │   ├── run_group_a.py          # ✅ **A그룹 원샷 러너** — 4 venv 를 subprocess 로 오가며 A1~A4
+    │   │                           #   (+`--ism` I그룹 · +`--sam3-text` T그룹, 둘 다 `--primary full`)
     │   │                           #   + GT-free 리포트·진단시트·오버레이·통계·run_meta 까지 낸다
     │   ├── compare_runs.py         # ✅ 런 N개 비교 (설정 diff 먼저 → 지표) + 누적 실험 노트
     │   ├── get_zed_info.py         # ✅ ZED X 실측 intrinsic 덤프

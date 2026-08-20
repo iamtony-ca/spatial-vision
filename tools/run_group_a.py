@@ -57,7 +57,11 @@
     🔴 **프롬프트를 실물 몸체에 맞춘다.** 기본 `"black plastic box"` 는 sim 검정 몸체 기준이다.
        반투명 주황이면 `--text-prompt "orange plastic box"`, 투명이면 `"clear plastic box"`.
     ⚠️ **미검출은 마스크 품질이 아니라 임계값 문제**다(§35-2m-2): 50cm 에서 conf 0.15 → 17/20,
-       0.05 → **20/20** 인데 IoU 중앙은 0.986 으로 불변이고 오선택도 0 이었다. 그래서 기본이 0.05 다.
+       0.05 → **20/20** 인데 IoU 중앙은 0.986 으로 불변이었다.
+    🔴🔴 **그렇다고 0.05 를 기본으로 쓰면 안 된다 (2026-08-20 정정).** 그 sim 씬은
+       **`distractors: 0 · occluders: 0`** 이라 «오선택 0» 이 **공허한 측정**이었다 —
+       고를 다른 물체가 없었을 뿐이다. 실물에서 **배경 물체를 집었다.** 기본값은 사용자가
+       실물에서 검증한 **0.15** 다. 내리는 것은 **오버레이로 무엇을 집었는지 확인한 뒤**에만.
     ⚠️ `--select center` 는 «카메라가 타깃을 겨눈다» 는 씬 규약에 기댄다(교훈 #15) — sim 은 그렇게
        생성돼 **자기순환**이다. 실물에서는 배경을 집을 수 있으니 **오버레이로 확인**하고,
        필요하면 `--text-select score` 로 바꾼다.
@@ -1417,8 +1421,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--text-prompt", default="black plastic box",
                     help="T그룹 프롬프트. 🔴 실물 몸체 색에 맞출 것 "
                          "(예: \"orange plastic box\" · \"clear plastic box\")")
-    ap.add_argument("--text-conf", type=float, default=0.05,
-                    help="T그룹 검출 임계값. §35-2m-2 — 0.05 가 검출률만 올리고 오선택은 안 늘렸다")
+    # 🔴🔴 **기본값을 0.05 → 0.15 로 되돌렸다 (2026-08-20).** 0.05 는 §35-2m-2 의 sim 측정
+    #   («검출 20/20 · 오선택 0»)에 근거했는데, 그 씬은 **`distractors: 0 · occluders: 0`** 이었다.
+    #   **고를 다른 물체가 없는 씬에서 «오선택 0» 은 공허하다** — 실물에서 배경 물체를 집었다.
+    #   0.15 는 사용자가 **실물 50cm 에서 검증한 값**이다(미검출 2/10 은 있지만 오선택은 없었다).
+    #   ⚠️ 내리려면 **오버레이로 무엇을 집었는지 먼저 확인**할 것 — 미검출과 오선택을 맞바꾸는 것이다.
+    ap.add_argument("--text-conf", type=float, default=0.15,
+                    help="T그룹 검출 임계값. 실물 검증값 0.15. 🔴 내리면 미검출은 줄지만 "
+                         "**배경 물체를 집을 위험**이 는다(sim 측정은 방해물 없는 씬이라 이 축을 못 봤다)")
     ap.add_argument("--text-select", default="center", choices=["center", "score", "largest"],
                     help="⚠️ center 는 «카메라가 타깃을 겨눈다» 는 규약에 기댄다(교훈 #15)")
     ap.add_argument("--stereo-scale", type=float, default=0.5)
@@ -1437,6 +1447,9 @@ def main(argv: list[str] | None = None) -> int:
                          "안 주면 FP 추정 z 와 stereo depth 중앙값끼리만 비교한다. "
                          "주면 그 둘이 실측과 각각 얼마나 벗어나는지까지 나온다 → "
                          "**계통 편향(scale·offset)을 real 에서 잡는 가장 싼 수단**")
+    ap.add_argument("--limit-frames", type=int, default=0,
+                    help="앞 N 장만 돌린다(빠른 시험). `<out>/_in_firstN/` 에 심링크 부분집합을 만들어 "
+                         "거기를 입력으로 쓴다. 🔴 10장 미만이면 좌우 일관성 판정이 «유보» 다")
     ap.add_argument("--overlay-frames", type=int, default=4, help="오버레이 시트에 넣을 프레임 수")
     ap.add_argument("--diag-all", action="store_true",
                     help="진단 시트를 **모든 프레임**에 대해 개별 장으로 쓴다 (기본은 시트에 든 것만)")
@@ -1496,6 +1509,29 @@ def main(argv: list[str] | None = None) -> int:
         if missing:
             print(f"❌ {f.name}: {', '.join(missing)} 없음", file=sys.stderr)
             return 2
+
+    # ★ `--limit-frames N` — 앞 N 장만 돌린다(빠른 시험용).
+    #   🔴 러너의 `frames` 만 자르면 안 된다 — **스테이지는 `--in` 디렉토리를 통째로 돈다.**
+    #   그래서 심링크 부분집합 디렉토리를 만들고 `--in` 을 그리로 돌린다(복사가 아니라 디스크 0).
+    #   ⚠️ 스테이지는 `--in` 에 쓰지 않고 전부 `--out` 에만 쓴다 — 그래서 심링크가 안전하다.
+    if a.limit_frames and a.limit_frames < len(frames):
+        sub = Path(a.out) / f"_in_first{a.limit_frames}"
+        sub.mkdir(parents=True, exist_ok=True)
+        for f in frames[:a.limit_frames]:
+            link = sub / f.name
+            if not link.exists():
+                link.symlink_to(f.resolve(), target_is_directory=True)
+        # 남아 있던 잉여 링크는 지운다(N 을 줄여서 재실행한 경우)
+        keep = {f.name for f in frames[:a.limit_frames]}
+        for old in sub.iterdir():
+            if old.name not in keep and old.is_symlink():
+                old.unlink()
+        print(f"★ --limit-frames {a.limit_frames} — 전체 {len(frames)}장 중 앞 {a.limit_frames}장만 돈다\n"
+              f"  입력을 {sub} (심링크) 로 바꾼다. 🔴 이 런의 모든 산출물은 그 부분집합 기준이다.")
+        if a.limit_frames < 10:
+            print(f"  ⚠️ 10장 미만이면 좌우 일관성 판정이 «유보» 로 나온다(프레임별 산포에 묻힌다).")
+        a.in_dir, in_dir = str(sub), sub
+        frames = sorted([p for p in sub.glob("frame_*") if (p / "left.png").exists()])
 
     # 🔴 **`source envs/env.sh` 를 빼먹으면 조용히 CPU 로 떨어진다.**
     #    ONNX Runtime 은 `libcublasLt.so.12`(= `$CUDA_HOME/lib64`)를 못 찾으면 CUDAExecutionProvider

@@ -3342,6 +3342,11 @@ grep -n "v2.Resize" third_party/sam3/sam3/model/sam3_image_processor.py
 물체가 작아 edge 가 약하고(flange 181px), `full` 실루엣은 배경·그림자 잡음이 많다.
 → **테두리 정합은 근접 전용이다.** 이는 근접 2단계 구조를 다시 한 번 정당화한다.
 
+> 🔴 **정정 (2026-08-20, §35-2m-6).** 이 결론은 **몸체 외관에 딸린 조건부**다. 50cm 에서
+> `black` 은 KPI 20→11/20 으로 무너지지만 **`orange` 는 R ×1.5 · `clear` 는 ×2.0 개선**된다.
+> 여기서 «원거리 악화» 로 본 것은 몸체 randomize 조건이었다. **거리가 아니라 «외곽에 밝기 경계가
+> 있는가»(§35-2i)가 축**이고, 켤지 말지는 **정합 이동량 t 중앙 ≥10mm** 로 GT 없이 판정한다.
+
 ## ★★★ 5. CAD-실물 불일치 하 — **테두리만 쓰면 중간부 불일치에 거의 면역, 그러나 테두리가 틀리면 못 버틴다**
 
 정합기 **고유의 편향**만 보려면 **GT 를 초기값으로** 줘야 한다(#48) — FP 초기값을 쓰면
@@ -5830,7 +5835,7 @@ R $CAP $O/c2 pose_refined.json  8 8 $O/c3      # ← 게이트는 여기만
 - 비용 **106 → 250ms/프레임**(120프레임 30.0s). 10초 예산에서 무시할 수준이다.
 - 🔴 **게이트 기준점을 손봐야 배포할 수 있다** — 현행 코드는 각 단이 **자기 입력** 대비 이동량을
   재므로 3단으로 쓰면 게이트가 1·2단 이동을 못 본다. 위 표의 후퇴율은 **최초 FP 초기값 대비로
-  사후 재계산**한 값이다(18 → 34). 러너에서 처리하거나 `--gate-ref-dir` 를 추가한다.
+  사후 재계산**한 값이다(18 → 34). 러너에서 처리하거나 `--gate-ref-dir` 를 추가한다(⬜ **둘 다 미구현** — 3단 캐스케이드는 아직 배포 경로가 아니다).
 
 ### 35-2k-4. 🔴 정직하게 짚을 것 둘
 
@@ -6057,7 +6062,7 @@ z 중앙 397 / 497mm. GT 를 지운 사본 `fr40`·`fr50` 에 손 명령을 그�
 
 | 축 | 손 명령 3벌 | `run_group_a.py` |
 |---|---|---|
-| 목적 | **«끝까지 도는가»** 스모크 | **후보 서열화** — 한 벌 데이터로 변형 5~6개 |
+| 목적 | **«끝까지 도는가»** 스모크 | **후보 서열화** — 한 벌 데이터로 변형 5~9개 |
 | 분할 | 하나만 (ISM **또는** SAM3 텍스트) | SAM3 **exemplar** flange + (`--ism`) ISM full + 진단용 SAM3 full |
 | SAM3 방식 | **텍스트 프롬프트** (`--prompt`·`--confidence`) | **참조 이미지** (`--refs`) — 텍스트 경로는 **없다** |
 | pose 메쉬 | `full` | `flange`(A계열) + `full`(I계열) |
@@ -6199,7 +6204,8 @@ ls runs/<출력>/I1/frame_*/pose_refined.json | wc -l      # 0 이면 진짜 실
 
 러너가 마지막에 `viz.overlay_pose` 를 돌려 `overlay_sheet.png` 와 `overlay/overlay_frame_*.png` 를 낸다.
 
-- **행 = 프레임 · 열 = 변형 5(A3·A1·A2a·A2b·A4)**, **행 안에서 크롭 박스를 공유**한다 —
+- **행 = 프레임 · 열 = 변형**(A3·A1·A2a·A2b·A4 + `--ism` 이면 I1 + `--sam3-text` 면 T1 = 최대 7),
+  **행 안에서 크롭 박스를 공유**한다 —
   변형마다 따로 크롭하면 어긋남을 눈으로 못 비교한다.
 - 그리는 것: **초록 = 예측 실루엣 윤곽** · 파랑 반투명 = 정합에 쓴 마스크(기본 α 0.22, `--mask-alpha 0` 으로 끔)
   · **축 삼각대**(물체 원점 X/Y/Z 60mm, 글자 라벨) · 주석 `z` · **`moved`**(초기값 대비 이동량) · **`[GATED]`**.
@@ -6475,8 +6481,10 @@ for Z in 0 5 -5; do envs/pose/bin/python -m spatial_vision.eval.lr_consistency \
 # A그룹 전체 (실물)
 python3 tools/make_frame_from_zed.py --left L.png --right R.png \
     --cam assets/cam/zedx_s48560070_hd1200.json --out runs/real01/frame_0000
-envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A --preset n25
+envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
+    --preset n30black --ism --sam3-text --text-prompt "black plastic box"
 #   → runs/real01_A/report.md · overlay_sheet.png · overlay/overlay_frame_*.png
+#   🔴 접미사 없는 `n25`·`n30` 은 외관 축 이전의 **구 세트**다 — 새 실험에 쓰지 않는다(§35-2f).
 
 # 오버레이만 다시 (마스크 끄고 실물 테두리를 그대로 보고 싶을 때)
 envs/pose/bin/python -m spatial_vision.viz.overlay_pose \

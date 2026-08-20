@@ -374,14 +374,19 @@ print('🔴 못 읽는 파일:', bad) if bad else print('✅ PNG', len(glob.glob
 #        GT-free 리포트(report.md)까지 낸다. 멱등이라 다시 돌려도 없는 것만 채운다.
 envs/pose/bin/python tools/run_group_a.py --list-presets     # ① 참조 세트가 있는지 먼저 (인자 불필요)
 envs/pose/bin/python tools/run_group_a.py \
-    --in runs/real01_near --out runs/real01_A --preset n25orange --ism \
-    --note "형광등 2등, 정면, 1차 시도" --true-distance-mm 250    # ② 둘 다 선택 인자
+    --in runs/real01_near --out runs/real01_A --preset n25orange \
+    --ism --sam3-text --text-prompt "orange plastic box" \
+    --note "형광등 2등, 정면, 1차 시도" --true-distance-mm 250    # ② 뒤 둘은 선택 인자
 # 여러 번 돌린 뒤 — 설정 diff 를 먼저 내고 지표를 나란히 놓는다 (누적 실험 노트)
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
 ```
 
 ★ `--preset` 은 **거리대 × 몸체 외관**이다(`n30orange` 식). 🔴 참조가 거리 종속이라 틀리면
-조용히 무너진다 — `--list-presets` 로 먼저 확인한다. `--ism` 은 ISM 대조군(추가 촬영 0).
+조용히 무너진다 — `--list-presets` 로 먼저 확인한다. 🔴 접미사 없는 `n20`·`n25`·`n30` 은
+**외관 축 이전의 구 세트**라 새 실험에 쓰지 않는다.
+★ `--ism`(CAD 템플릿) · `--sam3-text`(낱말) 은 **추가 촬영 0 인 대조군**이고 둘 다 **`--primary full`**
+이라 `mask_flange` 가 비어도 pose 가 나온다 — 검정 몸체에서 실제로 그 상황이 났다(`RESULTS.md §35-2m`).
+`--text-prompt` 는 **몸체 색에 맞춘다**(`"black/orange/clear plastic box"`).
 ★ `--note` 는 `run_meta.json` 에 남아 `compare_runs.py` 가 함께 보여준다. `--true-distance-mm`
 (줄자값)을 주면 **FP 추정 z 와 stereo depth 중 어느 쪽이 틀렸는지**까지 갈린다 —
 안 줘도 둘끼리는 비교된다(`RESULTS.md §35-2l`).
