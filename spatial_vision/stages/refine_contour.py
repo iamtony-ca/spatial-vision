@@ -446,6 +446,12 @@ def main(argv: list[str] | None = None) -> int:
                          "0=끄기. 남은 실패는 전부 면외 tilt 폭주이고 그 프레임들은 크게 움직인다 — "
                          "GT 없이 판정된다(§26). 권장 1.5° (원거리 5시점 융합 초기값 기준)")
     ap.add_argument("--gate-mm", type=float, default=0.0, help="같은 게이트를 평행이동 이동량에도 적용 (0=끄기)")
+    ap.add_argument("--gate-ref-dir", default=None,
+                    help="★ 게이트를 «이 디렉토리의 pose» 기준으로 잰다. 기본은 --pose-dir(이 호출의 "
+                         "초기값). 🔴 **캐스케이드에 필수** — 안 주면 마지막 단의 이동량이 «직전 단 대비» "
+                         "라 한 번에 돌린 팔과 «다른 양» 이 된다(§35-2k-3, 교훈 #26). 후퇴 자체는 "
+                         "여전히 --pose-dir 로 한다")
+    ap.add_argument("--gate-ref-name", default="pose_coarse.json", help="--gate-ref-dir 안의 파일명")
     ap.add_argument("--debug", action="store_true", help="프레임마다 contour_debug.png 저장")
     ap.add_argument("--out", dest="out_dir", required=True)
     args = ap.parse_args(argv)
@@ -492,12 +498,32 @@ def main(argv: list[str] | None = None) -> int:
 
         moved = float(np.linalg.norm(T[:3, 3] - T_init[:3, 3]))
         moved_deg = rot_deg(T_init[:3, :3], T[:3, :3])
-        # ★ **이동량 게이트** — 정합이 초기값에서 크게 회전하면 그건 개선이 아니라 폭주다.
+        # ★★ **게이트 기준점** — 기본은 이 호출의 초기값(`--pose-dir`)이다.
+        #    🔴 **캐스케이드(§35-2k-3)에서는 그게 틀린 기준**이다: `32@4 → 12@4 → 8@8` 을
+        #    `--pose-dir` 로 이어 붙이면 마지막 단의 «이동량» 이 **직전 단 대비**가 되어,
+        #    한 번에 돌린 팔의 «FP 초기값 대비» 와 **다른 양**이 된다(교훈 #26). 그대로 한 표에
+        #    놓으면 캐스케이드만 후퇴율이 낮아 보인다. `--gate-ref-dir` 로 **최초 FP 초기값**을
+        #    주면 기준이 맞춰지고 다른 팔과 나란히 읽을 수 있다.
+        T_ref = T_init
+        if args.gate_ref_dir:
+            Tr = load_pose_mm(Path(args.gate_ref_dir) / f.name / args.gate_ref_name)
+            if Tr is None:
+                # 🔴 조용히 초기값으로 물러나지 않는다(교훈 #22) — 기준이 바뀌면 후퇴율의 뜻이 바뀐다.
+                print(f"  ❌ {f.name}: --gate-ref-dir 에 {args.gate_ref_name} 이 없다", flush=True)
+                return 2
+            T_ref = Tr
+        gate_deg_v = rot_deg(T_ref[:3, :3], T[:3, :3])
+        gate_mm_v = float(np.linalg.norm(T[:3, 3] - T_ref[:3, 3]))
+        # ★ **이동량 게이트** — 정합이 기준점에서 크게 회전하면 그건 개선이 아니라 폭주다.
         #   남은 실패는 전부 면외 tilt 축퇴(§25-2a)이고 그 프레임만 크게 움직인다.
-        #   비교 대상이 GT 가 아니라 **초기값**이라 실환경에서 그대로 쓸 수 있다.
-        gated = bool((args.gate_deg > 0 and moved_deg > args.gate_deg)
-                     or (args.gate_mm > 0 and moved > args.gate_mm))
+        #   비교 대상이 GT 가 아니라 **기준 pose** 라 실환경에서 그대로 쓸 수 있다.
+        gated = bool((args.gate_deg > 0 and gate_deg_v > args.gate_deg)
+                     or (args.gate_mm > 0 and gate_mm_v > args.gate_mm))
+        # 🔴 후퇴는 **기준점이 아니라 이 호출의 초기값**으로 한다 — 캐스케이드에서 최초 FP 로
+        #    돌아가면 앞 단이 회수한 것까지 버린다.
         T_out = T_init if gated else T
+        if args.gate_ref_dir:            # 기준이 다르면 보고값도 그 기준으로 낸다
+            moved, moved_deg = gate_mm_v, gate_deg_v
 
         od = out_dir / f.name
         od.mkdir(parents=True, exist_ok=True)

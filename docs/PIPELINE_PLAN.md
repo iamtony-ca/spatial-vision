@@ -168,16 +168,31 @@ spatial_manipulation_ws/src/
     │   │                           #   build_sam3_refs(후보 생성) / select_sam3_refs(§19 선정) / mix_sam3_refs
     │   ├── eval/                   # ✅ verify_stereo(M2) / eval_depth(M3) / eval_seg(M4) / eval_pose(M5) /
     │   │                           #   fuse_pose(G 계열 초기값) / **lr_consistency**(좌우 투영, GT-free) /
-    │   │                           #   **group_stats**(프레임×변형 표·그래프) / perturb_depth / perturb_image /
-    │   │                           #   depth_budget / verify_randomization
-    │   └── viz/                    # ✅ overlay_pose(GT 없이도 동작) / diag_sheet(6패널) /
-    │                               #   ref_sheet(SAM3 참조) / dim_sheet(치수 도면) / render_mesh
+    │   │                           #   **group_stats**(프레임×변형 표·그래프·**신호등 traffic.png**) /
+    │   │                           #   **scale_check**(실루엣 기반 거리 — `baseline` 비의존, 교훈 #89) /
+    │   │                           #   **hybrid_pose**(R=coarse·t=refined 초기값 §27-7 — GT 불필요) /
+    │   │                           #   perturb_depth / perturb_image / depth_budget / verify_randomization
+    │   └── viz/                    # ✅ overlay_pose(GT 없이도 동작, `--combine` 겹치기 + mm 눈금자) /
+    │                               #   **seg_compare**(분할 + 그 pose, 크롭 없음) / diag_sheet(6패널) /
+    │                               #   ref_sheet(SAM3 참조) / dim_sheet(치수 도면) / render_mesh /
+    │                               #   **result_charts** — 판단용 3종, 러너가 자동 실행 (§35-2p):
+    │                               #     `stats/distance.png` 거리 4다리 (baseline↔fx 를 가른다)
+    │                               #     `stats/ranking.png`  팔 서열 (|Δdx| 정렬 + 비교불가 팔 격리)
+    │                               #     `stats/heatmap.png`  프레임 × 팔 (행 효과 vs 열 효과)
     ├── tools/                      # 실환경 진입점·오케스트레이션 (패키지 밖 단독 스크립트)
     │   ├── make_frame_from_zed.py  # ✅ 실카메라 L/R + 프로파일 → 프레임 디렉토리 (입력은 3파일뿐)
     │   ├── run_group_a.py          # ✅ **A그룹 원샷 러너** — 4 venv 를 subprocess 로 오가며 A1~A4
     │   │                           #   (+`--ism` I그룹 · +`--sam3-text` T그룹, 둘 다 `--primary full`)
-    │   │                           #   + GT-free 리포트·진단시트·오버레이·통계·run_meta 까지 낸다
+    │   │                           #   + GT-free 리포트·진단시트·오버레이(겹치기 포함)·분할+pose 대조
+    │   │                           #   · 신호등(stats/traffic.png)·통계·실루엣 거리·run_meta 까지 낸다
+    │   │                           #   `--limit-frames N` 으로 앞 N 장만 (새 설정 시험용)
+    │   │                           #   ★ `--mode` 로 후보 폭을 정한다: default 9팔 / wide 18 /
+    │   │                             all 30(+참조 스윕, --ism·--sam3-text 자동). `--list-modes`
     │   ├── compare_runs.py         # ✅ 런 N개 비교 (설정 diff 먼저 → 지표) + 누적 실험 노트
+    │   ├── audit_run.py            # ✅ **배선 감사** — «어느 팔의 숫자가 다른 팔 것은 아닌가» 7항목
+    │   │                           #   러너가 자동으로 돌려 `report.md` 「배선 감사」 절에 넣는다
+    │   ├── which_arm.py            # ✅ «어느 팔이 무엇을 집었나» 를 **표로** (마스크 면적·중심·pose t)
+    │   │                           #   `viz.seg_compare` 의 수치판. 프레임 하나를 파고들 때 쓴다
     │   ├── get_zed_info.py         # ✅ ZED X 실측 intrinsic 덤프
     │   └── zedx_check_pp_convention.py  # ⬜ cx/cy 반픽셀 규약 확인 (미실행)
     ├── third_party/                # git clone (submodule 아님 — 커밋 SHA 를 lock 파일에 기록)

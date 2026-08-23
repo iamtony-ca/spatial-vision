@@ -18,6 +18,8 @@
     stats/metrics_long.csv    (프레임 × 변형) 긴 형식     ← pandas/엑셀로 바로 분석
     stats/summary.json/.md    변형별 집계 (중앙·p90·최대)
     stats/variants.png        변형 비교 4패널 (후퇴율·이동량 분포·좌우 일관성·대응점)
+    stats/traffic.png         ★ **신호등 (프레임 × [촬영3 + 변형])** — 🔴 칸을 한눈에
+                              🔴 **순위표가 아니라 «고장 표시» 다** (아래 `traffic()` 주석)
     stats/repeatability.png   ★ **정지 구간 반복도** — 랜덤 오차 바닥
     stats/repeatability.json
 
@@ -104,14 +106,24 @@ def ang_deg(A, B):
 
 # ─────────────────────────────────────────────────────────── 수집
 
-def collect(root: Path, variants: list[str], pose_name: str) -> tuple[dict, list[dict], list[dict]]:
+def collect(root: Path, variants: list[str], pose_name: str,
+            alias: dict | None = None) -> tuple[dict, list[dict], list[dict]]:
+    """`alias` : `{변형id: (pose 디렉토리, pose 파일명)}`.
+
+    🔴 **«정합 off» 팔(A3·I3·T3)이 여기 필요하다.** 그 팔들은 `<root>/A3/` 같은 자기 디렉토리가
+       없고 pose 가 `fp_ns2/pose_coarse.json` 에 있다. 그래서 그냥 `--variants` 에 넣으면
+       «pose 없음» 으로 잡혀 **신호등이 ⬛ 로, CSV 가 빈 줄로** 나온다 — 실제로는 정상 동작하는,
+       심지어 sim GT 채점에서 **1~3위였던** 팔들이다(§35-2o-6). 별칭으로 실제 위치를 알려 준다.
+    """
     diag = _load(root / "diag" / "diag_metrics.json") or {}
     cap_rows = diag.get("frames", [])
     frames = [r["frame"] for r in cap_rows]
 
     long_rows: list[dict] = []
     present: dict[str, dict] = {}
+    alias = alias or {}
     for vid in variants:
+        pdir, pname = alias.get(vid, (root / vid, pose_name))
         mc = _load(root / vid / "meta_contour.json")
         lr = _load(root / "lr" / f"lr_consistency_{vid}.json")
         if mc is None and lr is None and not (root / vid).exists():
@@ -128,7 +140,7 @@ def collect(root: Path, variants: list[str], pose_name: str) -> tuple[dict, list
                    "gated": c.get("gated"),
                    "ddx_px": l.get("ddx_px"), "ddy_px": l.get("ddy_px"), "dz_mm": l.get("dz_mm"),
                    "lr_rms_L": l.get("rms_L"), "lr_rms_R": l.get("rms_R")}
-            T = _load(root / vid / fn / pose_name)
+            T = _load(Path(pdir) / fn / pname)
             if T:
                 R = np.asarray(T["R"], float).reshape(3, 3)
                 t = np.asarray(T["t_mm"], float)
@@ -224,8 +236,146 @@ def repeatability(long_rows: list[dict], variants: list[str]) -> dict:
     return out
 
 
+# ─────────────────────────────────────────────────────────── 신호등 (프레임 × 변형)
+
+# 🔴🔴 **이건 «순위표» 가 아니라 «고장 표시» 다.**
+#    GT 가 없으면 살아남은 것들 중 «어느 쪽이 더 정확한가» 는 프레임 단위로 원리적으로 못 정한다:
+#    적합도 rms 는 실패와 성공의 분포가 **완전히 겹치고**(교훈 #56), 좌우 일관성은 프레임당
+#    분해능이 ±1~2mm 이며(§35), 게이트는 계통 편향을 못 본다(교훈 #64).
+#    여기서 하는 일은 **«이 칸은 깨졌다» 를 40×9 격자에서 한눈에 찾는 것**까지다.
+LEVELS = ["🟢", "🟡", "🔴", "⬛"]              # 0 정상 · 1 주의 · 2 고장 · 3 없음/미측정
+LEVEL_RGB = ["#A5D6A7", "#FFE082", "#EF9A9A", "#BDBDBD"]
+
+# 임계값. ⚠️ **절대 기준이 아니다** — 촬영 조건별 지표(노출·마스크·depth)는 런 자기 자신을
+#    기준으로 하는 강건 z-score 를 쓴다(§35-2l-8b: 기준선이 없어 도메인 갭에 면역인 쪽).
+#    변형별 지표만 절대값을 쓰는데, 그 눈금은 §35-2m-6(이동량 10mm)·§35(좌우 dz) 에서 왔다.
+THR = {"moved_mm_warn": 10.0, "moved_mm_bad": 20.0, "moved_deg_bad": 10.0,
+       "ddx_warn": 2.0, "ddx_bad": 5.0, "corr_frac_warn": 0.3, "rz_warn": 3.5, "rz_bad": 6.0}
+
+
+def _rz(vals: list) -> np.ndarray:
+    """강건 z-score (중앙값·MAD). **런 자기 자신이 기준**이라 sim↔real 갭에 면역이다."""
+    v = np.array([np.nan if x is None else float(x) for x in vals], float)
+    ok = np.isfinite(v)
+    if ok.sum() < 3:
+        return np.zeros_like(v)
+    med = np.median(v[ok])
+    mad = np.median(np.abs(v[ok] - med))
+    if mad <= 1e-9:
+        return np.where(ok, 0.0, 0.0)
+    return np.where(ok, 0.6745 * (v - med) / mad, 0.0)
+
+
+def traffic(long_rows: list[dict], cap_rows: list[dict], variants: list[str]) -> dict:
+    """(프레임 × [촬영 3열 + 변형들]) 격자. 칸마다 `(레벨, 표시값, 이유)`."""
+    frames = [r["frame"] for r in cap_rows] or sorted({r["frame"] for r in long_rows})
+    by = {(r["frame"], r["variant"]): r for r in long_rows}
+
+    cap = {r["frame"]: flatten_capture(r) for r in cap_rows}
+    rz = {k: dict(zip(frames, _rz([cap.get(f, {}).get(k) for f in frames])))
+          for k in ("img_med", "full_dia_px", "plane_rms_mm")}
+
+    cols = ["노출", "마스크", "depth"] + variants
+    grid: dict[str, list] = {}
+    for f in frames:
+        c, row = cap.get(f, {}), []
+
+        # ① 노출 — 포화·암부는 절대 기준(센서 물리), 밝기 자체는 런 상대
+        sat, dark, med = c.get("sat_pct"), c.get("dark_pct"), c.get("img_med")
+        lv, why = 0, "ok"
+        if med is None:
+            lv, why = 3, "미측정"
+        elif (sat or 0) > 2.0:
+            lv, why = 2, f"포화 {sat:.1f}%"
+        elif abs(rz["img_med"].get(f, 0)) > THR["rz_bad"]:
+            lv, why = 1, f"밝기 이상치 z{rz['img_med'][f]:+.1f}"
+        elif (dark or 0) > 60:
+            lv, why = 1, f"암부 {dark:.0f}%"
+        row.append((lv, f"{med:.0f}" if med is not None else "-", why))
+
+        # ② 마스크 — 등가지름이 런 안에서 튀면 «다른 걸 집었거나 잘렸다»
+        d, z = c.get("full_dia_px"), abs(rz["full_dia_px"].get(f, 0))
+        lv, why = (3, "미측정") if d is None else \
+            (2, f"지름 이상치 z{z:.1f}") if z > THR["rz_bad"] else \
+            (1, f"지름 z{z:.1f}") if z > THR["rz_warn"] else (0, "ok")
+        row.append((lv, f"{d:.0f}" if d else "-", why))
+
+        # ③ depth — 평면 잔차(스테레오 관통 품질) + 주변 링 유효율
+        pr, vr = c.get("plane_rms_mm"), c.get("valid_ring")
+        z = abs(rz["plane_rms_mm"].get(f, 0))
+        lv, why = (3, "미측정") if pr is None else \
+            (2, f"링 유효 {100 * vr:.0f}%") if (vr is not None and vr < 0.5) else \
+            (2, f"평면잔차 z{z:.1f}") if z > THR["rz_bad"] else \
+            (1, f"평면잔차 z{z:.1f}") if z > THR["rz_warn"] else (0, "ok")
+        row.append((lv, f"{pr:.2f}" if pr is not None else "-", why))
+
+        # ④ 변형들
+        corr_med = {v: np.median([x["n_corr"] for x in long_rows
+                                  if x["variant"] == v and x.get("n_corr")] or [0]) for v in variants}
+        for v in variants:
+            r = by.get((f, v))
+            if r is None or r.get("tz_mm") is None:
+                row.append((3, "없음", "pose 없음"))
+                continue
+            mm, dg = r.get("moved_mm"), r.get("moved_deg")
+            ddx = abs(r["ddx_px"]) if r.get("ddx_px") is not None else None
+            nc = r.get("n_corr")
+            lv, why = 0, "ok"
+            if dg is not None and dg >= THR["moved_deg_bad"]:
+                lv, why = 2, f"이동 {dg:.1f}°"
+            elif mm is not None and mm >= THR["moved_mm_bad"]:
+                lv, why = 2, f"이동 {mm:.1f}mm"
+            elif ddx is not None and ddx >= THR["ddx_bad"]:
+                lv, why = 2, f"좌우 {ddx:.1f}px"
+            elif mm is not None and mm >= THR["moved_mm_warn"]:
+                lv, why = 1, f"이동 {mm:.1f}mm"
+            elif ddx is not None and ddx >= THR["ddx_warn"]:
+                lv, why = 1, f"좌우 {ddx:.1f}px"
+            elif nc and corr_med[v] and nc < THR["corr_frac_warn"] * corr_med[v]:
+                lv, why = 1, f"대응점 {nc:.0f}"
+            elif r.get("gated"):
+                lv, why = 1, "게이트 후퇴"
+            # ⚠️ 칸의 숫자는 **판정을 내린 그 값**이어야 한다. 늘 `moved_mm` 을 찍었더니
+            #    회전으로 🔴 가 된 칸에 «5.6» 이 찍혀 표와 이유가 어긋났다.
+            txt = (f"{mm:.1f}" if mm is not None else "·") if lv == 0 else \
+                why.replace("이동 ", "").replace("좌우 ", "LR ") \
+                   .replace("대응점 ", "n").replace("게이트 후퇴", "GATE")
+            row.append((lv, txt, why))
+        grid[f] = row
+    return {"frames": frames, "cols": cols, "grid": grid, "thresholds": THR}
+
+
+def traffic_md(tr: dict) -> list[str]:
+    L = ["## 신호등 — 프레임 × 변형 (고장 표시)\n",
+         "🔴🔴 **«순위표» 가 아니라 «고장 표시» 다.** GT 가 없으면 *살아남은 것들 중* 어느 쪽이 더 "
+         "정확한지는 **프레임 단위로 원리적으로 못 정한다** — rms 는 실패·성공 분포가 겹치고"
+         "(교훈 #56), 좌우 일관성은 프레임당 ±1~2mm 이며(§35), 게이트는 계통 편향을 못 본다"
+         "(교훈 #64). 여기서 찾는 것은 **«깨진 칸이 어디인가»** 까지다.\n",
+         "🟢 정상 · 🟡 주의 · 🔴 고장 · ⬛ pose 없음/미측정 &nbsp;|&nbsp; "
+         "촬영 3열(노출·마스크·depth)은 **런 자기 자신 기준 강건 z-score** — 도메인 갭에 면역이다.\n",
+         "| 프레임 | " + " | ".join(tr["cols"]) + " |",
+         "|---" * (len(tr["cols"]) + 1) + "|"]
+    for f in tr["frames"]:
+        cells = [f"{LEVELS[lv]} {txt}" for lv, txt, _ in tr["grid"][f]]
+        L.append(f"| {f.replace('frame_', '')} | " + " | ".join(cells) + " |")
+    bad = [(f, tr["cols"][i], why) for f in tr["frames"]
+           for i, (lv, _, why) in enumerate(tr["grid"][f]) if lv == 2]
+    L.append("")
+    if bad:
+        L.append("### 🔴 칸 목록 — **여기부터 연다**\n")
+        for f, c, why in bad[:40]:
+            L.append(f"- `{f}` · **{c}** — {why}")
+        if len(bad) > 40:
+            L.append(f"- … 외 {len(bad) - 40}칸")
+    else:
+        L.append("✅ 🔴 칸 없음. ⚠️ **«전부 맞다» 가 아니라 «이 지표들로는 안 걸린다» 다** — "
+                 "«다 같이 같은 방향으로 틀린» 경우는 이 표가 원리적으로 못 잡는다(오버레이 육안이 그 몫).")
+    L.append("")
+    return L
+
+
 def figures(out: Path, present: dict, long_rows: list[dict], cap_rows: list[dict],
-            rep: dict, gate_deg: float) -> list[str]:
+            rep: dict, gate_deg: float, tr: dict | None = None) -> list[str]:
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -312,10 +462,42 @@ def figures(out: Path, present: dict, long_rows: list[dict], cap_rows: list[dict
         fig.savefig(out / "repeatability.png", dpi=140)
         plt.close(fig)
         made.append("repeatability.png")
+
+    # ★★ 신호등 격자 — 40×12 를 한 장에. **칸의 숫자는 «주된 값», 색은 «판정»** 이다.
+    if tr and tr["frames"]:
+        fr, cols = tr["frames"], tr["cols"]
+        nr, nc = len(fr), len(cols)
+        fig, ax = plt.subplots(figsize=(1.05 * nc + 1.6, 0.30 * nr + 1.6))
+        for i, f in enumerate(fr):
+            for j, (lv, txt, _) in enumerate(tr["grid"][f]):
+                ax.add_patch(plt.Rectangle((j, nr - 1 - i), 1, 1, facecolor=LEVEL_RGB[lv],
+                                           edgecolor="white", lw=1.2))
+                # ⚠️ matplotlib 에 한글 폰트가 없다 — 한글이 들어간 표시값은 두부가 된다.
+                ax.text(j + 0.5, nr - 0.5 - i, txt.replace("없음", "none"),
+                        ha="center", va="center", fontsize=6.5)
+        ax.set_xlim(0, nc)
+        ax.set_ylim(0, nr)
+        ax.set_xticks(np.arange(nc) + 0.5)
+        # ⚠️ 라벨은 영문 — matplotlib 에 한글 폰트가 없다. 한글판은 `summary.md` 표를 본다.
+        ax.set_xticklabels(["expo", "mask", "depth"] + cols[3:], fontsize=7.5, rotation=20)
+        ax.xaxis.set_ticks_position("top")
+        ax.set_yticks(np.arange(nr) + 0.5)
+        ax.set_yticklabels([f.replace("frame_", "") for f in reversed(fr)], fontsize=6.5)
+        for s in ax.spines.values():
+            s.set_visible(False)
+        ax.tick_params(length=0)
+        ax.set_title("FAILURE FLAGS, not a ranking  —  green ok / yellow watch / red broken / "
+                     "gray missing\ncapture cols use robust z within this run (domain-gap immune)",
+                     fontsize=8.5, pad=26)
+        fig.tight_layout()
+        fig.savefig(out / "traffic.png", dpi=150)
+        plt.close(fig)
+        made.append("traffic.png")
     return made
 
 
-def summary_md(root: Path, summ: dict, rep: dict, cap_rows: list[dict], figs: list[str]) -> str:
+def summary_md(root: Path, summ: dict, rep: dict, cap_rows: list[dict], figs: list[str],
+               tr: dict | None = None) -> str:
     L = [f"# A그룹 통계 — `{root}`\n",
          "🔴 **실환경에는 GT 가 없다** — 아래는 전부 GT-free 지표다. "
          "절대 오차(mm·도)는 원리적으로 못 낸다.\n",
@@ -355,6 +537,8 @@ def summary_md(root: Path, summ: dict, rep: dict, cap_rows: list[dict], figs: li
                      f"{r['median']} / {r['p90']} / {r['max']} | {s['t_dev_norm_mm']['median']} | "
                      f"{t['x']} / {t['y']} / {t['z']} | **{s['tz_spread_mm']}** |")
         L.append("")
+    if tr:
+        L += traffic_md(tr)
     if cap_rows:
         L.append(f"## 촬영 — 프레임 {len(cap_rows)}장\n")
         L.append("`frames.csv` 에 전부 있다. 노출·거리·depth 품질은 `diag/diag_trends.png` 에서 추이로 본다.\n")
@@ -376,13 +560,22 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", default=None, help="기본 <root>/stats")
     ap.add_argument("--variants", default=",".join(DEFAULT_VARIANTS))
     ap.add_argument("--pose-name", default="pose_refined.json")
+    ap.add_argument("--alias", action="append", default=[],
+                    help="`변형id=디렉토리:파일명`. 자기 디렉토리가 없는 팔(A3·I3·T3 = 정합 off)의 "
+                         "pose 위치를 알려 준다. 예 `--alias A3=fp_ns2:pose_coarse.json`. "
+                         "🔴 없으면 그 팔이 «pose 없음» 으로 잡혀 신호등이 ⬛ 가 된다")
     ap.add_argument("--gate-deg", type=float, default=1.5)
     args = ap.parse_args(argv)
 
     root = Path(args.root)
     out = Path(args.out) if args.out else root / "stats"
     variants = [s.strip() for s in args.variants.split(",") if s.strip()]
-    present, cap_rows, long_rows = collect(root, variants, args.pose_name)
+    alias = {}
+    for spec in args.alias:
+        vid, _, rest = spec.partition("=")
+        d, _, nm = rest.partition(":")
+        alias[vid.strip()] = (root / d.strip(), nm.strip() or args.pose_name)
+    present, cap_rows, long_rows = collect(root, variants, args.pose_name, alias)
     if not long_rows:
         print(f"❌ {root} 에서 읽을 게 없다 — 러너를 먼저 돌릴 것")
         return 2
@@ -392,11 +585,16 @@ def main(argv: list[str] | None = None) -> int:
     write_csv(out / "metrics_long.csv", long_rows)
     summ = summarize(present, long_rows)
     rep = repeatability(long_rows, list(present))
-    figs = figures(out, present, long_rows, cap_rows, rep, args.gate_deg)
+    tr = traffic(long_rows, cap_rows, list(present))
+    figs = figures(out, present, long_rows, cap_rows, rep, args.gate_deg, tr)
     (out / "summary.json").write_text(json.dumps(
         {"root": str(root), "variants": list(present), "n_frames": len(cap_rows),
-         "summary": summ, "repeatability": rep}, indent=2, ensure_ascii=False))
-    md = summary_md(root, summ, rep, cap_rows, figs)
+         "summary": summ, "repeatability": rep,
+         "traffic": {"cols": tr["cols"], "thresholds": tr["thresholds"],
+                     "grid": {f: [{"level": lv, "value": v, "why": w}
+                                  for lv, v, w in tr["grid"][f]] for f in tr["frames"]}}},
+        indent=2, ensure_ascii=False))
+    md = summary_md(root, summ, rep, cap_rows, figs, tr)
     (out / "summary.md").write_text(md)
     print(md)
     print(f"→ {out}/  ({', '.join(['frames.csv', 'metrics_long.csv', 'summary.json', 'summary.md'] + figs)})")

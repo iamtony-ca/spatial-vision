@@ -418,23 +418,68 @@ done
 
 envs/pose/bin/python tools/run_group_a.py --list-presets      # ③ 참조 세트 확인 (인자 불필요)
 
-# ④ 전 체인 — stereo·SAM3·FP(±stage2)·정합 4변형·ISM 대조군·리포트까지 한 번에
+# ④ 전 체인 — stereo·SAM3(exemplar+텍스트)·ISM·FP(±stage2)·정합 6변형·리포트까지 한 번에
+#    처음이면 --limit-frames 3 으로 먼저 돌려 설정을 확인하고, 그다음 전체를 돌린다
 envs/pose/bin/python tools/run_group_a.py \
-    --in runs/real01 --out runs/real01_A --preset n25orange --ism \
+    --in runs/real01 --out runs/real01_A --preset n25orange \
+    --ism --sam3-text --text-prompt "orange plastic box" \
+    --mode wide \
     --note "형광등 2등, 0.28m, 1차" --true-distance-mm 280
+
+# ④′ 「후보를 전부 펼친다」 — 30팔. ★ `--ism`·`--sam3-text` 는 **--mode all 이 자동으로 켠다**
+#    (그 둘은 모드가 아니라 별도 플래그라, 안 켜지면 경로 둘이 통째로 빠져 30 → 24 가 된다)
+envs/pose/bin/python tools/run_group_a.py \
+    --in runs/real01 --out runs/real01_Aall --preset n25orange \
+    --text-prompt "orange plastic box" \
+    --mode all \
+    --note "형광등 2등, 0.28m, 전팔" --true-distance-mm 280
 
 # ⑤ 두 번째 런부터 — 설정 diff 를 먼저 내고 지표를 나란히 (누적 실험 노트)
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
 ```
 
-**소요**: 20프레임에 **4~5분**(ONNX·SAM3·FP·ISM 콜드 스타트 전부 포함, `--ism` 없으면 절반).
+**소요**: 20프레임에 **5~6분**(ONNX·SAM3·ISM·FP 콜드 스타트 전부 포함. `--ism --sam3-text` 를 빼면 절반).
 멱등이라 다시 돌려도 없는 것만 채운다(`--force` 로 강제, `--only st,A1` 로 부분 실행).
+시각 산출물만 다시 그리려면 `--only ov,ovc,segcmp,diag --force`(수 초).
 
 🔴 **③을 건너뛰지 말 것** — `--preset` 은 **촬영 거리대 × 몸체 외관**이고(`n30orange` 식) SAM3 참조가
 거리 종속이라 틀리면 **조용히 무너진다**(원거리 참조로 근접 질의 시 IoU 0.044 전례).
 없는 세트를 주면 러너가 **종료코드 2 로 죽는다** — 조용한 실패보다 낫다.
 ⚠️ `--note`·`--true-distance-mm`(줄자값)은 **선택**이지만 둘 다 주는 게 좋다. 전자는 실험 노트에
-남고, 후자는 **FP 추정 z 와 stereo depth 중 어느 쪽이 틀렸는지**까지 갈라 준다.
+남고, 후자는 **거리 사각 대조**를 완성한다. 🔴🔴 **줄자가 특히 중요한 이유**: `FP 추정 z` 와
+`stereo depth` 는 **둘 다 `Z = fx·B/disparity`** 라 «독립» 이 아니다 — `fx·B` 가 틀리면 **같은 비율로
+같이** 틀린다(교훈 #89). `scale_check`(실루엣)이 `baseline` 축을 열지만 **`fx` 는 순수 스케일이라
+어떤 내부 관측으로도 못 잡는다.** 줄자(또는 §7.5c 상대 GT)가 유일한 외부 길이다.
+⚠️ **줄자 기준점은 `flange` 상면 중심**이다(pose 원점 규약). 몸체 바닥·받침대를 재면 344mm 급으로
+어긋나고 그건 «편향» 이 아니라 «다른 것을 쟀다» 다.
+★ **`--mode`** — **후보 파이프라인을 얼마나 넓게 펼치나**(`--list-modes`). 기본 `default` = 9팔로
+지금까지와 같다. **`wide` = 18팔**(정합·게이트·초기값·캐스케이드·primary·edge) 이 **실물 초반 권장**이고,
+**`all` = 30팔**(+ 참조 거리대 스윕 · `--ism`·`--sam3-text` 자동 — ④′)이다. 20프레임 기준 wide +3~4분 · all +4~6분.
+⚠️ **`all` 은 «구현된 모드 전부» 이지 «가능한 파이프라인 전부» 가 아니다** — 미구현 축(prompt·band·
+stereo·jitter)과 **hand-eye 가 필요한 넷**(P1 2단계 · P2 G9 · P3 5시점 융합 · P4 G9+G10)은 빠진다.
+뒤의 넷은 `cam1_T_cam2` 가 있어야 성립하는데 로봇이 없으면 그 값이 **부정확한 게 아니라 존재하지 않는다.**
+🔴 넓히기는 «탐색» 이지 «성능 향상» 이 아니다 — 팔 ≥8 이면 리포트가 **선택 편향 경고**를 낸다.
+좁힌 뒤에는 **새로 찍은 20~40장**에서 확인한다(§35-2o-4).
+★ **그 밖의 인자는 `--help` 가 정본이다.** 운용에서 실제로 쓰는 것만 추리면:
+
+| 인자 | 언제 |
+|---|---|
+| `--report-only` | 계산 없이 **리포트만** 다시 낸다 (문구·판정을 고친 뒤) |
+| `--only <스텝>` / `--force` | 부분 실행 / 산출물이 있어도 다시 |
+| `--dry-run` | 무엇이 돌지 **명령만** 찍어 본다 |
+| `--stereo-scale` | ONNX 입력 배율. 🔴 기본 0.5 — 1280×720 초과에서 OOM(§34-12) |
+| `--text-select` | T그룹 인스턴스 선택 규칙(`center`/`score`). 🔴 `center` 는 «카메라가 타깃을 겨눈다» 는 씬 규약에 기댄다(교훈 #15) |
+| `--overlay-frames` / `--overlay-mask-alpha` / `--diag-all` | 시트에 넣을 프레임 수 / 마스크 투명도 / 진단 시트를 전 프레임에 |
+| `--refs-sweep` | `--mode refs` 가 돌 참조 프리셋 목록(쉼표). **안 주면 `--preset` 과 같은 외관의 모든 거리대**를 자동으로 잡는다. 🔴 없는 프리셋은 종료코드 2 로 거부 — 조용히 빠지면 «스윕했다고 믿는 반쪽 런» 이 된다 |
+| `--refs-sweep-nrefs` | `--mode refs` 에서 흔들 `--n-refs` 값(기본 `1,5`) |
+| `--use-prompts-file` | A그룹 SAM3 exemplar 질의에 `assets/obj/<id>/sam3_prompts.json` 의 텍스트를 **같이** 준다. 기본은 안 쓴다 — exemplar 만으로 지정이 끝나기 때문 |
+| `--allow-cpu` | `env.sh` 없이 CPU 폴백 허용 (수십 배 느리다 — 교훈 #80) |
+
+★ **`--limit-frames N`** — 앞 N 장만 돌린다(`<out>/_in_first<N>/` 심링크). 새 설정·새 프롬프트를
+처음 시험할 때 3~6장으로 먼저 확인하면 4~5분을 1분으로 줄인다.
+★ **`--text-conf`**(T그룹 임계값, 기본 `0.15`) — 미검출이 나오면 `0.05` 로 낮춘다. sim 에서 미검출
+프레임을 `0.01` 로 다시 뽑으니 **IoU 0.988** 이었다(«분할이 틀린» 게 아니라 «점수만 낮은» 것).
+🔴 낮추면 오선택 위험이 오르므로 **`segcmp/seg_compare.png` 의 «이탈» 열(>0.25)로 확인**한다.
 ⚠️ 입력은 **rectified · PNG 무손실** 이어야 한다. ZED SDK 의 `sl.VIEW.LEFT/RIGHT` 가 정류본이고
 `*_UNRECTIFIED` 는 `k1 0.543` 이 살아 있어 `cam.json`(왜곡항 0)과 안 맞는다.
 🔴 `make_frame_from_zed.py` 는 **정류를 하지 않는다** — 이미 정류된 것을 받는다고 **가정**한다.
@@ -443,8 +488,12 @@ envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index
 
 | 순서 | 볼 것 | 왜 |
 |---|---|---|
+| **0** | 🔴🔴 `## 배선 감사` | **여기가 ❌ 면 아래를 전부 읽지 말 것.** 배선이 어긋나면 숫자는 «틀린» 게 아니라 **«다른 뜻»** 이 되고 GT 없이는 눈으로 못 잡는다. 러너가 `tools/audit_run.py` 를 자동으로 돌린다 |
 | 1 | `## 촬영 진단` + `## 판정` 의 📏 눈금 | **이 런에서 10mm 가 몇 px 인가** — 오버레이를 정량적으로 보게 된다 |
 | 2 | 🔴 `overlay_sheet.png` | **GT 가 없으니 «맞는가» 를 보는 유일한 수단.** 지표를 아무리 봐도 «다 같이 틀린» 경우는 여기서만 보인다 |
+| 2b | 🔴🔴 `stats/distance.png` | **거리 4다리.** 실루엣만 갈라짐 → `baseline` · 셋이 붙고 줄자만 다름 → **`fx`**. ⚠️ `FP z`·`stereo` 는 «독립» 이 아니다(교훈 #89) |
+| 2c | 🔴 `stats/ranking.png` | **팔 서열** — \|Δdx\| 정렬. 🔴 `*all-gated`·`Z-fixed`·`init!=` 꼬리표가 붙은 팔은 **나란히 놓을 수 없다** |
+| 2d | `stats/heatmap.png` | 프레임 × 팔. **가로줄 = 어려운 프레임**(오버레이를 열 것) · **세로줄 = 나쁜 팔** |
 | 3 | `## 이 값이 상이한가` | sim 대역과 비교. ⚠️ 벗어남이 곧 고장이 아니다(도메인 갭일 수 있다) |
 | 4 | `## 이상 프레임` | 기준선 불필요 — **런 자기 자신이 기준**이라 도메인 갭에 면역 |
 | 5 | `## 여기부터 보라` → `worst/A1_debug/*/contour_debug.png` | Sobel 이 **물체 경계**를 잡았나, 융기 능선·그림자를 잡았나 |

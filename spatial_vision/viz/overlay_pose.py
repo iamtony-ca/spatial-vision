@@ -28,6 +28,8 @@
     · **파랑 반투명** = 정합에 실제로 쓴 마스크 (mask_band > mask_flange_proj > mask_flange)
     · **축 삼각대** = 물체 원점(flange 주 상면 중심)의 X/Y/Z. 글자로 라벨을 찍는다
     · 좌상단: GT 가 있으면 R/t 오차, 없으면 **초기값 대비 이동량**과 **게이트 후퇴 여부**
+    · **좌하단 mm 눈금자** — 크롭 배율이 프레임마다 달라서 밖에서 환산할 수 없다. 이미지 안에
+      박아야 *"이 어긋남이 몇 mm 인가"* 를 읽을 수 있다 (`--no-scalebar` 로 끈다)
 
 ⚠️ **`stages.refine_contour --debug` 와 색 규약이 다르다** — 거기서는 초록=GT · 노랑=모델 샘플이다.
    그래서 두 도구 모두 **이미지에 범례를 찍는다.** 시트를 인용할 때 색을 말로 옮기지 말 것.
@@ -93,6 +95,50 @@ def draw_axes(img, T, K, mm: float) -> None:
     cv2.circle(img, o, 4, (255, 255, 255), -1)
 
 
+def draw_scalebar(img, px_per_mm_disp: float, mm_per_px_src: float) -> None:
+    """★ **mm 눈금자** — *"10mm 쯤 어긋난 것 같다"* 를 눈대중이 아니라 **읽어서** 판정한다.
+
+    실환경에는 GT 가 없어 오차를 숫자로 못 낸다. 남는 건 오버레이인데, 거기서 «윤곽이 얼마나
+    떨어져 있나» 를 재려면 화면에 길이 기준이 있어야 한다. 크롭 배율이 프레임마다 달라서
+    *"이 시트는 1px 이 몇 mm"* 를 밖에서 계산할 수도 없다 → 이미지 안에 박는다.
+
+    ⚠️ **물체 평면(= pose 의 z)에서만 맞다.** 원근이 있으므로 더 앞/뒤의 화소에는 안 맞는다.
+    ⚠️ `px_per_mm_disp` 는 **크롭·리사이즈를 반영한 표시 이미지 기준**이고,
+       `mm_per_px_src` 는 **원본 픽셀** 기준이다(= Z/fx, 진짜 측정 분해능).
+    """
+    if not (np.isfinite(px_per_mm_disp) and px_per_mm_disp > 0):
+        return
+    H, W = img.shape[:2]
+    fits = [s for s in (5, 10, 20, 50, 100, 200, 500) if s * px_per_mm_disp <= 0.45 * W]
+    span = fits[-1] if fits else 5
+    L = int(round(span * px_per_mm_disp))
+    if L < 12:
+        return
+    x0, y = 10, H - 26
+    # ⚠️ **10 칸**으로 쪼갠다 — 5 칸이면 100mm 자의 한 칸이 20mm 라 우리가 실제로 판정하려는
+    #    «10mm 어긋났나» 를 못 읽는다. 5칸마다 눈금을 길게 해서 절반 지점을 표시한다.
+    txt = f"{span}mm · 눈금 {span / 10:g}mm   (원본 1px = {mm_per_px_src:.2f}mm)"
+    tw = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.40, 1)[0][0]
+    cv2.rectangle(img, (x0 - 6, y - 14), (x0 + max(L, tw) + 8, H - 4), (0, 0, 0), -1)
+    cv2.line(img, (x0, y), (x0 + L, y), (255, 255, 255), 2)
+    for k in range(11):
+        xk, big = x0 + int(round(L * k / 10)), k % 5 == 0
+        cv2.line(img, (xk, y - (6 if big else 3)), (xk, y + (6 if big else 3)),
+                 (255, 255, 255), 2 if big else 1)
+    cv2.putText(img, txt, (x0, H - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (255, 255, 255), 1)
+
+
+def scale_terms(K, T, box, hw, tile: int) -> tuple[float, float]:
+    """(표시 px/mm, 원본 mm/px). `T` 가 없으면 (0, 0) — 깊이를 모르면 눈금이 뜻이 없다."""
+    if T is None:
+        return 0.0, 0.0
+    z = float(T[2, 3])
+    if z <= 1e-6:
+        return 0.0, 0.0
+    src_w = (box[2] - box[0]) if box else hw[1]
+    return float(K[0, 0]) / z * (tile / max(src_w, 1)), z / float(K[0, 0])
+
+
 def parse_pred(spec: str, default_name: str) -> tuple[Path, str, str]:
     """`경로[:pose_이름]` → (디렉토리, pose 파일명, 라벨)."""
     if ":" in spec and not spec.split(":")[-1].startswith(("/", "\\")):
@@ -118,7 +164,7 @@ def square_box(mask: np.ndarray, hw, pad_frac: float = 0.35) -> tuple[int, int, 
 
 
 def make_tile(frame: Path, pred_dir: Path, pose_name: str, mesh, K, box, tile: int,
-              mask_alpha: float = 0.22):
+              mask_alpha: float = 0.22, scalebar: bool = True):
     """타일 하나. `box` 가 None 이면 이 타일의 예측으로 잡는다(그 박스를 반환해 행에서 공유).
 
     ⚠️ 마스크는 **연하게** 깐다 — 실환경 판정은 *"초록 윤곽이 사진의 진짜 테두리에 붙는가"* 인데
@@ -172,8 +218,88 @@ def make_tile(frame: Path, pred_dir: Path, pose_name: str, mesh, K, box, tile: i
     if img.size == 0:
         img = np.zeros((tile, tile, 3), np.uint8)
     img = cv2.resize(img, (tile, tile))
+    if scalebar:
+        draw_scalebar(img, *scale_terms(K, T_pr if T_pr is not None else T_gt, box, hw, tile))
     cv2.rectangle(img, (0, 0), (tile - 1, 22), (0, 0, 0), -1)
     cv2.putText(img, note, (5, 16), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (0, 255, 255), 1)
+    return img, box
+
+
+# ★ `--combine` 전용 팔레트 (BGR). 🔴 **빨강은 GT 전용이라 뺀다** — 위 규약과 충돌하면
+#   시트를 잘못 읽는다. 밝기·색상이 충분히 갈리는 순서로 고정한다(런마다 색이 바뀌면 안 된다).
+COMBO_COLORS = [(0, 255, 0), (255, 255, 0), (0, 255, 255), (255, 0, 255),
+                (0, 165, 255), (255, 128, 0), (128, 255, 128), (200, 200, 255)]
+
+
+def make_combo_tile(frame: Path, preds: list, mesh, K, box, tile: int, axes_for: int = 0,
+                    scalebar: bool = True):
+    """★ **예측 여러 개를 «한 장» 에 겹쳐** 그린다 (`--combine`).
+
+    타일을 나눠 그리면 *"coarse 와 refined 가 얼마나 어긋나는가"* 를 눈으로 못 잰다 —
+    같은 화소 위에 놓아야 보인다. 분할 백엔드별 FP 결과를 겹치는 것도 같은 이유다.
+
+    ⚠️ 마스크는 안 깐다(윤곽이 여럿이라 가려진다) · 축 삼각대는 **하나만** 그린다(`axes_for`).
+    """
+    img = cv2.imread(str(frame / "left.png"))
+    hw = img.shape[:2]
+    T_gt = load_pose(frame / "pose_gt.json")
+
+    drawn = []                                    # (라벨, 색, T) — 범례·주석에 그대로 쓴다
+    for i, (d, name, lab) in enumerate(preds):
+        T = load_pose(d / frame.name / name)
+        drawn.append((lab, COMBO_COLORS[i % len(COMBO_COLORS)], T, d, name))
+    first = next((T for _, _, T, _, _ in drawn if T is not None), None)
+
+    if box is None:
+        ref = T_gt if T_gt is not None else first
+        box = square_box(silhouette(mesh, ref, K, hw), hw) if ref is not None else None
+
+    if T_gt is not None:                          # GT 는 늘 빨강 (단독 모드와 같은 규약)
+        cs, _ = cv2.findContours(silhouette(mesh, T_gt, K, hw),
+                                 cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(img, cs, -1, (0, 0, 255), 2)
+    for i, (lab, col, T, d, name) in enumerate(drawn):
+        if T is None:
+            continue
+        cs, _ = cv2.findContours(silhouette(mesh, T, K, hw),
+                                 cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(img, cs, -1, col, 2)
+        if i == axes_for:
+            draw_axes(img, T, K, 60.0)
+
+    if box:
+        x0, y0, x1, y1 = box
+        img = img[y0:y1, x0:x1]
+    if img.size == 0:
+        img = np.zeros((tile, tile, 3), np.uint8)
+    img = cv2.resize(img, (tile, tile))
+    if scalebar:
+        draw_scalebar(img, *scale_terms(K, T_gt if T_gt is not None else first, box, hw, tile))
+
+    # 주석 — **줄마다 그 예측의 색으로** 찍는다. 색 규약을 밖에서 설명할 필요가 없어진다.
+    n = sum(1 for *_, T, _, _ in drawn if T is not None) + (1 if T_gt is not None else 0)
+    h = 16 * max(n, 1) + 6
+    cv2.rectangle(img, (0, 0), (tile - 1, h), (0, 0, 0), -1)
+    y = 14
+    if T_gt is not None:
+        cv2.putText(img, "GT", (5, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 0, 255), 1); y += 16
+    ref_T = T_gt if T_gt is not None else None
+    for lab, col, T, d, name in drawn:
+        if T is None:
+            cv2.putText(img, f"{lab}: 없음", (5, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, col, 1)
+            y += 16
+            continue
+        if ref_T is not None:                     # sim — GT 대비 오차
+            s = f"{lab}  R{rot_deg(ref_T, T):5.2f} t{np.linalg.norm(ref_T[:3, 3] - T[:3, 3]):5.1f}"
+        else:                                     # 실물 — z 와 «초기값 대비 이동량»
+            s = f"{lab}  z{T[2, 3]:.0f}"
+            T0 = load_pose(d / frame.name / "pose_coarse.json")
+            if T0 is not None and name != "pose_coarse.json":
+                s += f" mv{rot_deg(T0, T):.2f}d/{np.linalg.norm(T0[:3, 3] - T[:3, 3]):.1f}mm"
+            if (d / frame.name / "pose_contour_raw.json").exists():
+                s += " [G]"
+        cv2.putText(img, s, (5, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, col, 1)
+        y += 16
     return img, box
 
 
@@ -205,6 +331,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cols", type=int, default=3, help="예측이 하나일 때의 열 수")
     ap.add_argument("--mask-alpha", type=float, default=0.22,
                     help="마스크 반투명도. 0 이면 안 그린다 — 실물 테두리를 가리지 않고 보고 싶을 때")
+    ap.add_argument("--max-combine", type=int, default=8,
+                    help="`--combine` 에서 그릴 예측 수 상한. 🔴 팔레트가 8색이라 넘으면 색이 "
+                         "순환해 구분이 안 되고, 주석 줄이 타일을 통째로 덮는다(30팔에서 실제로 "
+                         "그랬다). 넘치면 **앞에서 자르고 범례에 밝힌다**")
+    ap.add_argument("--combine", action="store_true",
+                    help="★ 예측 전부를 **한 이미지에 겹쳐** 그린다(예측마다 다른 색 + 색 맞춘 주석). "
+                         "coarse↔refined 어긋남, 분할 백엔드별 FP 차이를 눈으로 재려면 이것이다")
+    ap.add_argument("--no-scalebar", action="store_true",
+                    help="mm 눈금자를 안 그린다. 기본은 그린다 — GT 가 없는 실환경에서 «몇 mm 어긋났나» 를 "
+                         "읽을 수 있는 유일한 수단이다(물체 평면 기준)")
     ap.add_argument("--per-frame-dir", default=None,
                     help="프레임마다 한 장씩 따로 쓴다(전체 시트와 별개). 육안 확대 검사용")
     ap.add_argument("--out", required=True)
@@ -212,6 +348,13 @@ def main(argv: list[str] | None = None) -> int:
 
     cap = Path(args.capture)
     preds = [parse_pred(s, args.pose_name) for s in args.pred]
+    n_dropped = 0
+    if args.combine and args.max_combine and len(preds) > args.max_combine:
+        # 🔴 조용히 자르지 않는다(교훈 #22) — 몇 개를 왜 뺐는지 로그와 **범례 양쪽**에 남긴다.
+        n_dropped = len(preds) - args.max_combine
+        print(f"⚠️ --combine 은 {args.max_combine}개까지만 그린다 (팔레트 8색). "
+              f"뒤 {n_dropped}개를 뺀다: {[l for _, _, l in preds[args.max_combine:]]}")
+        preds = preds[:args.max_combine]
     mesh = trimesh.load(Path(args.obj) / args.mesh, process=False)
     frames = sorted([p for p in cap.glob("frame_*") if p.is_dir()])
     if not frames:
@@ -242,16 +385,24 @@ def main(argv: list[str] | None = None) -> int:
         cam = json.loads((f / "cam.json").read_text())
         K = np.array([[cam["fx"], 0, cam["cx"]], [0, cam["fy"], cam["cy"]], [0, 0, 1]], float)
         box, tiles = None, []
-        for d, name, _ in preds:               # ★ 행 안에서 크롭 박스를 공유해야 나란히 비교된다
-            t, box = make_tile(f, d, name, mesh, K, box, args.tile, args.mask_alpha)
+        if args.combine:                       # ★ 전부 한 장에 겹친다
+            t, box = make_combo_tile(f, preds, mesh, K, box, args.tile,
+                                     scalebar=not args.no_scalebar)
             tiles.append(t)
+        else:
+            for d, name, _ in preds:           # ★ 행 안에서 크롭 박스를 공유해야 나란히 비교된다
+                t, box = make_tile(f, d, name, mesh, K, box, args.tile, args.mask_alpha,
+                                   scalebar=not args.no_scalebar)
+                tiles.append(t)
         rows.append((f.name, tiles))
         per_frame[f.name] = tiles
 
-    ncol = len(preds) if len(preds) > 1 else min(args.cols, len(sel))
+    # ⚠️ combine 모드는 타일이 프레임당 **하나**다 — 열 수를 예측 개수로 잡으면 폭이 안 맞는다.
+    ntile = 1 if args.combine else len(preds)
+    ncol = ntile if ntile > 1 else min(args.cols, len(sel))
     W = ncol * args.tile
 
-    if len(preds) > 1:      # 행 = 프레임, 열 = 변형
+    if ntile > 1:           # 행 = 프레임, 열 = 변형
         blocks = [label_bar("  |  ".join(f"{lab:^18}" for _, _, lab in preds), W, 28, (0, 255, 255))]
         for fname, tiles in rows:
             blocks.append(label_bar(fname, W, 22))
@@ -264,9 +415,18 @@ def main(argv: list[str] | None = None) -> int:
             chunk += [np.zeros_like(chunk[0])] * (ncol - len(chunk))
             blocks.append(np.concatenate(chunk, 1))
 
-    legend = ("red=GT  green=pred  " if has_gt else "green=pred (GT 없음)  ") + \
-             ("blue=mask  " if args.mask_alpha > 0 else "") + "axes=obj XYZ 60mm  | " + \
-             " · ".join(f"{lab}" for _, _, lab in preds) + f"  / {Path(args.obj).name}"
+    if args.combine:
+        # 🔴 색 규약을 **이미지 안에** 박는다 — 이 시트는 색으로만 구분되므로 밖에서 설명하면 안 된다.
+        legend = ("red=GT  | " if has_gt else "GT 없음  | ") + "  ".join(
+            f"[{i + 1}]{lab}" for i, (_, _, lab) in enumerate(preds)) + \
+            f"  (색 순서: green,cyan,yellow,magenta,orange…)  / {Path(args.obj).name}" + \
+            (f"  ⚠️ 뒤 {n_dropped}개 생략 — 전부 보려면 overlay_sheet.png" if n_dropped else "")
+    else:
+        legend = ("red=GT  green=pred  " if has_gt else "green=pred (GT 없음)  ") + \
+                 ("blue=mask  " if args.mask_alpha > 0 else "") + "axes=obj XYZ 60mm  | " + \
+                 " · ".join(f"{lab}" for _, _, lab in preds) + f"  / {Path(args.obj).name}"
+    if not args.no_scalebar:
+        legend += "  | 좌하단 = mm 눈금자(물체 평면)"
     sheet = np.concatenate([label_bar(legend, W, 30)] + blocks, 0)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -278,8 +438,9 @@ def main(argv: list[str] | None = None) -> int:
         pfd.mkdir(parents=True, exist_ok=True)
         # ⚠️ **프레임별 이미지의 폭은 `W` 가 아니다** — `W` 는 시트 격자용(`ncol × tile`)이고
         #    여기 한 줄은 **예측 개수 × tile** 이다. 예측이 하나면 둘이 어긋나 concat 이 터진다.
-        Wf = len(preds) * args.tile
-        head = label_bar("  |  ".join(f"{lab:^18}" for _, _, lab in preds), Wf, 28, (0, 255, 255))
+        Wf = ntile * args.tile
+        head = label_bar("겹쳐 그림 — 주석 줄 색 = 그 예측의 윤곽 색" if args.combine else
+                         "  |  ".join(f"{lab:^18}" for _, _, lab in preds), Wf, 28, (0, 255, 255))
         for fname, tiles in rows:
             cv2.imwrite(str(pfd / f"overlay_{fname}.png"),
                         np.concatenate([label_bar(legend, Wf, 30), head,
