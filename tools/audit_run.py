@@ -52,6 +52,17 @@ def _load(p: Path):
         return None
 
 
+def _in_root(root: Path, p: Path) -> Path:
+    """meta 에 기록된 경로를 **이 `root` 안의 같은 이름**으로 되돌린다.
+
+    🔴 러너는 절대 경로를 기록한다. 런 디렉토리를 복사·이동해서 감사하면 그 경로가 **옛 위치**를
+       가리켜, 감사기가 «지금 보고 있는 런» 이 아닌 것을 읽는다 — 자기검증 중에 실제로 걸렸다.
+       조용히 틀린 값을 쓰느니 이름으로 되찾는 편이 낫다(교훈 #22).
+    """
+    q = root / p.name
+    return q if q.exists() else p
+
+
 def _rt(p: Path):
     j = _load(p)
     if not j or "R" not in j:
@@ -95,9 +106,63 @@ def check(root: Path) -> tuple[list[str], list[str]]:
     for k, v in h.items():
         dup.setdefault(v, []).append(k)
     shared = [v for v in dup.values() if len(v) > 1]
-    (ok if not shared else bad).append(
-        f"① 산출물 고유성 — 팔 {len(h)}개 · 서로 다른 결과 {len(dup)}종"
-        + ("" if not shared else f"  🔴 **같은 산출물을 공유**: {shared}"))
+
+    # 🔴 «같다» 에는 두 종류가 있고 **처방이 정반대**다. 자동으로 무시하지 말고 **갈라서 보여준다**:
+    #    ⓐ 설정이 «게이트 문턱만» 다르다 → 그 사이 구간에 프레임이 없으면 같은 게 **정상**(소표본 우연).
+    #       실측: 8장 런에서 `A1`(1.5°)==`Cg3`(3.0°) — moved_deg 가 (1.5,3.0] 에 한 장도 없었다.
+    #    ⓑ 초기값·마스크가 다른데 결과가 같다 → **배선 오류**. 실측: `AF1`==`I1` (§35-2p-7).
+    #    ⚠️ ⓐ도 «통과» 로 적지 않는다 — 「우연히 같아 보이는 것」을 계속 눈에 띄게 둔다.
+    def cfg(vid: str) -> dict:
+        m = _load(root / vid / "meta_contour.json") or {}
+        return {k: m.get(k) for k in
+                ("init", "mesh", "outer_only", "keep_hole_mm", "hole_center_mm", "search_px",
+                 "per_edge", "min_grad", "polarity", "fix_z", "iters", "huber_px", "blur")}
+    def upstream_masks(vid: str) -> str | None:
+        """그 팔의 FP 가 실제로 먹은 **마스크 디렉토리의 내용 해시**.
+
+        🔴 «마스크 «디렉토리 이름» 이 다르다» 와 «마스크 «내용» 이 다르다» 는 다른 말이다.
+           `seg_full`(ISM·select exemplar)과 `seg_ism`(ISM·select score)은 **이름이 다른데
+           방해물이 없으면 내용이 byte 단위로 같다** — 그래서 하류 두 팔이 같은 결과를 낸다.
+           그건 배선 오류가 아니라 **«선택 규칙이 같은 것을 골랐다»** 이므로 갈라서 보고한다.
+        """
+        mc = _load(root / vid / "meta_contour.json") or {}
+        init = mc.get("init")
+        if not init:
+            return None
+        # 🔴 meta 의 경로는 **절대 경로**다 — 런을 복사·이동하면 «옛 위치» 를 읽어 감사가 조용히
+        #    엉뚱한 걸 본다(실제로 자기검증 중에 이 함정에 걸렸다). **항상 이 `root` 안에서** 찾는다.
+        mp = _load(_in_root(root, Path(init).parent) / "meta_pose.json") or {}
+        md = mp.get("masks")
+        if not md:
+            return None
+        m = hashlib.sha256()
+        for f in sorted(_in_root(root, Path(md)).glob("frame_*/*.png")):
+            m.update(f.name.encode())
+            m.update(f.read_bytes())
+        return m.hexdigest()
+
+    benign, real_dup = [], []
+    for grp in shared:
+        cs = [cfg(v) for v in grp if (root / v / "meta_contour.json").exists()]
+        ms = [upstream_masks(v) for v in grp]
+        if len(cs) == len(grp) and all(c == cs[0] for c in cs[1:]):
+            benign.append((grp, "게이트 문턱만 다르다 — 그 구간에 프레임이 없으면 정상"))
+        elif (len({c.get("init") for c in cs}) == len(grp)          # 🔴 초기값이 서로 «달라야» 한다
+              and all(x is not None for x in ms) and all(x == ms[0] for x in ms[1:])):
+            # 초기값 FP 런이 서로 다른데 그 상류 **마스크 내용이 같다** → 선택 규칙이 같은 것을 골랐다.
+            # ⚠️ 초기값이 «같은» 팔들(A1↔A2b 등)에는 이 면제를 주면 안 된다 — 그 경우 결과가 같다는
+            #    것은 «정합 플래그가 아무 일도 안 했다» 이고, 실제로 고장 주입이 여기로 새 나갔다.
+            benign.append((grp, "초기값 FP 런은 다른데 그 상류 **마스크 내용이 동일**하다"
+                                "(디렉토리 이름만 다르다) — 선택 규칙이 같은 것을 골랐다는 뜻"))
+        else:
+            real_dup.append(grp)
+    line = f"① 산출물 고유성 — 팔 {len(h)}개 · 서로 다른 결과 {len(dup)}종"
+    for grp, why in benign:
+        line += f"\n      ⚠️ {grp} 결과 동일 — {why} (소표본이면 흔하다)"
+    if real_dup:
+        line += (f"\n      🔴 **초기값·설정이 다른데 결과가 같다 = 배선 오류**: {real_dup}"
+                 f"\n         → 그 팔들의 `--masks`·`--pose-dir` 이 정말 다른지 확인할 것(§35-2p-7)")
+    (bad if real_dup else ok).append(line)
 
     # ── 2. 후퇴 = 자기 초기값 / 비후퇴 ≠ 초기값 ────────────────────────────────
     #    🔴 팔마다 초기값 출처가 다르다 — `meta_contour.json` 이 기록한 것을 **읽어서** 쓴다.
@@ -111,7 +176,7 @@ def check(root: Path) -> tuple[list[str], list[str]]:
         if not init:
             bad.append(f"② {a}: `meta_contour.json` 에 초기값 출처(`init`)가 없다")
             continue
-        sd, nm = Path(init).parent, Path(init).name
+        sd, nm = _in_root(root, Path(init).parent), Path(init).name   # 복사된 런에서도 맞게(위 참조)
         gated = {f["frame"] for f in mc.get("frames", []) if f.get("gated")}
         bad_g = bad_ng = 0
         for f in sorted((root / a).glob("frame_*/pose_refined.json")):

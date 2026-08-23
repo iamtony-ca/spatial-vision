@@ -137,9 +137,14 @@ MODES = {
     "cascade": {"arms": "+1", "cost": "+35초",
                 "what": "coarse-to-fine 정합 32→12→8 (§35-2k-3) — 횡 포획 4mm → 24mm. "
                         "게이트 기준을 최초 FP 로 맞춰(`--gate-ref-dir`) 다른 팔과 나란히 읽힌다"},
-    "primary": {"arms": "+1", "cost": "+40초",
-                "what": "A 경로를 `--primary full` 로도 (§22 유효 해상도 대조). "
-                        "⚠️ t 가 3배 나쁜 게 정상 — A1 과 나란히 놓지 말 것"},
+    # 🔴 이 모드는 «A 경로» 가 아니다 (2026-08-23 정정, 배선 감사가 잡았다 — §35-2p-7).
+    #    근접에는 **SAM3 `full` 참조가 없어** `seg_full` 을 ISM 으로 뽑는다. 그래서 이 팔은
+    #    「SAM3 full」이 아니라 **「ISM full + `--select exemplar`」** 이고, `I1`(ISM full +
+    #    `--select score`)과 **선택 규칙만** 다르다. 방해물이 없으면 둘이 같은 마스크가 된다.
+    "select": {"arms": "+1", "cost": "+40초",
+               "what": "ISM `full` 마스크의 **타깃 지정 규칙** 대조 — `--select exemplar`"
+                       "(flange 로 지목) vs `I1` 의 `--select score`. 방해물이 없으면 **`I1` 과 "
+                       "같은 결과가 정상**이다(교훈 #15). 옛 이름 `primary` 도 받는다"},
     "edge":    {"arms": "+5", "cost": "+25초",
                 "what": "정합기가 **어느 밝기 경계를 잡는가**: `--polarity` 3종 × `--min-grad` 2종. "
                         "🔴 검정 몸체에서 융기 능선을 잡는 §35-2i 편향을 직접 겨냥한다 — "
@@ -149,7 +154,7 @@ MODES = {
                         "🔴 참조는 거리 종속이라 틀리면 조용히 무너진다 — «실제 거리가 몇인가» 를 "
                         "데이터가 답하게 한다"},
     "wide":    {"arms": "+13~14", "cost": "+3~4분",
-                "what": "= default + contour + init + cascade + primary + edge. **실물 초반 권장**. "
+                "what": "= default + contour + init + cascade + select + edge. **실물 초반 권장**. "
                         "⚠️ `refs` 는 뺀다(비용 자릿수가 다르고 초기값이 달라지는 비교라 성격이 다르다) "
                         "— 필요하면 `--mode wide,refs`"},
     "all":     {"arms": "전부", "cost": "+4~6분",
@@ -534,20 +539,24 @@ def build_steps(a) -> list[Step]:
         ]
         arms.append((f"Rn{nr}", f"n-refs {nr} + 정합", fp, "pose_coarse.json", ["--outer-only"]))
 
-    # ── primary : A 경로를 `--primary full` 로도 (§22 유효 해상도 대조) ──────────────
-    #    같은 SAM3 백엔드에서 **crop 대상만** 바꾼 대조군. I·T 가 `full` 인 이유를 A 안에서 본다.
-    #    ⚠️ §22 로 t 가 3배 나빠지는 게 **정상**이다 — 이 팔의 t 를 A1 과 나란히 놓지 말 것.
-    if "primary" in modes:
-        af = o / "fp_afull"
-        steps.append(Step("fp_afull", "FoundationPose (SAM3 exemplar full 마스크 · --primary full)",
+    # ── select : ISM `full` 마스크의 **타깃 지정 규칙** 대조 ──────────────────────────
+    #    🔴 옛 이름은 `primary` 였고 «A 경로를 --primary full 로» 라고 적혀 있었다. **틀렸다** —
+    #       `seg_full` 은 근접에 SAM3 `full` 참조가 없어 **ISM 으로** 뽑는다(`--select exemplar`).
+    #       따라서 이 팔은 `I1`(ISM full + `--select score`)과 **선택 규칙만** 다르고,
+    #       방해물이 없으면 마스크가 **byte 단위로 같아진다**(sim 8·20프레임에서 실측).
+    #       → 배선 감사 ①이 8프레임 런에서 `AF1 == I1` 로 잡아 냈다(§35-2p-7).
+    #    ⚠️ 그래도 버리지 않는다 — 방해물이 있으면 갈리는 축이고, 그게 교훈 #15 의 «선택» 문제다.
+    if "select" in modes:
+        af = o / "fp_isel"
+        steps.append(Step("fp_isel", "FoundationPose (ISM full 마스크 · --select exemplar)",
                           [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
                            "--in", a.in_dir, "--out", af, "--no-stage2",
                            "--obj", obj, "--masks", o / "seg_full", "--depth", "stereo",
                            "--depth-dir", st, "--primary", "full",
                            "--flange-mask-from", "pose", "--input-scale", a.input_scale],
                           af, "meta_pose.json"))
-        arms.append(("AF1", "A 경로 --primary full + 정합 (§22 대조)", af, "pose_coarse.json",
-                     ["--outer-only"]))
+        arms.append(("IX1", "ISM full · select exemplar + 정합 (I1 은 select score)",
+                     af, "pose_coarse.json", ["--outer-only"]))
     for sid, desc, pdir, pname, extra in arms:
         d = Path(a.out) / sid
         steps.append(Step(sid, desc,
@@ -1730,7 +1739,7 @@ def report(a) -> int:
         + (["T1"] if a.sam3_text else [])
     # ★ `--mode` 로 늘어난 팔은 **디스크에 실제로 있는 것만** 집는다 — 리포트만 다시 낼 때
     #   (`--report-only`) 모드 인자를 안 줘도 그 런의 팔이 그대로 나온다.
-    ids += [k for k in ("Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "H1", "Ccas", "AF1",
+    ids += [k for k in ("Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "H1", "Ccas", "IX1",
                         "Ed", "Eb", "Ea", "Eg3", "Eg05")
             if (root / k / "meta_contour.json").exists() and k not in ids]
     # ★ `refs` 스윕 팔은 이름이 런마다 다르다 — **디스크를 훑어** 집는다(정적 목록으로 못 적는다).
@@ -1752,7 +1761,7 @@ def report(a) -> int:
               "Cs16": "Cs16 탐색폭 16px", "Cs32": "Cs32 탐색폭 32px",
               "Cg0": "Cg0 게이트 off", "Cg3": "Cg3 게이트 3.0°", "Cg07": "Cg07 게이트 0.75°",
               "Cz": "Cz --fix-z on", "H1": "H1 하이브리드 초기값 (§27-7)",
-              "Ccas": "Ccas 캐스케이드 32→12→8", "AF1": "AF1 A경로 --primary full ⚠️",
+              "Ccas": "Ccas 캐스케이드 32→12→8", "IX1": "IX1 ISM full · select exemplar",
               "Ed": "Ed 극성 dark_out", "Eb": "Eb 극성 bright_out", "Ea": "Ea 극성 any",
               "Eg3": "Eg3 min-grad 3.0", "Eg05": "Eg05 min-grad 0.5"}
     # ★ `refs` 스윕 팔은 **이름이 런마다 다르다**(`R_n40black`·`Rn5`) → 라벨을 만들어 붙인다.
@@ -1824,7 +1833,7 @@ def report(a) -> int:
     all_gated: list[str] = []
     order = ["A3", "A1", "A2a", "A2b", "A4"] + (["I3", "I1"] if a.ism else []) \
         + (["T3", "T1"] if a.sam3_text else []) \
-        + [k for k in ("Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "H1", "Ccas", "AF1",
+        + [k for k in ("Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "H1", "Ccas", "IX1",
                        "Ed", "Eb", "Ea", "Eg3", "Eg05") if k in v] \
         + sorted(k for k in v if k.startswith("R_") or (k.startswith("Rn") and k[2:].isdigit()))
     for sid in order:
@@ -2244,15 +2253,21 @@ def main(argv: list[str] | None = None) -> int:
         # ⚠️ `refs` 는 **뺀다** — 참조 스윕만 분할·FP 를 통째로 다시 돌아 비용이 자릿수로 다르고
         #    («팔당 36초» × 최대 5개), 게다가 **초기값이 달라지는 비교**라 성격이 다르다(교훈 #82).
         #    필요하면 명시적으로 `--mode wide,refs` 라고 쓴다.
-        a.mode += ["contour", "init", "cascade", "primary", "edge"]
+        a.mode += ["contour", "init", "cascade", "select", "edge"]
+    # 옛 이름 호환 — `primary` → `select`. 🔴 조용히 바꾸지 않고 **알리고** 바꾼다(교훈 #21).
+    #    `bad` 계산 **전**에 해야 «모르는 모드» 로 걸려 죽지 않는다.
+    if "primary" in a.mode:
+        a.mode = ["select" if m == "primary" else m for m in a.mode]
+        print("    ⚠️ `--mode primary` 는 **`select` 로 이름이 바뀌었다** — 그 팔은 «A 경로» 가 "
+              "아니라 «ISM full + select exemplar» 였다(§35-2p-7). 계속 진행한다", flush=True)
     bad = [m for m in a.mode if m not in MODES]
     if bad:
         # 🔴 조용히 무시하지 않는다 — 오타 하나로 «넓혔다고 믿는 좁은 런» 이 나온다.
         print(f"❌ 모르는 모드: {bad}. 가능한 값: {', '.join(MODES)}  (`--list-modes` 참고)")
         return 2
-    if "primary" in a.mode and not a.ism and not a.sam3_text:
-        print("    ⚠️ `primary` 모드는 `seg_full`(진단용) 마스크를 쓴다 — 그 스텝은 항상 돌므로 문제없다",
-              flush=True)
+    if "select" in a.mode:
+        print("    ⚠️ `select` 모드(`IX1`)는 `seg_full`(ISM) 마스크를 쓴다 — **`I1` 과 선택 규칙만 "
+              "다르다.** 방해물이 없으면 두 팔이 같은 결과인 것이 정상이다", flush=True)
 
     # ── `--mode refs` 의 스윕 목록을 여기서 확정한다 (build_steps 는 결과만 받는다) ──────────
     a.refs_sweep_list, a.refs_sweep_n = [], []

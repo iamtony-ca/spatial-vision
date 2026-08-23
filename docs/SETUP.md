@@ -370,16 +370,22 @@ import cv2,glob,sys
 bad=[p for p in glob.glob('runs/real01_near/frame_*/*.png') if cv2.imread(p) is None]
 print('🔴 못 읽는 파일:', bad) if bad else print('✅ PNG', len(glob.glob('runs/real01_near/frame_*/*.png')), '장 전부 정상')"
 
+# [5090] 🔴 여기서부터 **매번** — 안 하면 ONNX 가 조용히 CPU 로 떨어진다
+cd /isaac-sim/volume/spatial_manipulation_ws/src/vision && source envs/env.sh
+
 # [5090] ★ 손으로 잇지 말고 **A그룹 러너**를 쓴다 — 4개 venv 를 알아서 오가고
-#        GT-free 리포트(report.md)까지 낸다. 멱등이라 다시 돌려도 없는 것만 채운다.
+#        GT-free 리포트(report.md)·그림·배선 감사까지 낸다. 멱등이라 다시 돌려도 없는 것만 채운다.
 envs/pose/bin/python tools/run_group_a.py --list-presets     # ① 참조 세트가 있는지 먼저 (인자 불필요)
 envs/pose/bin/python tools/run_group_a.py \
     --in runs/real01_near --out runs/real01_A --preset n25orange \
-    --ism --sam3-text --text-prompt "orange plastic box" \
+    --text-prompt "orange plastic box" --mode all \
     --note "형광등 2등, 정면, 1차 시도" --true-distance-mm 250    # ② 뒤 둘은 선택 인자
 # 여러 번 돌린 뒤 — 설정 diff 를 먼저 내고 지표를 나란히 놓는다 (누적 실험 노트)
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
 ```
+
+★ **이미 PC 에 이미지가 있으면 위를 건너뛰고 §8.1 로 간다** — 복붙 순서와 `--mode` 선택,
+그리고 **읽는 순서**가 거기 정리돼 있다.
 
 ★ `--preset` 은 **거리대 × 몸체 외관**이다(`n30orange` 식). 🔴 참조가 거리 종속이라 틀리면
 조용히 무너진다 — `--list-presets` 로 먼저 확인한다. 🔴 접미사 없는 `n20`·`n25`·`n30` 은
@@ -426,11 +432,13 @@ envs/pose/bin/python tools/run_group_a.py \
     --mode wide \
     --note "형광등 2등, 0.28m, 1차" --true-distance-mm 280
 
-# ④′ 「후보를 전부 펼친다」 — 30팔. ★ `--ism`·`--sam3-text` 는 **--mode all 이 자동으로 켠다**
-#    (그 둘은 모드가 아니라 별도 플래그라, 안 켜지면 경로 둘이 통째로 빠져 30 → 24 가 된다)
+# ④′ 🔴🔴 **이게 실물에서 실제로 칠 한 줄이다 — 「후보를 전부 펼친다」 30팔.**
+#    ★ `--ism`·`--sam3-text` 는 **`--mode all` 이 자동으로 켠다**(그 둘은 모드가 아니라 별도
+#      플래그라, 안 켜지면 경로 둘이 통째로 빠져 30 → 24 가 된다)
+#    ★ `--preset` 과 `--text-prompt` 를 **개체 몸체 색**에 함께 맞춘다 (아래 표)
 envs/pose/bin/python tools/run_group_a.py \
-    --in runs/real01 --out runs/real01_Aall --preset n25orange \
-    --text-prompt "orange plastic box" \
+    --in runs/real01 --out runs/real01_Aall --preset n30black \
+    --text-prompt "black plastic box" \
     --mode all \
     --note "형광등 2등, 0.28m, 전팔" --true-distance-mm 280
 
@@ -438,9 +446,34 @@ envs/pose/bin/python tools/run_group_a.py \
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
 ```
 
-**소요**: 20프레임에 **5~6분**(ONNX·SAM3·ISM·FP 콜드 스타트 전부 포함. `--ism --sam3-text` 를 빼면 절반).
+★ **몸체 색 → `--preset` · `--text-prompt` 짝** (거리대는 실제 촬영 거리로 바꾼다):
+
+| 몸체 | `--preset` | `--text-prompt` |
+|---|---|---|
+| 검정 불투명 | `n25black` / `n30black` / `n40black` / `n50black` … | `"black plastic box"` |
+| 반투명 주황 | `n30orange` 식 | `"orange plastic box"` |
+| 투명 | `n30clear` 식 | `"clear plastic box"` |
+| 모르겠다 | `n30mixed` 식 | `"plastic box"` |
+
+**소요 (실측, RTX 5090 · 콜드 스타트 포함)** — 🔴 프레임 수보다 **모드**가 지배한다:
+
+| | 기본 `default` (9팔) | `--mode all` (30팔) |
+|---|---|---|
+| **8프레임** (실물 운용 규모) | ~1.5분 | **~7분** |
+| 20프레임 | 5~6분 | **13.4분** (실측 799·804·816초, 3회) |
+
 멱등이라 다시 돌려도 없는 것만 채운다(`--force` 로 강제, `--only st,A1` 로 부분 실행).
 시각 산출물만 다시 그리려면 `--only ov,ovc,segcmp,diag --force`(수 초).
+★ **처음 시험은 `--limit-frames 3`** — 설정(참조·프롬프트·거리)이 맞는지부터 1~2분에 확인하고
+그다음 전체를 돌린다.
+
+🔴🔴 **표본 경고 — 실물 7~10장은 «꼬리를 못 보는» 크기다.** 무결점이어도 95% 상한은
+**n=7 → 실패율 35% · n=10 → 26%** 다(rule of three, 교훈 #58: n=40 무결점이 n=120 에서
+110/120 이었던 전례). 7~10장으로 할 수 있는 것은 **«어느 팔이 깨졌나»(고장 검출)** 이고,
+**«어느 팔이 더 정확한가»(서열)는 못 낸다.** 후보를 2~3개로 좁힌 뒤 **그 후보만 20~40장**으로
+다시 찍는 것이 순서다(§35-2o-4 선택 편향).
+⚠️ 그리고 **런 사이 KPI 는 1~3장 그냥 흔들린다**(GPU 비결정론, 교훈 #24 · `RESULTS.md §35-2p-6`) —
+7~10장에서 **1~3장 차이는 잡음**이다. 손으로 촬영을 늘리는 편이 항상 싸다.
 
 🔴 **③을 건너뛰지 말 것** — `--preset` 은 **촬영 거리대 × 몸체 외관**이고(`n30orange` 식) SAM3 참조가
 거리 종속이라 틀리면 **조용히 무너진다**(원거리 참조로 근접 질의 시 IoU 0.044 전례).
@@ -453,7 +486,7 @@ envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index
 ⚠️ **줄자 기준점은 `flange` 상면 중심**이다(pose 원점 규약). 몸체 바닥·받침대를 재면 344mm 급으로
 어긋나고 그건 «편향» 이 아니라 «다른 것을 쟀다» 다.
 ★ **`--mode`** — **후보 파이프라인을 얼마나 넓게 펼치나**(`--list-modes`). 기본 `default` = 9팔로
-지금까지와 같다. **`wide` = 18팔**(정합·게이트·초기값·캐스케이드·primary·edge) 이 **실물 초반 권장**이고,
+지금까지와 같다. **`wide` = 18팔**(정합·게이트·초기값·캐스케이드·select·edge) 이 **실물 초반 권장**이고,
 **`all` = 30팔**(+ 참조 거리대 스윕 · `--ism`·`--sam3-text` 자동 — ④′)이다. 20프레임 기준 wide +3~4분 · all +4~6분.
 ⚠️ **`all` 은 «구현된 모드 전부» 이지 «가능한 파이프라인 전부» 가 아니다** — 미구현 축(prompt·band·
 stereo·jitter)과 **hand-eye 가 필요한 넷**(P1 2단계 · P2 G9 · P3 5시점 융합 · P4 G9+G10)은 빠진다.
