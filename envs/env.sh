@@ -37,6 +37,13 @@ export LD_LIBRARY_PATH="$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}"
 export TORCH_CUDA_ARCH_LIST="12.0"
 export MAX_JOBS="${MAX_JOBS:-8}"
 
+# --- CUDA 메모리 단편화 완화 ---------------------------------------------------
+# 🔴 FoundationPose 는 **프레임마다 메모리가 쌓여** 뒤쪽 프레임에서 OOM 이 난다.
+#    1920×1200 · `pose_fp --input-scale 0.75` 는 frame_0002 에서 죽는데(31GiB 카드),
+#    이 한 줄이면 **20/20 통과**한다. 실측: 0.5 ✅ · 0.75 ❌→✅ · 1.0 ❌(단일 할당 6.5GiB, 여전히 불가).
+#    → §34-12 의 *"1920×1200 은 0.5 필요"* 상한이 **0.75 로 올라간다**(RESULTS §38-4).
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+
 mkdir -p "$XDG_CACHE_HOME" "$PIP_CACHE_DIR" "$UV_CACHE_DIR" "$TORCH_HOME" \
          "$HF_HOME" "$TORCH_EXTENSIONS_DIR" "$TRITON_CACHE_DIR" "$CUDA_CACHE_PATH" \
          "$UV_PYTHON_INSTALL_DIR" "$VISION_ROOT/envs/bin"

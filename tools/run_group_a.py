@@ -157,8 +157,16 @@ MODES = {
                 "what": "= default + contour + init + cascade + select + edge. **실물 초반 권장**. "
                         "⚠️ `refs` 는 뺀다(비용 자릿수가 다르고 초기값이 달라지는 비교라 성격이 다르다) "
                         "— 필요하면 `--mode wide,refs`"},
+    # ★★★ 유일하게 **실물에서 검증된** 구성이다 (사용자, 다른 PC · RESULTS §38).
+    #     참조 기반 SAM3(A그룹)가 실물에서 **전부 실패**했고, 텍스트 마스크 + `--primary full` +
+    #     **stage2 on** + 하이브리드(R=coarse·t=refined)가 «눈으로 오차가 분간 안 되는» 수준을 냈다.
+    #     🔴 정합(`refine_contour`)이 **하나도 없다** — 이 축은 실물에서 아직 이득이 확인되지 않았다.
+    "combo":   {"arms": "+4", "cost": "+2~3분",
+                "what": "**실물 검증 체인**: 텍스트 full 마스크 → `pose_fp --primary full` "
+                        "(**stage2 on**) × `--input-scale 0.75/0.5` × `--flange-mask-proj hull` "
+                        "+ 하이브리드. 🔴 `--sam3-text` 필요 · 0.75 는 `expandable_segments` 필요(§38-4)"},
     "all":     {"arms": "전부", "cost": "+4~6분",
-                "what": "quick 을 뺀 전부 (refs 스윕 포함). ★ **`--ism`·`--sam3-text` 도 자동으로 켠다** "
+                "what": "quick 을 뺀 전부 (refs 스윕 + combo 포함). ★ **`--ism`·`--sam3-text` 도 자동으로 켠다** "
                         "— «all» 은 경로도 전부라는 뜻이다"},
 }
 
@@ -260,15 +268,27 @@ def _live_preds(cands: list[str]) -> list[str]:
     return live or cands
 
 
-def _live_pose_dir(cands: list[Path]) -> Path:
-    """진단 시트의 6번 패널이 가리킬 곳 — **pose 를 낸 첫 팔**."""
+def _live_pose_dir(cands: list[Path], fallback: Path | None = None) -> Path:
+    """진단 시트의 6번 패널이 가리킬 곳 — **pose 를 낸 첫 팔**.
+
+    🔴 `cands` 가 **빌 수 있다** — `--mode quick` 은 정합 팔을 하나도 만들지 않는다.
+       그때 `cands[0]` 을 하면 `IndexError` 로 **런 전체가 죽는다**(진단 스테이지가
+       `optional=True` 여도 소용없다 — 죽는 곳이 `Step.resolve()` 라 그 처리 밖이다).
+       교훈 #79(«진단 스테이지는 본 파이프라인을 안 죽인다»)가 **인자 조립 단계**에서 새는 경우다.
+    """
     for d in cands:
         if _n_pose(d):
             if d != cands[0]:
                 print(f"    ⚠️ `{cands[0].name}` 에 pose 가 없다 → 진단 시트는 "
                       f"**`{d.name}`** 을 가리킨다", flush=True)
             return d
-    return cands[0]
+    if cands:
+        return cands[0]
+    if fallback is not None:
+        print(f"    ⚠️ 정합 팔이 없다(`--mode quick` 등) → 진단 시트는 FP 산출물 "
+              f"**`{fallback.name}`** 을 가리킨다", flush=True)
+        return fallback
+    raise ValueError("_live_pose_dir: 후보도 fallback 도 없다")
 
 
 def _live_seg(cands: list[Path], mask_name: str, fallback: Path) -> Path:
@@ -380,6 +400,69 @@ def build_steps(a) -> list[Step]:
                  txt_fp, "meta_pose.json"),
         ]
 
+        # ── TF그룹 — flange 를 **텍스트로 직접** 뽑아 `--primary flange` 로 간다 ──────────
+        # ★ 왜 별도 팔인가 — §22 의 유효 해상도가 3배 다르다(`full` 4.34 vs `flange` 1.38 mm/px).
+        #   `--primary full` 은 그래서 t 가 구조적으로 3배 나쁘다(§35-2m-1). 그 천장을 넘으려면
+        #   flange 마스크가 필요한데, 지금까지는 **SAM3 exemplar(A그룹)만** 그것을 낼 수 있었다.
+        #   → 참조 자산 없이 낱말로 뽑을 수 있으면 «A 의 정확도 + T 의 무의존» 이 된다.
+        # 🔴 **공짜가 아니다.** § M4 에서 SAM3 의 결손이 **flange 에 몰린다**고 쟀다
+        #   (flange recall 0.844 vs body 0.968) — 그때는 exemplar·원거리 조건이었다.
+        #   근접 + 텍스트에서도 그런지는 **미측정**이고, 이 팔이 그것을 재는 장치다.
+        # 🔴 `--primary flange` 는 마스크가 조금만 어긋나도 90° 로 뒤집힌다(성립 조건 IoU ≥0.98,
+        #   §32-1). **A1 과 나란히 놓고 «둘의 회전이 90° 배수로 어긋나는가» 를 본다.**
+        if a.text_prompt_flange:
+            seg_tf, txf_fp = o / "seg_txtf", o / "fp_txtf"
+            steps += [
+                Step("seg_txtf", f"segment flange (SAM3 텍스트 “{a.text_prompt_flange}”)",
+                     [PY["sam3"], "-m", "spatial_vision.stages.segment_sam3",
+                      "--in", a.in_dir, "--out", seg_tf, "--target", "flange",
+                      "--prompt", a.text_prompt_flange, "--confidence", a.text_conf_flange,
+                      "--select", a.text_select],
+                     seg_tf, "meta_segment_flange.json"),
+                Step("fp_txtf", "FoundationPose (텍스트 flange 마스크 · --primary flange)",
+                     [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
+                      "--in", a.in_dir, "--out", txf_fp, "--no-stage2",
+                      "--obj", obj, "--masks", seg_tf, "--depth", "stereo", "--depth-dir", st,
+                      "--primary", "flange", "--flange-mask-from", "pose",
+                      "--input-scale", a.input_scale],
+                     txf_fp, "meta_pose.json"),
+            ]
+
+    # ── COMBO — **실물에서 실제로 통과한 체인** (사용자, 다른 PC · RESULTS §38) ──────────────
+    # 🔴 이 프로젝트에서 «실물 사진으로 끝까지 돌려 눈으로 확인된» 유일한 구성이다. sim 권고와
+    #    세 군데가 다르다: ① 참조가 아니라 **텍스트** 마스크 ② `--primary full`(flange 아님)
+    #    ③ **stage2 on**(sim 기본은 `--no-stage2`) ④ **정합이 없다**.
+    # ★ 최선은 하이브리드(R=coarse · t=refined, §27-7)였다 — stage2 를 켜야 `pose_refined` 가 생긴다.
+    # 🔴 `--input-scale 0.75` 는 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 가 없으면
+    #    1920×1200 에서 **frame_0002 부터 OOM** 이다(§38-4). `env.sh` 가 그것을 건다.
+    if "combo" in set(a.mode) and a.sam3_text:
+        seg_t = o / "seg_txt"
+        c075, c050, chull, chyb = (o / "fp_c075", o / "fp_c050", o / "fp_chull", o / "hyb_combo")
+        cf = ["--obj", obj, "--masks", seg_t, "--depth", "stereo", "--depth-dir", st,
+              "--primary", "full", "--flange-mask-from", "pose"]     # 🔴 --no-stage2 를 **안 준다**
+        steps += [
+            Step("fp_c075", "COMBO P1 — --primary full · stage2 on · --input-scale 0.75",
+                 [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
+                  "--in", a.in_dir, "--out", c075, "--input-scale", "0.75"] + cf,
+                 c075, "meta_pose.json"),
+            Step("fp_c050", "COMBO P2 — 같은 체인 · --input-scale 0.5 (P1 의 해상도 대조군)",
+                 [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
+                  "--in", a.in_dir, "--out", c050, "--input-scale", "0.5"] + cf,
+                 c050, "meta_pose.json"),
+            # ⚠️ `hull` 은 **옛 동작**이고 교훈 #20 이 «노치를 메워 1.55% 부푼다» 고 적은 쪽이다.
+            #    그런데 실물에서 이 팔도 «분간 안 되는» 축에 들었다 → 대조군으로 남긴다.
+            Step("fp_chull", "COMBO P3 — --flange-mask-proj hull (옛 볼록껍질 투영, 교훈 #20)",
+                 [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
+                  "--in", a.in_dir, "--out", chull, "--input-scale", "0.75",
+                  "--flange-mask-proj", "hull"] + cf,
+                 chull, "meta_pose.json"),
+            Step("hyb_combo", "COMBO H1 — 하이브리드 R=coarse · t=refined (실물 최선)",
+                 [PY["pose"], "-m", "spatial_vision.eval.hybrid_pose",
+                  "--r-dir", c075, "--r-name", "pose_coarse.json",
+                  "--t-dir", c075, "--t-name", "pose_refined.json", "--out", chyb],
+                 chyb, "meta_hybrid.json"),
+        ]
+
     # ══════════════════════════════════════════════════════════════════════════════════
     #  변형(팔) 구성 — `--mode` 로 넓힌다
     # ══════════════════════════════════════════════════════════════════════════════════
@@ -409,6 +492,10 @@ def build_steps(a) -> list[Step]:
     if a.sam3_text:
         arms.append(("T1", "텍스트 초기값 + 정합    ← 참조 비의존 대조군",
                      o / "fp_txt", "pose_coarse.json", ["--outer-only"]))
+        if a.text_prompt_flange:
+            # TF1 = A1 과 **같은 정합·같은 게이트**. 앞단(분할·`--primary`)의 차이만 남긴다.
+            arms.append(("TF1", "텍스트 flange 초기값 + 정합 ← A1 의 참조 비의존판",
+                         o / "fp_txtf", "pose_coarse.json", ["--outer-only"]))
 
     modes = set(a.mode)
     if "quick" in modes:                     # 「끝까지 도는가」 + 분할 3종만. 정합 팔 0
@@ -573,6 +660,14 @@ def build_steps(a) -> list[Step]:
         lr.append(("I3", o / "fp_ism", "pose_coarse.json"))
     if a.sam3_text:
         lr.append(("T3", o / "fp_txt", "pose_coarse.json"))
+        if a.text_prompt_flange:
+            lr.append(("TF3", o / "fp_txtf", "pose_coarse.json"))
+    # COMBO — 정합을 안 하므로 «팔» 이 아니라 별칭이다. `pose_refined` 를 본다(stage2 산출물).
+    if "combo" in set(a.mode) and a.sam3_text:
+        lr += [("RP1", o / "fp_c075", "pose_refined.json"),
+               ("RP2", o / "fp_c050", "pose_refined.json"),
+               ("RP3", o / "fp_chull", "pose_refined.json"),
+               ("RH1", o / "hyb_combo", "pose_coarse.json")]
     lr += [(sid, Path(a.out) / sid, "pose_refined.json") for sid, *_ in arms]
     for sid, pdir, pname in lr:
         steps.append(Step(f"lr_{sid}", f"좌우 투영 일관성 · {sid}",
@@ -593,6 +688,10 @@ def build_steps(a) -> list[Step]:
     ov_cands = [f"{ns2}:pose_coarse.json"] \
         + ([f"{o / 'fp_ism'}:pose_coarse.json"] if a.ism else []) \
         + ([f"{o / 'fp_txt'}:pose_coarse.json"] if a.sam3_text else []) \
+        + ([f"{o / 'fp_txtf'}:pose_coarse.json"] if a.text_prompt_flange else []) \
+        + ([f"{o / 'fp_c075'}:pose_refined.json", f"{o / 'fp_c050'}:pose_refined.json",
+            f"{o / 'fp_chull'}:pose_refined.json", f"{o / 'hyb_combo'}:pose_coarse.json"]
+           if "combo" in set(a.mode) and a.sam3_text else []) \
         + [str(Path(a.out) / sid) for sid, *_ in arms]
     steps.append(Step("ov", "오버레이 시트 (육안 검사)",
                       lambda: [PY["pose"], "-m", "spatial_vision.viz.overlay_pose",
@@ -628,6 +727,7 @@ def build_steps(a) -> list[Step]:
     seg_cands = [f"{seg}:mask_flange.png:A_exemplar_flange"] \
         + ([f"{o / 'seg_ism'}:mask_full.png:I_ISM_full"] if a.ism else []) \
         + ([f"{o / 'seg_txt'}:mask_full.png:T_text_full"] if a.sam3_text else []) \
+        + ([f"{o / 'seg_txtf'}:mask_flange.png:TF_text_flange"] if a.text_prompt_flange else []) \
         + [f"{o / 'seg_full'}:mask_full.png:진단용_full"]
     # ★★ **같은 타일에 그 경로의 FP pose 도 얹는다** — 마스크만 보면
     #    «마스크부터 엉뚱한 걸 잡았다» 와 «마스크는 맞는데 pose 가 틀렸다» 가 안 갈린다.
@@ -635,7 +735,10 @@ def build_steps(a) -> list[Step]:
     #    🔴 크롭을 안 하는 시트라 **가장자리 오선택도 화면에 남는다** — 그게 이 도구의 존재 이유다.
     segp_cands = [f"{ns2}:pose_coarse.json:A_pose"] \
         + ([f"{o / 'fp_ism'}:pose_coarse.json:I_pose"] if a.ism else []) \
-        + ([f"{o / 'fp_txt'}:pose_coarse.json:T_pose"] if a.sam3_text else [])
+        + ([f"{o / 'fp_txt'}:pose_coarse.json:T_pose"] if a.sam3_text else []) \
+        + ([f"{o / 'fp_txtf'}:pose_coarse.json:TF_pose"] if a.text_prompt_flange else []) \
+        + ([f"{o / 'hyb_combo'}:pose_coarse.json:RH1_pose"]
+           if "combo" in set(a.mode) and a.sam3_text else [])
     steps.append(Step("segcmp", "분할 + pose 겹쳐 비교 (무엇을 집었나 · pose 가 거기 붙었나)",
                       lambda: [PY["pose"], "-m", "spatial_vision.viz.seg_compare",
                                "--capture", a.in_dir, "--frames", a.overlay_frames,
@@ -662,7 +765,11 @@ def build_steps(a) -> list[Step]:
                                                        "mask_full.png", o / "seg_full"),
                                "--seg-flange", seg,
                                "--depth-dir", st,
-                               "--pose-dir", _live_pose_dir([Path(a.out) / s for s in arm_ids]),
+                               # fallback = FP 산출물. 정합 팔이 0 이어도 «FP 가 나왔나» 는 봐야 한다.
+                               "--pose-dir", _live_pose_dir(
+                                   [Path(a.out) / s for s in arm_ids],
+                                   _live_pose_dir([ns2, o / "fp_txt", o / "fp_ism",
+                                                   o / "fp_txtf"], ns2)),
                                "--obj", obj, "--frames", a.overlay_frames, "--width", 380,
                                "--gate-deg", a.gate_deg]
                               + (["--all"] if a.diag_all else []),
@@ -694,11 +801,18 @@ def build_steps(a) -> list[Step]:
     # 🔴 **«정합 off» 팔(A3·I3·T3)도 넣는다.** sim GT 채점에서 **이 셋이 1~3위**였는데(§35-2o-6)
     #    자기 디렉토리가 없어 통계 한 벌에서 통째로 빠져 있었다 — 「분석용 CSV 에 승자가 없는」
     #    상태였다. `--alias` 로 실제 pose 위치를 알려 준다.
+    combo_on = "combo" in set(a.mode) and a.sam3_text
     stat_ids = [sid for sid, *_ in arms] + ["A3"] \
-        + (["I3"] if a.ism else []) + (["T3"] if a.sam3_text else [])
+        + (["I3"] if a.ism else []) + (["T3"] if a.sam3_text else []) \
+        + (["TF3"] if a.text_prompt_flange else []) \
+        + (["RP1", "RP2", "RP3", "RH1"] if combo_on else [])
     stat_alias = ["A3=fp_ns2:pose_coarse.json"] \
         + (["I3=fp_ism:pose_coarse.json"] if a.ism else []) \
-        + (["T3=fp_txt:pose_coarse.json"] if a.sam3_text else [])
+        + (["T3=fp_txt:pose_coarse.json"] if a.sam3_text else []) \
+        + (["TF3=fp_txtf:pose_coarse.json"] if a.text_prompt_flange else []) \
+        + (["RP1=fp_c075:pose_refined.json", "RP2=fp_c050:pose_refined.json",
+            "RP3=fp_chull:pose_refined.json", "RH1=hyb_combo:pose_coarse.json"]
+           if combo_on else [])
     steps.append(Step("stats", "통계 표·그래프·CSV",
                       [PY["pose"], "-m", "spatial_vision.eval.group_stats",
                        "--root", o, "--variants", ",".join(stat_ids),
@@ -1740,7 +1854,7 @@ def report(a) -> int:
     # ★ `--mode` 로 늘어난 팔은 **디스크에 실제로 있는 것만** 집는다 — 리포트만 다시 낼 때
     #   (`--report-only`) 모드 인자를 안 줘도 그 런의 팔이 그대로 나온다.
     ids += [k for k in ("Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "H1", "Ccas", "IX1",
-                        "Ed", "Eb", "Ea", "Eg3", "Eg05")
+                        "TF1", "Ed", "Eb", "Ea", "Eg3", "Eg05")
             if (root / k / "meta_contour.json").exists() and k not in ids]
     # ★ `refs` 스윕 팔은 이름이 런마다 다르다 — **디스크를 훑어** 집는다(정적 목록으로 못 적는다).
     ids += sorted(d.name for d in root.iterdir()
@@ -1753,9 +1867,22 @@ def report(a) -> int:
         v["I3"] = read_variant(root, "I3")                   # ISM 경로의 정합 전 (I1 의 분모)
     if a.sam3_text:
         v["T3"] = read_variant(root, "T3")                   # 텍스트 경로의 정합 전 (T1 의 분모)
+    # 🔴 TF 는 **디스크로 탐지**한다 — `--report-only` 는 `--text-prompt-flange` 없이 돌 수 있다.
+    if (root / "fp_txtf").exists():
+        v["TF3"] = read_variant(root, "TF3")                 # 텍스트 flange 경로의 정합 전
+    # COMBO — 실물 검증 체인. 정합이 없어 자기 디렉토리가 없다(lr 만 있다).
+    for k in ("RP1", "RP2", "RP3", "RH1"):
+        if (root / "lr" / f"lr_consistency_{k}.json").exists():
+            v[k] = read_variant(root, k)
     labels = {"A1": "A1 홀 제외 (배포본)", "A2a": "A2a 홀 윤곽 (규격부)",
               "A2b": "A2b 홀 중심", "A3": "A3 정합 off (FP 단독)", "A4": "A4 refine 초기값",
               "I1": "I1 ISM 초기값 + 정합 (CAD only)", "I3": "I3 ISM 정합 off",
+              "RP1": "RP1 COMBO P1 (full·stage2·scale .75)  ← 실물 검증",
+              "RP2": "RP2 COMBO P2 (같은 체인 scale .50)",
+              "RP3": "RP3 COMBO P3 (hull 투영)",
+              "RH1": "RH1 COMBO 하이브리드 R=coarse·t=refined  ← 실물 최선",
+              "TF1": "TF1 텍스트 flange + 정합 (--primary flange)",
+              "TF3": "TF3 텍스트 flange 정합 off",
               "T1": "T1 텍스트 초기값 + 정합 (참조 비의존)", "T3": "T3 텍스트 정합 off",
               # ── `--mode` 로 늘어나는 팔 ─────────────────────────────────────────
               "Cs16": "Cs16 탐색폭 16px", "Cs32": "Cs32 탐색폭 32px",
@@ -1833,6 +1960,7 @@ def report(a) -> int:
     all_gated: list[str] = []
     order = ["A3", "A1", "A2a", "A2b", "A4"] + (["I3", "I1"] if a.ism else []) \
         + (["T3", "T1"] if a.sam3_text else []) \
+        + [k for k in ("TF3", "TF1", "RP1", "RP2", "RP3", "RH1") if k in v] \
         + [k for k in ("Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "H1", "Ccas", "IX1",
                        "Ed", "Eb", "Ea", "Eg3", "Eg05") if k in v] \
         + sorted(k for k in v if k.startswith("R_") or (k.startswith("Rn") and k[2:].isdigit()))
@@ -2177,6 +2305,17 @@ def main(argv: list[str] | None = None) -> int:
                          "**배경 물체를 집을 위험**이 는다(sim 측정은 방해물 없는 씬이라 이 축을 못 봤다)")
     ap.add_argument("--text-select", default="center", choices=["center", "score", "largest"],
                     help="⚠️ center 는 «카메라가 타깃을 겨눈다» 는 규약에 기댄다(교훈 #15)")
+    # ── TF그룹 — flange 를 텍스트로 직접 뽑아 `--primary flange` ───────────────────────
+    # 🔴 기본값을 **비워 둔다.** 켜면 분할 1 + FP 1 스텝이 늘고(10프레임 ≈ 31초), 무엇보다
+    #    `--primary flange` 는 마스크가 조금만 어긋나도 90° 로 뒤집혀(§32-1) **다른 팔과 성질이
+    #    다른 실패**를 낸다. 값어치는 §22 의 t 3배인데, 그게 실제로 나오는지부터 확인해야 한다.
+    ap.add_argument("--text-prompt-flange", default=None,
+                    help="TF그룹 프롬프트 (flange 를 낱말로). 주면 `seg_txtf`·`fp_txtf`·TF1·TF3 이 생긴다. "
+                         "실사진 스윕 1순위: \"black top flange on top of the plastic box\" (RESULTS §37-4b). "
+                         "🔴 `--sam3-text` 와 함께 써야 한다")
+    ap.add_argument("--text-conf-flange", type=float, default=0.15,
+                    help="TF그룹 검출 임계값. flange 는 작아서 점수가 낮게 나오는 경향이 있다 — "
+                         "미검출이면 내려 보되 **오버레이로 무엇을 집었는지 확인**한다")
     ap.add_argument("--stereo-scale", type=float, default=0.5)
     ap.add_argument("--input-scale", type=float, default=0.5, help="🔴 1.0 은 OOM (§34-12)")
     ap.add_argument("--gate-deg", type=float, default=1.5)
@@ -2256,6 +2395,17 @@ def main(argv: list[str] | None = None) -> int:
         a.mode += ["contour", "init", "cascade", "select", "edge"]
     # 옛 이름 호환 — `primary` → `select`. 🔴 조용히 바꾸지 않고 **알리고** 바꾼다(교훈 #21).
     #    `bad` 계산 **전**에 해야 «모르는 모드» 로 걸려 죽지 않는다.
+    # 🔴 `--mode all` 은 «경로도 전부» 인데 TF 만 값(프롬프트)이 필요해 자동으로 못 켠다.
+    #    조용히 빠지면 «all 을 줬는데 TF 가 없다» 가 되므로 **알린다**(교훈 #21).
+    if ("combo" in a.mode or "all" in a.mode) and not a.text_prompt_flange:
+        print("    ⚠️ `--text-prompt-flange` 가 없어 **TF 경로(TF1·TF3)가 빠진다.** "
+              "켜려면 예: --text-prompt-flange \"black square bracket on top of the box\" "
+              "(RESULTS §37-9b — 프롬프트는 배포할 사진으로 다시 고를 것)")
+    if a.text_prompt_flange and not a.sam3_text:
+        # 🔴 조용히 무시하면 «돌렸는데 팔이 없다» 가 된다 — 켜 주고 이유를 말한다.
+        a.sam3_text = True
+        print("    ⚠️ `--text-prompt-flange` 를 줬으므로 `--sam3-text` 를 **자동으로 켠다** "
+              "(TF 팔은 T 경로와 같은 분기 안에 있다)")
     if "primary" in a.mode:
         a.mode = ["select" if m == "primary" else m for m in a.mode]
         print("    ⚠️ `--mode primary` 는 **`select` 로 이름이 바뀌었다** — 그 팔은 «A 경로» 가 "

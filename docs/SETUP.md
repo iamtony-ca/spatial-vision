@@ -455,6 +455,22 @@ envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index
 | 투명 | `n30clear` 식 | `"clear plastic box"` |
 | 모르겠다 | `n30mixed` 식 | `"plastic box"` |
 
+🔴 **위 표는 «몸체 색을 알 때» 의 짝이다.** 색 지정 프롬프트는 **조건부**라 색이 틀리면
+**조용히 검출 0** 이 된다. **모르거나 투톤(검정 프레임 + 흰 문)이면 색을 빼고** 무조건부 프롬프트를
+쓴다 — 실사진에서 고른 1순위는 `full` **`"boxy plastic object"`** ·
+`flange` **`"black top flange on top of the plastic box"`** 다.
+⚠️ **약어는 안 통하고 풀어 쓰면 통한다** (`"FOUP"` ❌ / `"front opening unified pod"` ✅).
+⚠️ **`score` 로 프롬프트를 고르면 안 된다** — 마스크 품질이 아니라 **`--text-conf` 문턱 여유**를
+재는 값이다. 고를 때는 **미검출 0** 이 1순위다.
+🔴🔴 **sim 에서 만든 SAM3 참조(exemplar)는 실물에서 전부 실패했다** — 실물에서 쓸 수 있는
+SAM3 경로는 **텍스트뿐**이다(`RESULTS.md §38-1`). A그룹은 대조군으로만 돌린다.
+🔴 `pose_fp --input-scale 0.75` 는 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 가
+없으면 1920×1200 에서 **몇 프레임 뒤 OOM** 이다 — `envs/env.sh` 가 상설로 건다(§38-4).
+★ **실물에서 실제로 통과한 체인**은 `--mode combo`(= `all` 에 포함)로 재현된다(§38-5).
+
+★ 실물 사진이 생기면 **먼저 프롬프트 스윕부터** 돌린다(분할만, 수십 초):
+`tools/sam3_prompt_sweep.py`. 수치·판정 근거·명령 블록은 **`RESULTS.md §37`**(특히 **§37-7**).
+
 **소요 (실측, RTX 5090 · 콜드 스타트 포함)** — 🔴 프레임 수보다 **모드**가 지배한다:
 
 | | 기본 `default` (9팔) | `--mode all` (30팔) |

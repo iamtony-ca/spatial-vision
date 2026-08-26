@@ -1,0 +1,12 @@
+{
+  "_note": "실사진의 몸체 외관 라벨. tools/sam3_prompt_sweep.py 가 읽어 외관별로 프롬프트 성적을 가른다. 값은 CLAUDE.md 의 3종(black/orange/clear) + 실물에서 흔한 two-tone(검정 프레임 + 흰/베이지 문). 육안 분류이고 사람이 고쳐도 된다.",
+  "300mm-foup":       "black",
+  "foup2.png":        "black",
+  "entegris_f300":    "orange",
+  "entegris_f300_2":  "orange",
+  "foup3":            "clear",
+  "foup5":            "clear",
+  "foup5_1":          "clear",
+  "foup2.jpeg":       "twotone",
+  "foup4":            "twotone"
+}

@@ -4938,7 +4938,7 @@ envs/pose/bin/python -m spatial_vision.stages.refine_contour --in runs/pert/r2_n
 
 # 횡단 정리 — "조용히 틀렸을 것들"
 
-> 🛠 **측정 절이 아니다** — 전 절을 가로지르는 **오류 패턴 89건**. 새 실험 설계 전에 훑을 것.
+> 🛠 **측정 절이 아니다** — 전 절을 가로지르는 **오류 패턴 93건**. 새 실험 설계 전에 훑을 것.
 
 파이프라인 전체에서 **눈으로는 안 보이고 수치로만 드러나는** 오류가 반복해서 나왔다. 공통 교훈:
 **단위·규약·양자화는 반드시 독립적인 방법으로 교차검증한다.**
@@ -5036,6 +5036,10 @@ envs/pose/bin/python -m spatial_vision.stages.refine_contour --in runs/pert/r2_n
 | 87 | GT 없이 «이 프레임만 다르다» 를 찾으려고 프레임별 지표에 **강건 z-score**(중앙값·MAD)를 걸었다 | **두 군데서 무너졌다.** ① sim 의 `valid_all` 은 값의 대부분이 정확히 1.0 이라 **MAD=0** 이 되고 z 가 **209** 로 발산했다 — «강건» 통계인데 척도가 붕괴한 것이다. ② 좌우 Δdx 는 20장 중 **6장이 −1.5~−4.6px 로 뭉쳐** 있어 그 6장이 전부 이상치로 찍혔다. 그건 «소수의 사고» 가 아니라 **«30% 가 다르게 동작한다»** 는 뜻인데, 이상치로 보고하면 «프레임 몇 장 문제» 로 오독하게 된다 | **강건 통계도 척도가 0 이 되면 안 강건하다** — 척도에 `max(MAD, IQR, 0.02·\|중앙값\|)` 처럼 **바닥을 깐다**(z 209 → 8.1). 그리고 **«이상치» 는 소수일 때만 이상치다** — 한 지표에서 25% 넘게 걸리면 그건 분포가 갈라진 것이므로 **별도 항목으로 보고**하고 처방도 다르게 한다(프레임 열기 ❌ / 조건 축 상관 보기 ✅). ★ 검증은 **알려진 정답에 대고** 한다 — GT 로 재니 플래그된 5장의 R 오차가 나머지의 **3.6배**(0.597 vs 0.168°)로 플래그가 실제로 유의미함이 확인됐다. #84 와 같은 교훈의 반복이다: **새 진단기는 그 자체가 검증 대상이다** |
 | 88 | 실물에서 pose 가 하나도 안 나왔다. `diag_sheet` 의 6번 패널이 「없음」이라 «파이프라인이 실패했다» 로 읽었고, 앞 패널의 `mask_full` 이 멀쩡해 보여 «정합 단계가 문제» 라고 진단했다 | **두 겹으로 틀렸다.** ① 진짜 원인은 훨씬 앞이다 — 러너 A그룹은 `pose_fp --primary flange` 라 `mask_flange` 가 필수인데 SAM3 exemplar 가 빈 마스크를 냈고, `pose_fp` 가 프레임을 건너뛰어 **정합은 실행조차 안 됐다.** 예전에 통과했던 손 명령은 `--primary full` 이라 그 마스크를 아예 안 읽는다. ② 게다가 **같은 런의 `I1` 에는 pose 가 20개 있었다** — `diag`·`ov` 가 `A1` 이라는 **문자열을 명령에 박아** 넘기고 있어서 안 보였을 뿐이다 | **«시트가 비었다» 와 «계산이 실패했다» 는 다른 사건이다** — 진단 도구가 가리키는 경로부터 확인한다(`ls <out>/*/frame_*/pose_*.json \| wc -l` 한 줄). ★ 더 일반적으로 **진단 UI 에 산출물 경로를 상수로 박지 않는다**: 팔이 여럿인 파이프라인에서 한 팔이 죽으면 UI 가 «전부 죽었다» 로 보이게 만든다. 처방은 **실행 직전 지연 평가**(`Step.resolve()`)로 살아 있는 산출물을 고르되 **대체 사실을 로그로 남기는 것** — 조용히 바꾸면 교훈 #22(«틀린 값을 조용히 돌려주는 fallback»)가 UI 층에서 재발한다. 🔴 그리고 **계산에는 후퇴를 넣지 않았다**: `A1`(flange)과 `I1`(full)은 §22 유효 해상도가 3배 달라 **바꿔 쓸 수 있는 값이 아니다** — 자동 대체는 리포트의 t 를 런마다 다른 뜻으로 만든다 |
 | 89 | GT 없이 거리를 검증하려고 «FP 추정 z» 와 «stereo depth 평면적합» 을 대조하고, 리포트에 **«두 독립 추정이 맞는다 ✅»** 라고 찍고 있었다. 실제로 sim 에서 둘이 1.7mm 안에 들어와 «거리는 문제없다» 로 읽었다 | **«독립» 이 애초에 틀린 말이었다.** 두 값의 **뿌리가 같다** — 둘 다 `Z = fx·B/disparity` 에서 나온다. `fx·B` 가 `s` 배 틀리면 둘 다 `s` 배 틀리므로 이 대조는 **캘리브레이션 축에 원리적으로 무반응**이다. 게다가 투영 크기까지 같이 스케일돼 **오버레이 윤곽이 완벽히 붙은 채로** 거리만 틀린다 — 좌우 일관성·게이트·평면 잔차 어느 것도 반응하지 않는다 | **«두 값이 맞는다» 를 쓰기 전에 «무엇을 공유하는가» 를 먼저 적는다.** 공유 인자가 있으면 그 인자에는 무반응이고, 그때 ✅ 를 찍으면 **없는 안전을 보고하는 것**이다. 처방은 ① 문구를 «다른 경로(단 `fx·B` 공유)» 로 정정 ② **`baseline` 을 안 쓰는 세 번째 관측**을 추가(`eval.scale_check` — 실루엣 크기, §35-2n-6) ③ 🔴 그래도 **`fx` 는 순수 스케일이라 어떤 내부 관측으로도 못 잡는다** → 외부 길이(줄자·§7.5c 상대 GT)가 유일하다고 명시. ⚠️ 새 지표는 **일부러 틀려서** 반응을 확인한다(#8) — ×1.2 주입 시 601mm → 507mm(참 502)로 되돌리는 것까지 봤다. 관련: #26(«같은 양인가»)의 형제 — 그쪽은 «정의가 다른 두 값», 이쪽은 «정의는 같은데 입력을 공유하는 두 값» 이다 |
+| 90 | 프롬프트 스윕에서 **모델이 내놓은 `score` 로 «최선» 을 골랐다.** `boxy plastic object` 가 score 중앙 0.902 로 1위라 배포 후보로 적었다. 그다음 `full` 이 flange 를 빼먹는 것을 보고 이번엔 **flange 포함률**로 1위를 `front opening unified pod` 으로 **뒤집었다.** 두 번 다 한 지표만 보고 순위를 매긴 것이다 | **`score` 는 마스크 품질과 무관하다** — `flange_in_full` 과의 상관이 **r=+0.06**(n=212). 후보 셋의 **마스크 면적이 소수점 3~4자리까지 같은데** score 는 0.906/0.855/0.629 로 갈렸다. score 가 재는 것은 **«`--text-conf` 문턱을 넘느냐»** 뿐이다. 그리고 뒤집었던 두 번째 기준(flange 포함률)도 **주입 실험에서 pose 영향이 잡음 이하**로 나와(§37-6) 근거가 사라졌다 | **순위를 매기기 전에 «이 지표가 무엇의 대리인가» 를 한 줄로 적는다.** 적을 수 없으면 그 지표로 서열화하지 않는다. ★ 그리고 **지표는 최종 목표에 연결해서 검증한다** — 여기서는 GT 로 pose 를 채점해 보니 «갈리는 것은 검출률뿐» 이었다(§37-5). §35-2o-6b(좌우 \|Δdx\| r −0.94 / 게이트 후퇴율 **+0.82**)와 같은 절차이고 같은 교훈이다: **그럴듯한 GT-free 지표 대부분은 목표와 무관하거나 부호가 반대다.** ⚠️ 중앙값이 아니라 **최소값**을 봐야 하는 지표가 있다 — score 는 문턱 지표라 «여유» 가 최소값에 있다 |
+| 91 | «`full` 마스크가 top flange 를 빼먹는다» 를 발견하고, **pose 원점이 flange 상면 중심이므로 기준 구조물이 빠진 것** 이라고 진단해 🔴🔴 로 문서에 적었다. 추론은 깔끔했다 — 면적은 4~6% 뿐이라 IoU·면적비가 이 결손을 못 잡는다는 것까지 맞았다 | **측정이 부정했다.** sim 에서 flange 를 **통째로**(마스크의 12.8%, 실사진 결손보다 큰 양) 지우고 pose 를 내니 t 중앙이 2.040 → 2.357mm 였는데, **같은 입력으로 FP 를 두 번 돌린 잡음 바닥이 0.512mm** 다. 즉 **효과가 측정되지 않는다.** FP 는 depth 로 정합하고 마스크는 crop 영역을 고를 뿐이라 13% 를 잘라내도 crop 이 거의 안 움직인다 | **«원점 구조물» 같은 구조적 논증은 가설이지 결과가 아니다.** 이 프로젝트에는 주입 도구 계보가 있다(`perturb_depth`·`perturb_image`·`perturb_mesh`) — **없으면 만들어서 재는 것이 문서에 🔴 를 적는 것보다 싸다**(`eval.perturb_mask` 를 그래서 만들었다, 30분). ★ 그리고 **효과를 보고하기 전에 잡음 바닥부터 잰다**(교훈 #86) — 여기서는 대조군을 한 번 더 돌리는 FP 런 1회가 전부였고, 그 한 번이 «+0.32mm 개선/악화» 를 쓸 뻔한 것을 막았다. ⚠️ 이 결론은 **검정 몸체 한정**이다 — 결손이 실제로 난 반투명 몸체는 sim 이 cutout opacity 때문에 못 잰다 |
+| 92 | 실사진 9장에서 flange 프롬프트 1위(`"black top flange on top of the plastic box"`, 9/9·이탈 0)를 골라 **sim 검정에 그대로** 썼다. 마스크 **recall 이 0.965** 라 «flange 를 잘 덮었다» 로 읽었다 | **몸체 전체를 집고 있었다.** 마스크 픽셀이 `GT mask_full` 과 거의 같고 **IoU 0.118 · precision 0.121** 이다 — recall 만 보면 «덮었다», IoU 를 보면 «8배 크다». 그 마스크로 `--primary flange` 를 돌리자 §32-1 이 예고한 **180° 뒤집힘**(R 최대 176.7°)이 났다. 그리고 sim 최선(`"black square bracket on top of the box"`)은 **실사진에서 7위**였다 — **순위가 정반대** | **recall 하나로 마스크를 판정하지 않는다** — «덮었나»(recall)와 «그것만 덮었나»(precision)는 다른 질문이고, 부품 마스크에서는 후자가 지배한다. ★ 더 큰 교훈: **프롬프트 순위는 이미지 조건에 딸린 값**이라 도메인을 넘겨 쓰면 안 된다. 실사진은 몸체·flange 대비가 있었고 sim 검정은 §35-2i 그대로 «검정 위 검정» 이라 경계가 없다. 처방은 **배포할 사진으로 스윕을 다시 돌리는 것**(§37-7)이고, 그게 `sam3_prompt_sweep.py` 가 존재하는 이유다. ⚠️ `--select center`/`score` 는 **원인이 아니었다**(결과가 소수점까지 같다) — 선택 규칙을 의심하기 전에 **후보 자체**를 본다 |
+| 93 | `eval_pose` 결과 JSON 에서 `list(d['results'])[0]` 로 값을 꺼내 표에 «refined» 라고 적었다 | **첫 항목은 `coarse` 였다.** `eval_pose` 는 **단계마다 항목을 따로** 낸다(`<dir>/coarse`, `<dir>/refined`) — `--no-stage2` 런은 하나뿐이라 `[0]` 이 우연히 맞았고, stage2 를 켠 런에서만 어긋났다. 하마터면 «stage2 refined 가 R 0.453 으로 최고» 라는 **정반대 결론**을 쓸 뻔했다(실제 refined 는 1.400) | **집계기가 «항목이 하나뿐» 을 가정하면 조건이 바뀌는 순간 조용히 틀린다** — 인덱스로 꺼내지 말고 **키를 명시**하거나 전 항목을 펼친다. ★ 잡은 방법이 이번에도 «두 값이 같아야 하는데 다르다» 였다: 하이브리드의 `t` 는 정의상 `refined` 와 **같아야** 하는데 표가 1.124 vs 2.494 를 보였다. **불변식을 하나 알고 있으면 집계 버그가 드러난다**(교훈 #26 의 형제) |
 
 # 추적 중인 항목
 
@@ -7339,3 +7343,570 @@ sim 은 이 축을 원천적으로 못 본다(렌더와 CAD 가 같은 메쉬라
 테두리 정합은 블러 4px·게인 20×에 무감각한데 **FP 는 꼬리가 터진다**(R 최대 2.1° → 111.6°).
 손 촬영이라 노출 증가가 곧 블러다(근접 1px = 0.324mm). 반사 억제 자체는 이득이다 —
 광택 하이라이트가 테두리를 가로지르면 **rms 가 정상 범위인 채로 틀린 대응점**을 잡는다(§26).
+
+---
+
+# ★★★★★ 37. SAM3 **텍스트 프롬프트** 실사진 스윕 + pose 영향 측정 (2026-08-26)
+
+> 🔴 **T그룹(`--sam3-text`)의 성능은 전적으로 «낱말» 이 정한다.** 그런데 지금 쓰는 낱말
+> (`"black plastic box"` 류)은 **sim 검정 몸체에서 고른 것**이다. 실사진에서도 통하는지는
+> sim 으로 알 수 없다 — 텍스처·조명·배경이 전부 다르기 때문이다. 그 축만 떼어 쟀다.
+
+**입력은 `assets/real_imgs/` 실사진 9장**(웹 수집 FOUP 사진). 몸체 외관 라벨은
+`assets/real_imgs/appearance.json` — **검정 2 · 반투명 주황 2 · 투명 3 · 투톤(검정+흰 문) 2**.
+🔴 **GT 가 없다.** IoU 를 못 내므로 판정은 **GT-free 형상 지표 + 육안**이다.
+🔴 **단일 물체 씬 9장**이라 «오선택» 축은 원리적으로 못 잰다(distractor 가 없다).
+
+## 37-1. 결론 (요약)
+
+| 질문 | 답 |
+|---|---|
+| `full` 최선 | **`"boxy plastic object"`** — 9/9 · score 중앙 0.902 · **최소 0.645** |
+| `flange` 최선 | **`"black top flange on top of the plastic box"`** — 9/9 · 0.906 · **최소 0.590** |
+| 도메인 **약어**(`FOUP`·`wafer cassette`) | **검출 0/9.** conf 0.05 에서도 후보가 안 나온다 |
+| 도메인 **풀네임**(`front opening unified pod`) | `full` 에서 **9/9**. 약어와 정반대다 |
+| 도메인 풀네임을 flange 프롬프트의 **닻**으로 | ❌ **역효과** (67% / 53% vs 일반명사 80% / 82%) |
+| 색 지정(`black`/`orange` plastic box) | **조건부** — 제 색에서 2/2, 아니면 검출 0 |
+| 프롬프트가 **pose** 를 바꾸나 | **거의 안 바꾼다.** 갈리는 것은 **검출률뿐**이고 그게 곧 KPI 다 |
+| `full` 마스크가 **flange 를 빼먹으면** | 🔴 **대가가 잡음 바닥 이하다.** 추론과 반대였다(§37-6) |
+
+## 37-2. 도구 — `tools/sam3_prompt_sweep.py` (신설)
+
+모델을 **한 번만 올리고** 이미지 × 프롬프트를 전부 한 프로세스에서 돈다(콜드 스타트 회피, 교훈 #9·#76).
+
+| 산출물 | 무엇 |
+|---|---|
+| `report.md` | 맨 앞에 「전 이미지 통과」 결론 · 외관 교차표 · 2요인 교차표 · 이탈 · flange 포함률 |
+| `results.csv` / `.json` | 프레임 × 프롬프트 전 지표 |
+| `sheets/perfect__<t>.png` | **전 이미지 통과만** (이탈 적은 순 → score 순). **여기서 고른다** |
+| `sheets/matrix__<t>.png` | **전수** (프롬프트 전부 × 이미지 전부). 「왜 떨어졌나」용 |
+| `sheets/perfect/<t>__NN__*.png` | 후보 하나를 9장 전부 크게 |
+| `ov/` · `masks/` | 프롬프트별 오버레이 · 마스크 |
+| `instances__*.png` | `--instances` — **인스턴스를 하나씩 따로** 그린다 |
+
+- `--prompts-json` 으로 프롬프트 목록을 갈아끼운다(2요인 격자를 코드로 생성해 오타 방지).
+- `--rebuild-sheets` = **추론 없이** 시트·CSV·리포트 재생성(2초, 모델 안 올림).
+- **배선 검증 상설** — 디스크 마스크를 다시 읽어 표와 대조한다. 리포트 머리에 찍힌다.
+
+### 판정 지표 (전부 GT-free)
+
+`ok` 는 «눈으로 볼 값어치가 있는가» 필터이지 «맞다» 가 아니다. **판정은 오버레이**다.
+
+| 지표 | 뜻 |
+|---|---|
+| `area_frac`·`solidity`·`n_cc`·`border_frac` | 마스크 생김새 |
+| `in_region`·`rel_y`·`rel_area` | **flange 전용, 물체 기준** — 「몸체 ∪ 몸체 바로 위」 안인가 |
+| **면적 이탈** | 전 이미지 통과 프롬프트끼리 같은 이미지에서 낸 **면적 중앙값**에서 25% 이상 벗어남 |
+| **`flange_in_full`** | `full` 마스크가 top flange 를 포함한 비율 |
+
+## 37-3. `full` — 36 프롬프트 × 9장 (540 추론, 66초)
+
+**전 이미지 통과 11/36.** 면적 이탈 0 인 10개 (score 중앙 / **최소** / flange 포함 최소):
+
+| 프롬프트 | 범주 | score 중앙 | **score 최소** | flange 포함 최소 |
+|---|---|---|---|---|
+| **`boxy plastic object`** | 서술 | **0.902** | **0.645** | 0.01 |
+| `front opening unified pod` | 도메인 | 0.688 | 0.250 | **0.94** |
+| `cube shaped plastic case` | 서술 | 0.668 | 0.367 | 0.00 |
+| `case` | 일반 | 0.350 | 0.145 | 0.00 |
+| `square plastic box with a handle on the side` | 서술 | 0.198 | 0.081 | **0.88** |
+| `plastic container` · `box` · `the box` · `storage box` · `plastic box` | 일반 | 0.10~0.18 | 0.055~0.090 | 0.00~0.04 |
+
+- ❌ **검출 0/9**: `FOUP` · `reticle pod` · `semiconductor shipping box`.
+- **약어는 안 되고 풀어 쓰면 된다** — `FOUP` 0/9 vs `front opening unified pod` 9/9.
+  같은 규칙이 flange 에서도 성립한다(`robotic handling flange` 0/9 vs `black square bracket on top` 9/9).
+- 🔴 `rectangular plastic enclosure` 는 9/9 «통과» 인데 **투톤 2장에서 흰 문만** 집는다
+  (면적 0.271 vs 합의 0.491). **통과 수만으로는 «전체» 와 «일부» 가 안 갈린다** → 면적 이탈 검사를 넣은 이유.
+
+### 37-3b. 색 지정은 «나쁜» 게 아니라 «조건부» 다
+
+외관 교차표(분모 = 그 외관의 장수):
+
+| 프롬프트 | black(2) | orange(2) | clear(3) | twotone(2) |
+|---|---|---|---|---|
+| `black plastic box` | **2** | 0 | 0 | 0 |
+| `orange plastic box` | 0 | **2** | 0 | 0 |
+| `boxy plastic object` 외 10개 | **2** | **2** | **3** | **2** |
+
+**제 색에서만 걸리고 아니면 조용히 검출 0** 이다. `--preset` 과 짝지으면 유효하고,
+**몸체 색을 모를 때는 무조건부 11개 중에서 고른다.** 투톤(검정 프레임 + 흰 문)에서는
+`black plastic box` 가 **검정부만** 집는다 — 실물에 흔한 조합이라 주의.
+
+## 37-4. `flange` — 2요인 통제 실험
+
+«무엇을»(서술어) × «무엇 위의»(소속구)로 나눠 격자로 쟀다.
+`assets/prompts/flange_anchor_sweep.json`(35개, 342 추론, 49초) →
+`assets/prompts/flange_topflange_sweep.json`(66개, 621 추론, 80초).
+
+**서술어 9 × 소속구 7 통과 수 (분모 9):**
+
+| 서술어 \ 소속구 | 맨몸 | `on top` | `…the box` | `…the front opening unified pod` | `of the FOUP풀네임` | `…the wafer carrier` | `…the plastic box` | 행평균 |
+|---|---|---|---|---|---|---|---|---|
+| **`black top flange`** | **9** | **9** | **9** | 8 | 1 | 7 | **9** | **83%** |
+| `black square bracket` | 7 | **9** | **9** | 6 | 2 | 7 | 8 | 76% |
+| `square top plate` | 8 | 6 | 7 | 7 | 8 | 0 | **9** | 71% |
+| `black plate with a round hole` | 5 | 7 | 8 | 7 | 7 | 2 | 4 | 63% |
+| `top flange plate` | 6 | 7 | 6 | 6 | 6 | 0 | **9** | 63% |
+| `square flange` | 8 | 3 | 5 | 6 | 7 | 0 | **9** | 60% |
+| `mounting plate with a hole` | 7 | 8 | 7 | 4 | 0 | 0 | 7 | 52% |
+| **`top flange`** | **9** | 6 | **0** | 0 | 0 | 0 | 4 | 30% |
+| `flange` | 4 | **9** | **0** | 0 | 0 | 0 | 4 | 27% |
+| **열평균** | 78% | 79% | 63% | 54% | 38% | **20%** | 78% | |
+
+- ★ **도메인 풀네임 닻은 역효과다** (67% · 53%) — `full` 에서 그 낱말이 9/9 였던 것과 **결론이 반대**다.
+- ★ **상호작용이 있다 — 평균만 보면 오독한다.** 약한 서술어는 닻이 살리고(`square flange` 3→9),
+  **강한 서술어는 닻이 죽인다**(`black square bracket` 9 → 2). 닻은 정보를 더하는 게 아니라
+  **모델이 아는 개념 쪽으로 질의를 끌어당긴다** — 이미 맞게 잡고 있으면 손해다.
+- 🔴 **약한 낱말은 구절 전체를 오염시킨다** — `wafer carrier` 닻은 20%. 그 낱말 단독이 `full` 에서
+  6/9 로 약했는데, 구절에 넣으면 강한 서술어(`bracket` 9→7)까지 끌어내린다.
+- ★ **`top flange` 는 맨몸으로 9/9 인데 닻을 붙이면 0/9 로 무너진다.** `black` 하나를 붙이면
+  7개 소속구 중 5개에서 8~9/9 로 안정된다 — 색 한정어가 «flange» 를 배관 플랜지 등에서 떼어낸다.
+
+### 37-4b. 전 이미지 통과 · 면적 이탈 0 (8개)
+
+| 프롬프트 | score 중앙 | **score 최소** |
+|---|---|---|
+| **`black top flange on top of the plastic box`** | **0.906** | **0.590** |
+| `black square bracket on top` | 0.855 | 0.531 |
+| `black square bracket on top of the box` | 0.820 | 0.275 |
+| `top mounting plate with a hole` | 0.809 | **0.695** |
+| `black top flange on top of the box` | 0.684 | 0.311 |
+| `top flange` | 0.629 | 0.320 |
+| `black top flange` | 0.602 | 0.247 |
+
+🔴 **이 후보들의 마스크는 사실상 같다** — 9장 전부에서 면적이 소수점 3~4자리까지 일치한다
+(예 `foup3` 0.0149 / 0.0149 / 0.0148). **더 정확해지는 게 아니라 score 만 오른다.**
+
+### 37-4c. `score` 가 무엇인지 — 오독 주의
+
+`score` = SAM3 의 **open-vocabulary 검출 신뢰도**(「이 영역이 그 낱말에 맞는가」).
+**마스크 품질이 아니다** — `flange_in_full` 과의 상관이 **r = +0.06** (n=212, 사실상 0).
+
+- ✅ 쓸모: **`--text-conf` 문턱을 넘느냐.** 못 넘으면 그 프레임은 **검출 0** 이 된다.
+- 🔴 그래서 **중앙값이 아니라 «최소값» 이 여유**다. `front opening unified pod` 은 중앙 0.688 인데
+  최소 0.250 이라 `--text-conf 0.15` 에 가깝다.
+- ⚠️ **«score 1위 = 최선» 으로 고르면 안 된다.** 이 절을 쓰는 과정에서 실제로 두 번 그렇게 골랐다가
+  둘 다 정정했다(교훈 #90).
+
+## 37-5. 프롬프트가 pose 를 바꾸나 — sim GT 채점 (n=20)
+
+`runs/fr50`(sim 50cm 검정, 「가짜 실물」) + GT `runs/fr_d50`. **stereo depth 를 `ALL20/st` 로 고정**해
+유일한 변수를 프롬프트로 뒀다. `segment_sam3 --confidence 0.15 --select center` →
+`pose_fp --primary full --no-stage2 --input-scale 0.5` → `eval_pose`.
+
+| 프롬프트 | 검출 | R 중앙 | R 최대 | t 중앙 | t 최대 | **KPI/20** |
+|---|---|---|---|---|---|---|
+| `black plastic box` (현행 기본) | 🔴 **17/20** | 0.464 | 1.163 | 1.904 | 4.157 | **17** |
+| **`boxy plastic object`** | **20/20** | 0.496 | 1.018 | 2.040 | 4.176 | **20** |
+| `front opening unified pod` | **20/20** | 0.597 | 1.081 | 2.258 | 5.266 | 19 |
+| `cube shaped plastic case` | 18/20 | 0.426 | 1.070 | 1.999 | 4.139 | 18 |
+
+**공통 16프레임만** (검출률 차이 제거): R 중앙 0.426~0.597 · t 중앙 1.888~1.983.
+→ **넷이 구분되지 않는다**(FP 재실행 잡음 R 중앙 0.087° 안, §37-6).
+
+- ★★ **갈리는 것은 검출률 하나뿐이고 그게 곧 KPI 다.** 현행 프롬프트는 `--text-conf 0.15` 에서
+  **3프레임을 통째로 놓친다**(마스크 파일은 있는데 **비어 있다** → `pose_fp` 가 건너뛴다).
+- ⚠️ **sim 검정에서는 flange 결손이 0/20 이다** — 그 현상은 실사진 반투명 주황에서만 났다.
+  놓친 3프레임은 «flange 결손» 이 아니라 «완전 미검출» 이다. 두 고장을 섞지 말 것.
+
+## 37-6. `full` 마스크에서 flange 가 빠지면 pose 가 얼마나 틀리나 — **주입 실험**
+
+🔴 실사진에서 대부분의 `full` 프롬프트가 **반투명 주황 몸체에서 top flange 를 통째로 잘라냈다**
+(`flange_in_full` 0.00~0.34). pose 원점이 flange 상면 중심이라 «기준 구조물이 빠진» 것으로 보였다.
+real 에는 GT 가 없으므로 **sim 에서 결손만 주입해** 대가를 매겼다.
+
+**`spatial_vision.eval.perturb_mask` (신설)** — 온전한 마스크에서 **부품**을 지운다.
+GT `mask_flange.png` 는 «어디를 지울지» 정하는 데만 쓴다. 기존 `perturb_depth`·`perturb_image` 가
+전역 열화라면 이쪽은 **구조물 하나**를 지운다 — 다른 종류의 고장이다.
+
+| 교란 | 지운 면적 | R 중앙 | R 최대 | t 중앙 | t 최대 | KPI |
+|---|---|---|---|---|---|---|
+| 없음 (대조 = `boxy`) | 0% | 0.496 | 1.018 | 2.040 | 4.176 | 20/20 |
+| flange 위쪽 50% | 6.8% | 0.555 | 1.116 | 2.310 | 4.147 | 20/20 |
+| flange 위쪽 75% | 10.7% | 0.483 | 0.948 | 2.302 | 4.572 | 20/20 |
+| **flange 전체** | **12.8%** | 0.510 | 1.354 | 2.357 | 4.434 | **20/20** |
+
+**같은 입력으로 FP 를 두 번 돌린 잡음 바닥 (n=20): R 중앙값 차 0.087° · t 중앙값 차 0.512mm**
+(프레임별 \|ΔR\| 중앙 0.082°/최대 0.701° · \|Δt\| 중앙 0.252mm/최대 2.565mm).
+
+★★★ **flange 를 통째로 지운 효과(t +0.32mm)가 잡음 바닥(0.51mm)보다 작다 — 측정되지 않는다.**
+KPI 는 전 구간 20/20.
+
+- ★ **§18(«분할은 pose 의 병목이 아니다»)이 «부품 결손» 까지 확장된다.** 그 절은 경계 오차만 쟀고
+  나는 부품 결손은 다를 거라 봤는데 **아니었다**. FP 는 depth 로 정합하고 마스크는 crop 영역을
+  고를 뿐이라 13% 를 잘라내도 crop 이 거의 안 움직인다.
+- ★ **주입량이 실사진보다 크다** — sim 50cm 에서 flange 는 마스크의 **12.8%** 인데 실사진에서는
+  몸체 대비 **2~7%**(시점이 더 측면이라 단축된다). 더 센 교란에도 효과가 없다.
+- 🔴 **재지 않은 것**: ① **반투명·투명 몸체** — sim 은 cutout opacity 때문에 `--primary full` 경로가
+  원천적으로 무효다(§35-2f). **실사진에서 결손이 난 게 바로 그 몸체다** → 이 결론은 **검정에서만 유효**.
+  ② flange 결손이 **몸체 저분할과 같이 올 때** ③ 실물 조명·텍스처.
+
+## 37-7. ZED X 실물 사진이 들어오면 — 한 번에 돌릴 것
+
+**촬영 1벌**(`left.png`+`right.png`+`cam.json`)이면 아래가 전부 오프라인으로 나온다.
+
+```bash
+source envs/env.sh
+
+# ── ① 왼쪽 이미지만 모은다 ──────────────────────────────────────────────────
+mkdir -p assets/real_imgs_zedx
+for f in runs/real01/frame_*/left.png; do cp $f assets/real_imgs_zedx/$(basename $(dirname $f)).png; done
+#   🔴 appearance.json 을 같이 만든다 — 몸체 외관을 적어야 «조건부 프롬프트» 가 갈린다
+#      {"frame_0000": "black", …}  값: black | orange | clear | twotone
+
+# ── ② 최종 후보 전부 (§37-8) — 분할만, N장 × 23 추론 ────────────────────────
+envs/seg_sam3/bin/python tools/sam3_prompt_sweep.py \
+    --imgs assets/real_imgs_zedx --out runs/psweep_zedx \
+    --prompts-json assets/prompts/real_finalists.json --target full,flange --confidence 0.05
+#   → sheets/perfect__{full,flange}.png 부터 본다. 전수는 matrix__*.png
+#   → 안 걸리는 게 많으면 목록을 빼고 **내장 60종 전수**로 다시 (--prompts-json 없이)
+#   ⚠️ 여기서 고른 프롬프트를 **같은 사진으로 검증하면 안 된다**(§35-2o-4)
+
+# ── ③ 2요인 격자 (닻 축) — flange 가 잘 안 잡힐 때만 ────────────────────────
+envs/seg_sam3/bin/python tools/sam3_prompt_sweep.py --imgs assets/real_imgs_zedx \
+    --out runs/psweep_zedx_f2 --prompts-json assets/prompts/flange_topflange_sweep.json \
+    --target full,flange --confidence 0.05
+
+# ── ④ 전 체인 — 살아남은 낱말로. TF 팔(§37-9)까지 켠다 ──────────────────────
+envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
+    --mode all --preset n30black --sam3-text \
+    --text-prompt "boxy plastic object" --text-conf 0.15 \
+    --text-prompt-flange "black top flange on top of the plastic box" \
+    --note "1차" --true-distance-mm 280
+#   프롬프트를 바꿔 두 번째 런 → tools/compare_runs.py 로 나란히
+envs/pose/bin/python tools/compare_runs.py runs/real01_A runs/real01_B --index runs/runs_index.md
+```
+
+**시작 프롬프트 (이 절의 결론)**
+
+| target | 1순위 | 2순위 | 몸체 색을 알 때 |
+|---|---|---|---|
+| `full` | `"boxy plastic object"` | `"front opening unified pod"` | `"black/orange/clear plastic box"` |
+| `flange` | `"black top flange on top of the plastic box"` | `"black square bracket on top"` | — |
+
+## 37-8. 실물에 그대로 가져갈 목록 — `assets/prompts/real_finalists.json`
+
+**전 이미지 통과한 것 전부**를 파일로 굳혔다 — `full` **11** + `flange` **12**(중복 문장 제거).
+정렬은 **`score` 최소값 내림차순** = «미검출까지의 여유» 순이다(§37-4c).
+🔴 실사진 9장에서 통과한 것이므로 **ZED X 사진에서 다시 걸러야 한다** — 이 파일은 «후보» 지 «답» 이 아니다.
+
+| # | `full` | score 중앙 / **최소** | | `flange` | score 중앙 / **최소** |
+|---|---|---|---|---|---|
+| 1 | `boxy plastic object` | 0.902 / **0.645** | | `top mounting plate with a hole` | 0.809 / **0.695** |
+| 2 | `cube shaped plastic case` | 0.668 / 0.367 | | `black top flange on top of the plastic box` | 0.906 / 0.590 |
+| 3 | `front opening unified pod` | 0.688 / 0.250 | | `black square bracket on top` | 0.855 / 0.531 |
+| 4 | `case` | 0.350 / 0.145 | | `black top flange on top` | 0.809 / 0.449 |
+| 5 | `box` | 0.152 / 0.090 | | `top flange` | 0.629 / 0.320 |
+| 6 | `square plastic box with a handle on the side` | 0.198 / 0.081 | | `black top flange on top of the box` | 0.684 / 0.311 |
+| 7 | `rectangular plastic enclosure` ⚠️ | 0.354 / 0.069 | | `black square bracket on top of the box` | 0.820 / 0.275 |
+| 8 | `plastic box` | 0.104 / 0.065 | | `black top flange` | 0.602 / 0.247 |
+| 9 | `plastic container` | 0.181 / 0.062 | | `top flange plate on top of the plastic box` ⚠️ | 0.598 / 0.168 |
+| 10 | `the box` | 0.133 / 0.059 | | `square top plate on top of the plastic box` ⚠️ | 0.535 / 0.151 |
+| 11 | `storage box` | 0.115 / 0.055 | | `square flange on top of the plastic box` ⚠️ | 0.283 / 0.059 |
+| 12 | — | | | `flange on top` ⚠️ | 0.181 / 0.055 |
+
+⚠️ = **면적 이탈이 있는 것**(다른 프롬프트와 다른 것을 집은 칸이 있다). 남겨 둔 이유는 «실물에서
+어떤 결과가 나오는지 본다» 이고, **고를 때는 이탈 0 인 것부터** 본다.
+🔴 `rectangular plastic enclosure` 는 투톤 몸체에서 **흰 문만** 집는다 — 실물이 투톤이면 제외.
+
+```bash
+# 실물 사진에 이 목록 전부 (분할만 · N장 × 23 추론 ≈ 40초/9장)
+envs/seg_sam3/bin/python tools/sam3_prompt_sweep.py \
+    --imgs assets/real_imgs_zedx --out runs/psweep_zedx \
+    --prompts-json assets/prompts/real_finalists.json --target full,flange --confidence 0.05
+```
+⚠️ **`full` 3개(`s_boxy`·`d_fooup_long`·`s_cube`)는 재는 대상이자 flange 판정의 «물체 기준 프레임»**
+이기도 하다(`--ref-full-slug` 기본값). 목록에서 빼면 flange 판정이 약한 대체로 떨어진다.
+
+## 37-9. TF그룹 — flange 를 **텍스트로** 뽑아 `--primary flange`
+
+`run_group_a.py --text-prompt-flange "…"` 로 켠다(`--sam3-text` 는 자동으로 켜진다).
+`seg_txtf`(SAM3 `--target flange`) → `fp_txtf --primary flange --no-stage2` → **TF1**(정합+게이트) / **TF3**(정합 전).
+
+- ★ **왜 만드나** — `--primary full` 은 §22 유효 해상도 때문에 **t 가 구조적으로 3배 나쁘다**
+  (4.34 vs 1.38 mm/px). 그 천장을 넘으려면 flange 마스크가 필요한데 지금까지는 **SAM3 exemplar(A그룹)
+  만** 낼 수 있었다 — 즉 **참조 자산이 필수**였다. 텍스트로 되면 «A 의 정확도 + T 의 무의존» 이 된다.
+- 🔴 **공짜가 아니다.** § M4 에서 SAM3 의 결손이 **flange 에 몰린다**고 쟀다(recall 0.844 vs body 0.968).
+  그건 exemplar·원거리 조건이었고 **근접 + 텍스트에서도 그런지는 미측정** — TF 팔이 그것을 재는 장치다.
+- 🔴 `--primary flange` 는 마스크가 조금만 어긋나도 **90° 로 뒤집힌다**(성립 조건 IoU ≥0.98, §32-1).
+  **A1 과 나란히 놓고 «둘의 회전이 90° 배수로 어긋나는가» 를 반드시 본다.**
+- 비용: 분할 142ms/frame + FP 954ms/frame (sim 6프레임 실측).
+- 배선 확인(sim 50cm 검정 6프레임): 감사 7/7 통과 · TF1·TF3 이 리포트·`metrics_long.csv`·오버레이·
+  `segcmp`·좌우 일관성에 전부 등록됨. ⚠️ 그 런에서 **TF1 의 정합 이동량 중앙이 12.74mm** 라
+  「≥10mm 면 정합을 끈다」(§35-2m-6)가 발동한다 — 검정 50cm 라 §35-2m-6 와 **일관**이다(새 사실 아님).
+
+🔴 **곁들여 선재 버그를 잡았다** — `--mode quick` 은 정합 팔을 0개 만드는데 진단 시트의
+`--pose-dir` 조립부가 `cands[0]` 을 해 **`IndexError` 로 런 전체가 exit 1** 이었다.
+진단 스테이지가 `optional=True` 여도 소용없다 — **죽는 곳이 `Step.resolve()` 라 그 처리 밖**이다.
+교훈 #79(«진단 스테이지는 본 파이프라인을 안 죽인다»)가 **인자 조립 단계에서 새는** 경우다.
+
+### 37-9b. **sim GT 로 성능을 쟀다** (2026-08-26) — 「t 이득은 실재하고, R 은 2배 나쁘다」
+
+`runs/fr50`(가짜 실물 50cm 검정) **10프레임** + GT `runs/fr_d50`.
+**depth(`ALL20/st`)·`--input-scale 0.5`·프레임을 전부 고정**하고 갈래만 바꿨다.
+
+| 구성 | 단계 | R 중앙 | R 최대 | t 중앙 | t 최대 | KPI |
+|---|---|---|---|---|---|---|
+| **A** exemplar flange → `--primary flange` | coarse | 0.976 | 1.227 | 1.363 | 2.116 | **10/10** |
+| **TF** 텍스트 flange `bracket` → `--primary flange` | coarse | 1.001 | 1.267 | **1.095** | 2.249 | **10/10** |
+| **TF** 텍스트 flange `blktflange` | coarse | 0.932 | 🔴 **176.7** | 1.070 | 🔴 133.2 | 9/10 |
+| **TF** `blktflange` + stage2 on | coarse | 1.052 | 91.9 | 1.139 | 129.5 | 9/10 |
+| ″ | refined | 1.422 | 92.0 | 1.141 | 129.7 | 8/10 |
+| **T** 텍스트 full → `--primary full` (`--no-stage2`) | coarse | 0.522 | 1.018 | 1.973 | 4.009 | **10/10** |
+| **COMBO**(§38) 텍스트 full · stage2 on · scale 0.5 | coarse | 0.453 | 0.974 | 2.494 | 5.427 | 9/10 |
+| ″ | refined | 1.400 | 3.009 | 1.124 | 2.293 | 9/10 |
+| **COMBO 하이브리드** R=coarse · t=refined | — | **0.453** | **0.974** | **1.124** | 2.293 | **10/10** |
+
+⚠️ **위 COMBO 행은 §38 의 네 파이프라인 중 «P2(scale 0.5)» 하나다** — 분할 conf 도 0.15 로
+사용자 명령(0.10)과 다르다. **네 개 전부는 §38-7** 에 따로 있다(그쪽이 정본).
+
+**① TF 는 작동하고 t 이득이 실재한다.** `--primary full`(T) 대비 **t 1.973 → 1.095mm (1.8배)**.
+§22 가 예측한 유효 해상도 이득(실측 `full.ply` diameter 656.0mm → 4.92 mm/px ·
+`top_flange.ply` 203.2mm → **1.52 mm/px**, 3.2배)이 pose 오차로 확인됐다.
+★ **텍스트가 exemplar 를 t 에서 이겼다**(1.095 vs 1.363) — 마스크 IoU 는 exemplar 가 훨씬 좋은데도
+(0.966 vs 0.808). **참조 자산 없이 그 구간에 도달한다.**
+
+**② 대가는 회전이다.** flange 계열 R 중앙 ~1.0° vs `full` 계열 0.45~0.52° — **2배 나쁘다.**
+§32-1 의 «flange 는 방향 정보가 표면의 3.5%·전부 경계» 가 그대로 나타난다.
+
+**③ 🔴 COMBO 하이브리드가 전 구성 중 최선이다** — R 0.453 / t 1.124 / **10-10**.
+그리고 **§27-7 이 왜 옳은지가 숫자로 보인다**: coarse 는 R 이 좋고 t 가 나쁘며(0.453 / 2.494),
+refined 는 반대다(1.400 / 1.124). **각각 단독은 KPI 9/10 인데 좋은 쪽만 합치면 10/10** 이 된다.
+실물에서 H1 이 최선이었던 이유(§38-2)가 sim GT 로 재현됐다.
+
+**④ 🔴🔴 프롬프트 하나가 180° 뒤집힘을 만든다 — 그리고 실사진과 순위가 정반대다**
+
+| flange 프롬프트 | 마스크 IoU 중앙 | precision | recall | R 최대 | KPI | **실사진 9장 순위**(§37-4b) |
+|---|---|---|---|---|---|---|
+| `black square bracket on top of the box` | **0.808** | 0.818 | 0.975 | 1.267 | **10/10** | 7위 |
+| `black top flange on top of the plastic box` | 🔴 **0.118** | 0.121 | 0.965 | 🔴 **176.7°** | 9/10 | **1위** |
+| (참고) A exemplar | 0.966 | 0.995 | 0.967 | 1.227 | 10/10 | — |
+
+두 번째는 **몸체 전체를 집는다**(마스크 픽셀 ≈ `GT mask_full`). 그 마스크로 `--primary flange` 를
+돌리면 §32-1 이 예고한 **180° 뒤집힘**이 실제로 난다.
+⚠️ **`--select` 탓이 아니다** — `center`/`score` 결과가 **소수점까지 같다**. 프롬프트 자체가
+sim 검정에서 몸체를 부른다(§35-2i: 몸체와 flange 가 같은 검정이라 경계가 없다).
+🔴 **어느 마스크도 §32-1 의 성립 조건 `IoU ≥0.98` 에 못 미친다**(최고 exemplar 0.966) — 그런데도
+`bracket`·exemplar 는 10/10 이다. **0.98 은 «필요조건» 이 아니라 «안전 여유» 로 읽어야 한다.**
+
+**⑤ stage2 는 flange 경로에서 해롭다** — coarse R 1.052 → refined **1.422**, KPI 9 → **8**.
+`--primary flange` 에 `--no-stage2` 를 준 설계가 맞다(§27-7 재확인).
+
+### 37-9c. 그래서 TF 를 어떻게 쓰나
+
+- **단독 채택이 아니다.** R 이 2배 나쁘고 프롬프트에 극도로 민감하다.
+- **COMBO/A 와 나란히 놓고 «회전이 90°/180° 배수로 어긋나면 TF 를 버린다»** — 원거리 안전망과 같은 구조.
+- 쓸 자리는 **t 가 병목일 때**다. `--primary full` 의 t 천장(1.9~2.5mm)을 1.1mm 로 내린다.
+- 🔴 **프롬프트를 실물에서 다시 골라야 한다** — 실사진 1위가 sim 검정에서 최악이었다(위 ④).
+  `--mode all` 로 TF 를 켜기 전에 §37-7 의 스윕을 그 사진으로 먼저 돌린다.
+
+🔴 **판정 기준은 「검출률(= 미검출 0)」이 1순위**다. score 중앙값이나 마스크 정확도가 아니다(§37-5).
+🔴 **실물에는 distractor 가 있다** — 이 스윕이 원리적으로 못 잰 축이다. `--select center` 가
+배경을 집을 수 있으므로(교훈 #15) `segcmp` 의 «이탈» 열과 오버레이로 **반드시 확인**한다.
+⚠️ conf 를 0.05 로 내리는 것은 오버레이로 무엇을 집었는지 확인한 뒤에만(§35-2m-2 의 정정).
+
+---
+
+# ★★★★★ 38. **실물 데이터로 끝까지 돌린 파이프라인** (사용자, 다른 PC · 2026-08-26 제공)
+
+> 🔴🔴 **이 프로젝트에서 «실물 사진으로 전 체인을 돌려 눈으로 확인된» 유일한 기록이다.**
+> 여기 PC 는 sim 전용이고, 실물 데이터는 다른 PC 에 있다. 아래는 **거기서 실제로 통과한** 구성이다.
+> ⚠️ **GT 가 없다** — 판정은 «시각적 결과 이미지에서 눈으로는 오차가 분간 안 되는 수준» 이다.
+> 절대 오차(mm·도)가 아니므로 sim 수치와 나란히 놓으면 안 된다.
+
+## 38-1. 🔴🔴 참조 기반 SAM3(A그룹)는 **실물에서 전부 실패했다**
+
+**sim 에서 만든 exemplar 참조**(`assets/obj/<id>/sam3_refs*`)로는 실물에서 **하나도 안 됐다**.
+→ **텍스트 프롬프트가 유일하게 살아남은 SAM3 경로**다.
+
+- §35-2m 이 «A 계열이 `mask_flange` 빔으로 전멸» 이라고 적은 것의 **일반화**다. 그때는 검정 몸체
+  한 런이었는데, 실물 전반에서 그렇다는 것이 확인됐다.
+- ★ 이것이 **§37 의 프롬프트 스윕을 만든 이유**이고, 그 결론이 실물 결과와 **독립적으로 일치**한다:
+  사용자가 실물에서 고른 프롬프트가 **`"boxy plastic object"`** 인데, 우리가 실사진 9장 스윕에서
+  뽑은 `full` 1순위도 같은 문장이다(§37-3). **서로 모르는 상태에서 같은 답에 도달했다.**
+- ⚠️ «참조가 못 쓴다» 가 아니라 «**sim 에서 만든** 참조가 못 쓴다» 다. 실사진으로 참조를 만드는
+  경로는 남아 있지만 **사용자 방침상 최후 수단**이다.
+
+## 38-2. 통과한 체인 — 정리
+
+```
+stereo_onnx --scale 0.5
+  → segment_sam3 --target full --prompt "boxy plastic object" --confidence 0.10 --select center
+  → pose_fp --primary full  (★ stage2 **on**)  --flange-mask-from pose
+  → hybrid_pose (R = pose_coarse · t = pose_refined)      ← 최선
+```
+
+**sim 권고와 네 군데가 다르다:**
+
+| | sim 배포 권고 | **실물에서 통과한 것** |
+|---|---|---|
+| 분할 | SAM3 **exemplar** `flange` | **텍스트** `full` |
+| `--primary` | `flange` (§22 유효 해상도 3배) | **`full`** |
+| stage2 | **`--no-stage2`** (§34-13) | **on** (하이브리드에 `pose_refined` 가 필요하다) |
+| 테두리 정합 | `refine_contour --outer-only` + 게이트 | **없다** |
+
+- ★ **하이브리드가 최선인 것은 §27-7 과 일치한다** — «회전은 coarse, 평행이동은 refined».
+  실물에서 독립적으로 재현된 셈이다.
+- 🔴 **정합이 하나도 없다.** §35-2m-6 이 «검정 몸체 50cm 에서 정합이 KPI 를 반으로 떨어뜨린다» 고
+  쟀는데, 실물 체인이 정합 없이 «분간 안 되는» 수준을 냈다는 것은 그것과 **모순되지 않는다**.
+  ⬜ 다만 «정합을 켜면 더 좋아지는가» 는 **실물에서 아직 안 재 봤다** — 열린 항목이다.
+- 네 구성(`0.75` / `0.5` / `hull` / 하이브리드)이 **전부 «분간 안 되는»** 축에 들었다.
+  → 눈으로는 못 가른다는 뜻이고, **서열화는 좌우 투영 일관성 같은 GT-free 지표로** 해야 한다.
+
+## 38-3. 명령어 — 오타 교정본
+
+받은 명령에서 **실행을 막는 오류 5종**을 찾았다(전부 실제로 확인).
+
+| # | 받은 것 | 고친 것 | 왜 |
+|---|---|---|---|
+| 1 | `spatial_vision.stage.segment_sam3` | **`stages`** | 그런 모듈이 없다 |
+| 2 | `--on $IN` | **`--in`** | `segment_sam3` 에 `--on` 이 없다 |
+| 3 | `-prompt` | **`--prompt`** | 대시 하나면 다른 인자로 파싱된다 |
+| 4 | `deployablle_…onnx` | **`deployable_…onnx`** | 실제 파일명(`l` 하나) |
+| 5 | `--masks $OUT/seg \ `(역슬래시 뒤 공백) | 공백 제거 | 줄 이음이 깨져 다음 줄이 별도 명령이 된다 |
+
+⚠️ 붙여넣기 과정에서 **en 대시(`–`)와 스마트 따옴표(`“ ”`)** 가 섞여 있었다 — 셸에서 그대로 쓰면
+`--` 로 인식되지 않는다. 아래는 **실제로 돌려 본** 교정본이다(`fr50` = 「가짜 실물」 20프레임).
+
+```bash
+cd /isaac-sim/volume/spatial_manipulation_ws/src/vision
+source envs/env.sh
+
+OBJ=assets/obj/foup_300_semi_r2
+IN=runs/<capture>
+OUT=runs/COMBO_<name>
+ONNX=weights/ngc_foundationstereo/deployable_foundation_stereo_s_dynamic_v2.0.onnx
+
+# depth
+envs/stereo_onnx/bin/python -m spatial_vision.stages.stereo_onnx \
+    --in $IN --out $OUT/st --scale 0.5 --model $ONNX
+
+# full mask — SAM3 텍스트
+envs/seg_sam3/bin/python -m spatial_vision.stages.segment_sam3 \
+    --in $IN --out $OUT/seg --target full \
+    --prompt "boxy plastic object" --confidence 0.10 --select center
+
+# P1_s2_075 — stage2 on
+envs/pose/bin/python -m spatial_vision.stages.pose_fp \
+    --in $IN --out $OUT/fp --obj $OBJ --masks $OUT/seg \
+    --depth stereo --depth-dir $OUT/st \
+    --primary full --input-scale 0.75 --flange-mask-from pose
+
+# P2_s2_050
+envs/pose/bin/python -m spatial_vision.stages.pose_fp \
+    --in $IN --out $OUT/fp_is050 --obj $OBJ --masks $OUT/seg \
+    --depth stereo --depth-dir $OUT/st \
+    --primary full --input-scale 0.5 --flange-mask-from pose
+
+# P3_hull
+envs/pose/bin/python -m spatial_vision.stages.pose_fp \
+    --in $IN --out $OUT/fp_hull --obj $OBJ --masks $OUT/seg \
+    --depth stereo --depth-dir $OUT/st \
+    --primary full --input-scale 0.75 --flange-mask-from pose --flange-mask-proj hull
+
+# H1_Rc_Ts075 — 하이브리드 (실물 최선)
+envs/pose/bin/python -m spatial_vision.eval.hybrid_pose \
+    --r-dir $OUT/fp --r-name pose_coarse.json \
+    --t-dir $OUT/fp --t-name pose_refined.json \
+    --out $OUT/hyb_Rc_Ts075
+```
+
+## 38-4. 🔴🔴 `--input-scale 0.75` 는 **환경변수 한 줄이 없으면 OOM 이다**
+
+교정본을 돌리다 잡았다. 1920×1200 · RTX 5090(31GiB)에서 `--input-scale 0.75` 는
+**frame_0000·0001 은 성공하고 frame_0002 에서 죽는다** — 즉 **프레임마다 메모리가 쌓인다.**
+
+```
+torch.OutOfMemoryError: Tried to allocate 1.22 GiB. … 1.18 GiB is free
+```
+
+★ **`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 로 20/20 통과한다.**
+
+| `--input-scale` | 없이 | `expandable_segments:True` |
+|---|---|---|
+| 0.5 | ✅ 20/20 | ✅ 20/20 |
+| **0.75** | 🔴 **2/20 (OOM)** | ✅ **20/20** |
+| 1.0 | 🔴 | 🔴 여전히 불가 (단일 할당 6.49GiB) |
+
+→ **§34-12 의 «1920×1200 은 0.5 필요» 상한이 0.75 로 올라간다.** `envs/env.sh` 에 상설로 넣었다.
+🔴 **다른 PC 에서 0.75 가 됐다면 그쪽은 프레임이 적었거나 이미 이 설정이 있었을 것이다** —
+프레임 수를 늘리면 같은 지점에서 죽는다. 확인할 것.
+⚠️ §22 상 `--input-scale` 은 **네트워크 유효 해상도를 안 바꾼다**(crop 이 `diameter×ratio` → 160×160).
+바뀌는 것은 crop 원본의 충실도뿐이다 — 그래서 0.75 와 0.5 가 «분간 안 되는» 것은 예상과 맞는다.
+
+## 38-5. 러너로 재현 가능하게 했다 — `--mode combo`
+
+**이 체인은 `run_group_a.py` 로 만들 수 없었다** — 러너의 `fp_s2` 는 `--primary flange` 이고
+`fp_txt` 는 `--no-stage2` 라, «텍스트 마스크 + `--primary full` + stage2 on» 조합이 없었다.
+`--mode combo` 로 넣었다(`--sam3-text` 필요, `--mode all` 에 자동 포함).
+
+| 팔 | 무엇 | 산출물 |
+|---|---|---|
+| **RP1** | P1 — `--primary full` · stage2 on · `--input-scale 0.75` | `fp_c075/pose_refined.json` |
+| **RP2** | P2 — 같은 체인 `0.5` (해상도 대조군) | `fp_c050/pose_refined.json` |
+| **RP3** | P3 — `--flange-mask-proj hull` (옛 볼록껍질, 교훈 #20) | `fp_chull/pose_refined.json` |
+| **RH1** | H1 — 하이브리드 R=coarse · t=refined **(실물 최선)** | `hyb_combo/pose_coarse.json` |
+
+정합을 안 하므로 «팔» 이 아니라 **별칭**으로 등록했다(A3·T3 와 같은 방식) — 좌우 일관성·통계
+CSV·오버레이·신호등·배선 감사에 전부 들어간다. 검증(가짜 실물 `fr50` 6프레임):
+**배선 감사 7/7 통과 · 오버레이 11열 · CSV 66행 불일치 0.**
+
+```bash
+envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
+    --mode all --preset n30black --sam3-text \
+    --text-prompt "boxy plastic object" --text-conf 0.10 \
+    --text-prompt-flange "black top flange on top of the plastic box" \
+    --true-distance-mm 280
+```
+→ 실물 검증 체인(RP1~RH1) + 오늘 고른 프롬프트 후보 + 정합·게이트 축이 **한 런에서 나란히** 나온다.
+
+⚠️ 팔이 30개를 넘으면 **선택 편향**이 커진다 — 리포트가 경고를 낸다. 좁힌 뒤에는
+**새로 찍은 사진**에서 확인한다(§35-2o-4).
+
+## 38-7. **네 파이프라인 전부 sim GT 로 쟀다** (2026-08-26)
+
+`runs/fr50_10`(가짜 실물 50cm 검정 10프레임) + GT `runs/fr_d50`.
+**사용자 명령 그대로** — 분할 `"boxy plastic object" --confidence 0.10 --select center`,
+depth 는 `ALL20/st` 고정. 🔴 `0.75` 두 개는 `expandable_segments`(§38-4) 덕에 **10/10 완주**했다.
+
+| 파이프라인 | 단계 | R 중앙 | R 최대 | t 중앙 | t 최대 | ADD 중앙 | KPI |
+|---|---|---|---|---|---|---|---|
+| **P1_s2_075** `--input-scale 0.75` | coarse | **0.366** | **0.856** | 2.333 | 4.382 | 2.371 | 10/10 |
+| ″ | refined | 1.363 | 3.202 | 1.106 | 2.705 | 2.634 | 9/10 |
+| **P2_s2_050** `--input-scale 0.5` | coarse | 0.501 | 0.873 | 2.142 | 4.037 | 2.182 | 10/10 |
+| ″ | refined | 1.417 | 3.825 | **1.040** | **2.233** | 2.594 | 9/10 |
+| **P3_hull** `0.75 + --flange-mask-proj hull` | coarse | 0.409 | 0.890 | 2.017 | 4.139 | 2.055 | 10/10 |
+| ″ | refined | 1.402 | 2.551 | 1.258 | 2.752 | 2.825 | **10/10** |
+| **H1_Rc_Ts075** 하이브리드 (P1) ★사용자 최선 | — | **0.366** | **0.856** | 1.106 | 2.705 | **1.395** | **10/10** |
+| (추가) 하이브리드 P2 기반 | — | 0.501 | 0.873 | **1.040** | **2.233** | **1.328** | **10/10** |
+| (추가) 하이브리드 P3 기반 | — | 0.409 | 0.890 | 1.258 | 2.752 | 1.497 | **10/10** |
+
+**① 사용자가 «최선» 이라 한 H1 이 sim GT 에서도 최선이다.** ADD 중앙 **1.395mm** 로
+어느 단일 단계(2.05~2.83)보다 **1.5~2배** 좋다. 눈으로 고른 결론이 GT 로 확인됐다.
+
+**② 하이브리드가 이기는 이유가 표에 그대로 있다** — 모든 P 에서 **coarse 는 R 이 좋고 t 가 나쁘며
+(R 0.37~0.50 / t 2.0~2.3), refined 는 정확히 반대다(R 1.36~1.42 / t 1.04~1.26)**.
+§27-7 의 «회전은 coarse, 평행이동은 refined» 가 **세 파이프라인에서 동시에** 성립한다.
+🔴 그리고 `refined` 단독은 P1·P2 에서 **KPI 9/10** 인데 하이브리드는 **전부 10/10** 이다.
+
+**③ 🔴 세 P 는 서로 구분되지 않는다** — 사용자가 «눈으로 분간 안 됨» 이라 한 그대로다.
+ADD 중앙 2.055~2.371 (차 0.32mm), 하이브리드로 보면 1.328~1.497 (차 0.17mm).
+**FP 재실행 잡음 바닥이 t 중앙 0.512mm**(§37-6)이므로 **이 차이는 측정되지 않는다.**
+→ `0.75` vs `0.5` vs `hull` 은 **아무거나 써도 된다.** 계산은 `0.5` 가 가장 싸다(1123 vs 1255ms).
+- ⚠️ §22 대로 `--input-scale` 은 **네트워크 유효 해상도를 안 바꾼다** — 예상과 맞는 결과다.
+- ⚠️ `hull` 은 교훈 #20 이 «노치를 메워 1.55% 부푼다» 고 한 **옛 동작**인데 여기서도 안 진다.
+  refined 만 보면 KPI 10/10 으로 **유일하게 온전**하다(P1·P2 는 9/10). 표본 10 이라 단정은 못 한다.
+
+**④ 그래서 배포 판단** — **하이브리드를 켜는 것이 유일하게 의미 있는 선택**이고,
+`--input-scale`·`--flange-mask-proj` 는 **취향이다.** 러너 `--mode combo` 는 셋을 다 만들어
+`RP1`/`RP2`/`RP3`/`RH1` 로 나란히 내므로, 실물에서도 같은 판정을 **좌우 \|Δdx\|** 로 반복하면 된다.
+
+## 38-6. 열린 항목
+
+| # | 무엇 | 왜 |
+|---|---|---|
+| 1 | **정합을 켜면 실물에서 좋아지나** | 통과한 체인에 정합이 없다. §35-2m-6 의 «이동량 t 중앙 ≥10mm 면 끈다» 규칙을 실물에서 적용해 볼 것 |
+| 2 | **네 구성의 서열** | 전부 «눈으로 분간 안 됨» 이라 육안으로는 못 가른다 → **좌우 \|Δdx\|** 로 서열화(§35-2o-6b, r=−0.94) |
+| 3 | 다른 PC 의 **캡처 해상도·프레임 수** | 0.75 가 거기서 왜 통과했는지가 §38-4 로 설명되는지 확인 |
+| 4 | `--primary flange` 를 텍스트로 (TF그룹, §37-9) | `--primary full` 의 t 천장(§22, 3배)을 넘을 유일한 무참조 경로 |
+| 5 | **여러 FOUP 개체** | 사용자가 계속 진행하려는 방향. §29 의 개체 변이 축이 실물에서 처음으로 관측된다 |

@@ -1,0 +1,232 @@
+{
+  "_note": "top flange 프롬프트 2요인 스윕 — 서술어 5 × 소속구 6 + 대조군 5. full 3개는 재는 대상이 아니라 flange 판정의 «물체 기준 프레임» 용이다.",
+  "_factors": {
+    "desc": {
+      "bracket": "black square bracket",
+      "mount": "mounting plate with a hole",
+      "topplate": "square top plate",
+      "flange": "square flange",
+      "holeplate": "black plate with a round hole"
+    },
+    "anchor": {
+      "a0_top": {
+        "phrase": "on top",
+        "뜻": "닻 없음(1차 최선의 형태)"
+      },
+      "a1_box": {
+        "phrase": "on top of the box",
+        "뜻": "일반명사 닻"
+      },
+      "a2_onfoup": {
+        "phrase": "on top of the front opening unified pod",
+        "뜻": "★ 도메인 풀네임 닻"
+      },
+      "a3_offoup": {
+        "phrase": "of the front opening unified pod",
+        "뜻": "★ 소유격"
+      },
+      "a4_carrier": {
+        "phrase": "on top of the wafer carrier",
+        "뜻": "약한 도메인어 닻"
+      },
+      "a5_plastic": {
+        "phrase": "on top of the plastic box",
+        "뜻": "재질+일반명사 닻"
+      }
+    }
+  },
+  "full": [
+    [
+      "s_boxy",
+      "descript",
+      "boxy plastic object"
+    ],
+    [
+      "d_fooup_long",
+      "domain",
+      "front opening unified pod"
+    ],
+    [
+      "s_cube",
+      "descript",
+      "cube shaped plastic case"
+    ]
+  ],
+  "flange": [
+    [
+      "x_bracket__a0_top",
+      "D:bracket/A:a0_top",
+      "black square bracket on top"
+    ],
+    [
+      "x_bracket__a1_box",
+      "D:bracket/A:a1_box",
+      "black square bracket on top of the box"
+    ],
+    [
+      "x_bracket__a2_onfoup",
+      "D:bracket/A:a2_onfoup",
+      "black square bracket on top of the front opening unified pod"
+    ],
+    [
+      "x_bracket__a3_offoup",
+      "D:bracket/A:a3_offoup",
+      "black square bracket of the front opening unified pod"
+    ],
+    [
+      "x_bracket__a4_carrier",
+      "D:bracket/A:a4_carrier",
+      "black square bracket on top of the wafer carrier"
+    ],
+    [
+      "x_bracket__a5_plastic",
+      "D:bracket/A:a5_plastic",
+      "black square bracket on top of the plastic box"
+    ],
+    [
+      "x_mount__a0_top",
+      "D:mount/A:a0_top",
+      "mounting plate with a hole on top"
+    ],
+    [
+      "x_mount__a1_box",
+      "D:mount/A:a1_box",
+      "mounting plate with a hole on top of the box"
+    ],
+    [
+      "x_mount__a2_onfoup",
+      "D:mount/A:a2_onfoup",
+      "mounting plate with a hole on top of the front opening unified pod"
+    ],
+    [
+      "x_mount__a3_offoup",
+      "D:mount/A:a3_offoup",
+      "mounting plate with a hole of the front opening unified pod"
+    ],
+    [
+      "x_mount__a4_carrier",
+      "D:mount/A:a4_carrier",
+      "mounting plate with a hole on top of the wafer carrier"
+    ],
+    [
+      "x_mount__a5_plastic",
+      "D:mount/A:a5_plastic",
+      "mounting plate with a hole on top of the plastic box"
+    ],
+    [
+      "x_topplate__a0_top",
+      "D:topplate/A:a0_top",
+      "square top plate on top"
+    ],
+    [
+      "x_topplate__a1_box",
+      "D:topplate/A:a1_box",
+      "square top plate on top of the box"
+    ],
+    [
+      "x_topplate__a2_onfoup",
+      "D:topplate/A:a2_onfoup",
+      "square top plate on top of the front opening unified pod"
+    ],
+    [
+      "x_topplate__a3_offoup",
+      "D:topplate/A:a3_offoup",
+      "square top plate of the front opening unified pod"
+    ],
+    [
+      "x_topplate__a4_carrier",
+      "D:topplate/A:a4_carrier",
+      "square top plate on top of the wafer carrier"
+    ],
+    [
+      "x_topplate__a5_plastic",
+      "D:topplate/A:a5_plastic",
+      "square top plate on top of the plastic box"
+    ],
+    [
+      "x_flange__a0_top",
+      "D:flange/A:a0_top",
+      "square flange on top"
+    ],
+    [
+      "x_flange__a1_box",
+      "D:flange/A:a1_box",
+      "square flange on top of the box"
+    ],
+    [
+      "x_flange__a2_onfoup",
+      "D:flange/A:a2_onfoup",
+      "square flange on top of the front opening unified pod"
+    ],
+    [
+      "x_flange__a3_offoup",
+      "D:flange/A:a3_offoup",
+      "square flange of the front opening unified pod"
+    ],
+    [
+      "x_flange__a4_carrier",
+      "D:flange/A:a4_carrier",
+      "square flange on top of the wafer carrier"
+    ],
+    [
+      "x_flange__a5_plastic",
+      "D:flange/A:a5_plastic",
+      "square flange on top of the plastic box"
+    ],
+    [
+      "x_holeplate__a0_top",
+      "D:holeplate/A:a0_top",
+      "black plate with a round hole on top"
+    ],
+    [
+      "x_holeplate__a1_box",
+      "D:holeplate/A:a1_box",
+      "black plate with a round hole on top of the box"
+    ],
+    [
+      "x_holeplate__a2_onfoup",
+      "D:holeplate/A:a2_onfoup",
+      "black plate with a round hole on top of the front opening unified pod"
+    ],
+    [
+      "x_holeplate__a3_offoup",
+      "D:holeplate/A:a3_offoup",
+      "black plate with a round hole of the front opening unified pod"
+    ],
+    [
+      "x_holeplate__a4_carrier",
+      "D:holeplate/A:a4_carrier",
+      "black plate with a round hole on top of the wafer carrier"
+    ],
+    [
+      "x_holeplate__a5_plastic",
+      "D:holeplate/A:a5_plastic",
+      "black plate with a round hole on top of the plastic box"
+    ],
+    [
+      "c1_bracket_top",
+      "control",
+      "black square bracket on top"
+    ],
+    [
+      "c2_mounting",
+      "control",
+      "top mounting plate with a hole"
+    ],
+    [
+      "c3_topplate",
+      "control",
+      "top plate"
+    ],
+    [
+      "c4_couplinglid",
+      "control",
+      "coupling plate on the lid"
+    ],
+    [
+      "c5_lid",
+      "control",
+      "lid"
+    ]
+  ]
+}

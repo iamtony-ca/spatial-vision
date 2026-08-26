@@ -1,0 +1,126 @@
+{
+  "_note": "실물 ZED X 이미지로 돌릴 최종 후보. `perfect__full.png`(전 이미지 통과 11) + `perfect__flange.png`(전 이미지 통과 13, 중복 문장 제거) 를 그대로 옮긴 것. 정렬은 **score 최소값 내림차순** = 미검출까지의 여유 순(RESULTS §37-4c).",
+  "_source": {
+    "full": "runs/promptsweep/sheets/perfect__full.png",
+    "flange": "runs/promptsweep_flange2/sheets/perfect__flange.png"
+  },
+  "full": [
+    [
+      "s_boxy",
+      "descript",
+      "boxy plastic object"
+    ],
+    [
+      "s_cube",
+      "descript",
+      "cube shaped plastic case"
+    ],
+    [
+      "d_fooup_long",
+      "domain",
+      "front opening unified pod"
+    ],
+    [
+      "g_case",
+      "generic",
+      "case"
+    ],
+    [
+      "g_box",
+      "generic",
+      "box"
+    ],
+    [
+      "s_sidehandle",
+      "descript",
+      "square plastic box with a handle on the side"
+    ],
+    [
+      "s_rectangular",
+      "descript",
+      "rectangular plastic enclosure"
+    ],
+    [
+      "g_plasticbox",
+      "generic",
+      "plastic box"
+    ],
+    [
+      "g_plasticcont",
+      "generic",
+      "plastic container"
+    ],
+    [
+      "g_thebox",
+      "generic",
+      "the box"
+    ],
+    [
+      "g_storagebox",
+      "generic",
+      "storage box"
+    ]
+  ],
+  "flange": [
+    [
+      "c2_mounting",
+      "control",
+      "top mounting plate with a hole"
+    ],
+    [
+      "x_blktflange__a5_plastic",
+      "D:blktflange/A:a5_plastic",
+      "black top flange on top of the plastic box"
+    ],
+    [
+      "x_bracket__a0_top",
+      "D:bracket/A:a0_top",
+      "black square bracket on top"
+    ],
+    [
+      "x_blktflange__a0_top",
+      "D:blktflange/A:a0_top",
+      "black top flange on top"
+    ],
+    [
+      "x_topflange__ab_bare",
+      "D:topflange/A:ab_bare",
+      "top flange"
+    ],
+    [
+      "x_blktflange__a1_box",
+      "D:blktflange/A:a1_box",
+      "black top flange on top of the box"
+    ],
+    [
+      "x_bracket__a1_box",
+      "D:bracket/A:a1_box",
+      "black square bracket on top of the box"
+    ],
+    [
+      "x_blktflange__ab_bare",
+      "D:blktflange/A:ab_bare",
+      "black top flange"
+    ],
+    [
+      "x_tflangepl__a5_plastic",
+      "D:tflangepl/A:a5_plastic",
+      "top flange plate on top of the plastic box"
+    ],
+    [
+      "x_topplate__a5_plastic",
+      "D:topplate/A:a5_plastic",
+      "square top plate on top of the plastic box"
+    ],
+    [
+      "x_sqflange__a5_plastic",
+      "D:sqflange/A:a5_plastic",
+      "square flange on top of the plastic box"
+    ],
+    [
+      "x_flange__a0_top",
+      "D:flange/A:a0_top",
+      "flange on top"
+    ]
+  ]
+}

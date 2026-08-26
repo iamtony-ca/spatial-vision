@@ -42,7 +42,12 @@ NOT_ARMS = ("fp_", "seg", "st", "lr", "diag", "overlay", "segcmp", "stats", "wor
 CASCADE_STAGES = ("Ccas_s1", "Ccas_s2")
 # 정합을 안 하는 팔 — pose 가 자기 디렉토리가 아니라 FP 디렉토리에 있다
 ALIAS = {"A3": ("fp_ns2", "pose_coarse.json"), "I3": ("fp_ism", "pose_coarse.json"),
-         "T3": ("fp_txt", "pose_coarse.json")}
+         "T3": ("fp_txt", "pose_coarse.json"), "TF3": ("fp_txtf", "pose_coarse.json"),
+         # COMBO — 실물 검증 체인(§38). 정합을 안 하므로 자기 디렉토리가 없다.
+         "RP1": ("fp_c075", "pose_refined.json"), "RP2": ("fp_c050", "pose_refined.json"),
+         "RP3": ("fp_chull", "pose_refined.json"), "RH1": ("hyb_combo", "pose_coarse.json")}
+# 🔴 여기에 안 적힌 별칭은 ④ lr 파일 수 · ⑤ 오버레이 열 수 검사에서 **초과분으로 잡혀 감사 실패**가 된다.
+#    새 «정합 안 하는 팔» 을 만들 때마다 이 표를 같이 고친다 — 실제로 TF3 을 빠뜨려 잡혔다.
 
 
 def _load(p: Path):
@@ -178,7 +183,11 @@ def check(root: Path) -> tuple[list[str], list[str]]:
             continue
         sd, nm = _in_root(root, Path(init).parent), Path(init).name   # 복사된 런에서도 맞게(위 참조)
         gated = {f["frame"] for f in mc.get("frames", []) if f.get("gated")}
+        # ★ 대응점 0 = 정합기가 **아무 일도 못 했다** → 초기값을 그대로 돌려주는데 `gated=False` 라
+        #   「정합이 성공했다」처럼 보인다. 이유를 알아야 조치가 갈리므로 프레임별로 들고 온다.
+        ncorr = {f.get("frame"): f.get("n_corr") for f in mc.get("frames", [])}
         bad_g = bad_ng = 0
+        degen: list[str] = []
         for f in sorted((root / a).glob("frame_*/pose_refined.json")):
             fn = f.parent.name
             cur, ini = _rt(f), _rt(sd / fn / nm)
@@ -188,8 +197,14 @@ def check(root: Path) -> tuple[list[str], list[str]]:
                 bad_g += 1
             if fn not in gated and _same(cur, ini):
                 bad_ng += 1
+                if not ncorr.get(fn):
+                    degen.append(fn)
         if bad_g or bad_ng:
-            bad.append(f"② {a}: 후퇴인데 초기값과 다름 {bad_g}장 · 비후퇴인데 초기값과 같음 {bad_ng}장 "
+            why = (f" — 그중 **대응점 0** 인 프레임 {len(degen)}장 {degen[:4]}: 정합기가 "
+                   "에지를 하나도 못 찾아 초기값을 그대로 냈다(=«정합 안 됨»). "
+                   "🔴 마스크·조명·거리를 의심할 것 — «정합이 잘 맞아서 안 움직인 것» 이 아니다"
+                   if degen else "")
+            bad.append(f"② {a}: 후퇴인데 초기값과 다름 {bad_g}장 · 비후퇴인데 초기값과 같음 {bad_ng}장{why} "
                        f"(초기값 = `{sd.name}/{nm}`)")
         else:
             n_ok += 1
