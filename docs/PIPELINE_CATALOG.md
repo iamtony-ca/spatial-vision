@@ -1123,7 +1123,8 @@ envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
     --mode wide \
     --note "형광등 2등, FOUP 정면, 1차 시도" --true-distance-mm 280      # 뒤 둘은 선택
 #   --mode : 후보를 얼마나 넓게 펼치나 (`--list-modes`). 기본 `default` = 9팔.
-#           `wide` = 18팔(정합·게이트·초기값·캐스케이드·select·edge) — **실물 초반 권장**
+#           `wide` = **23팔**(정합·게이트·초기값·캐스케이드·select·edge) — **실물 초반 권장**
+#                    ⚠️ `combo`(§38 실물 검증 체인)는 `wide` 에 안 들어간다 — `--mode wide,combo`
 #           `all`  = **34팔** (참조 스윕 + 실물 검증 COMBO. `--ism`·`--sam3-text` 자동)
 #                    `--text-prompt-flange` 를 주면 **36팔**(TF 경로, §37-9)
 #   --limit-frames N : 앞 N 장만 (새 설정을 처음 시험할 때)

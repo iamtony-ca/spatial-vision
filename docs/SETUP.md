@@ -434,13 +434,19 @@ envs/pose/bin/python tools/run_group_a.py \
 
 # ④′ 🔴🔴 **이게 실물에서 실제로 칠 한 줄이다 — 「후보를 전부 펼친다」 34팔 (+TF 면 36).**
 #    ★ `--ism`·`--sam3-text` 는 **`--mode all` 이 자동으로 켠다**(그 둘은 모드가 아니라 별도
-#      플래그라, 안 켜지면 경로 둘이 통째로 빠져 30 → 24 가 된다)
-#    ★ `--preset` 과 `--text-prompt` 를 **개체 몸체 색**에 함께 맞춘다 (아래 표)
+#      플래그라, 안 켜지면 경로 둘이 통째로 빠진다)
+#    🔴 **`--text-prompt-flange` 만은 자동으로 못 켠다**(값이 필요하다) — 안 주면 **TF 경로가
+#      빠지고** 러너가 경고한다. 34팔 → 주면 36팔 (§37-9)
+#    🔴 **낱말은 ⓪ 스윕에서 살아남은 것을 쓴다** — 아래는 «시작 후보» 일 뿐이다(§37-3·§37-4b).
+#      실사진 1위가 sim 검정에서 최악이었다(교훈 #92) → 반드시 배포할 사진에서 다시 고른다.
 envs/pose/bin/python tools/run_group_a.py \
     --in runs/real01 --out runs/real01_Aall --preset n30black \
-    --text-prompt "black plastic box" \
+    --text-prompt "boxy plastic object" --text-conf 0.10 \
+    --text-prompt-flange "black square bracket on top of the box" \
     --mode all \
     --note "형광등 2등, 0.28m, 전팔" --true-distance-mm 280
+#    → 실물 검증 COMBO(RP1·RP2·RP3·**RH1**, §38) + TF(TF1·TF3) + A/I/T + 정합·참조 축이
+#      **한 런에서 나란히** 나온다. 실측 소요: 10프레임 약 11분 (콜드 스타트 포함)
 
 # ⑤ 두 번째 런부터 — 설정 diff 를 먼저 내고 지표를 나란히 (누적 실험 노트)
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
@@ -502,7 +508,7 @@ SAM3 경로는 **텍스트뿐**이다(`RESULTS.md §38-1`). A그룹은 대조군
 ⚠️ **줄자 기준점은 `flange` 상면 중심**이다(pose 원점 규약). 몸체 바닥·받침대를 재면 344mm 급으로
 어긋나고 그건 «편향» 이 아니라 «다른 것을 쟀다» 다.
 ★ **`--mode`** — **후보 파이프라인을 얼마나 넓게 펼치나**(`--list-modes`). 기본 `default` = 9팔로
-지금까지와 같다. **`wide` = 18팔**(정합·게이트·초기값·캐스케이드·select·edge) 이 **실물 초반 권장**이고,
+지금까지와 같다. **`wide` = 23팔**(정합·게이트·초기값·캐스케이드·select·edge) 이 **실물 초반 권장**이고,
 **`all` = 34팔**(참조 거리대 스윕 + **실물 검증 COMBO** 포함 · `--ism`·`--sam3-text` 자동 — ④′), **`--text-prompt-flange` 를 주면 36팔**(TF 경로). `wide` = 23팔. 실측: 10프레임 `all`+TF **약 11분**(콜드 스타트 포함).
 ⚠️ **`all` 은 «구현된 모드 전부» 이지 «가능한 파이프라인 전부» 가 아니다** — 미구현 축(prompt·band·
 stereo·jitter)과 **hand-eye 가 필요한 넷**(P1 2단계 · P2 G9 · P3 5시점 융합 · P4 G9+G10)은 빠진다.

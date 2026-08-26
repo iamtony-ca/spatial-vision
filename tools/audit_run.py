@@ -68,6 +68,30 @@ def _in_root(root: Path, p: Path) -> Path:
     return q if q.exists() else p
 
 
+
+def _auto_polarity_match(root: Path, grp: list[str], cs: list[dict]) -> bool:
+    """`--polarity auto` 팔이 상대 팔의 **고정 극성으로 매 프레임 판정**됐는가.
+
+    ★ 이것만 다른 두 팔은 «설정은 다른데 실행된 것이 같다» — 배선 오류가 아니다.
+      검정 몸체에서는 `auto` 가 항상 `dark_out` 이라 `A1`↔`Ed` 가 늘 같아진다.
+    🔴 판정 근거는 **기록된 값**(`polarity_used`)이다 — 추측하지 않는다. 기록이 없으면 False
+      (모르면 «정상» 이라고 하지 않는다, 교훈 #22).
+    """
+    if len(grp) != 2 or len(cs) != 2:
+        return False
+    pol = [c.get("polarity") for c in cs]
+    # 그 둘 말고 다른 설정이 같아야 한다
+    if any(a.get(k) != b.get(k) for a, b in [tuple(cs)] for k in cs[0] if k != "polarity"):
+        return False
+    if "auto" not in pol or pol[0] == pol[1]:
+        return False
+    fixed = pol[1] if pol[0] == "auto" else pol[0]
+    vid = grp[0] if pol[0] == "auto" else grp[1]
+    fr = (_load(root / vid / "meta_contour.json") or {}).get("frames") or []
+    used = [f.get("polarity_used") for f in fr]
+    return bool(used) and all(u == fixed for u in used)
+
+
 def _rt(p: Path):
     j = _load(p)
     if not j or "R" not in j:
@@ -152,6 +176,9 @@ def check(root: Path) -> tuple[list[str], list[str]]:
         ms = [upstream_masks(v) for v in grp]
         if len(cs) == len(grp) and all(c == cs[0] for c in cs[1:]):
             benign.append((grp, "게이트 문턱만 다르다 — 그 구간에 프레임이 없으면 정상"))
+        elif _auto_polarity_match(root, grp, cs):
+            benign.append((grp, "한쪽이 `--polarity auto` 이고 **매 프레임 상대 팔의 고정값으로 판정**됐다 "
+                                "— 설정은 다르지만 실행된 것이 같다(검정 몸체에서 흔하다)"))
         elif (len({c.get("init") for c in cs}) == len(grp)          # 🔴 초기값이 서로 «달라야» 한다
               and all(x is not None for x in ms) and all(x == ms[0] for x in ms[1:])):
             # 초기값 FP 런이 서로 다른데 그 상류 **마스크 내용이 같다** → 선택 규칙이 같은 것을 골랐다.

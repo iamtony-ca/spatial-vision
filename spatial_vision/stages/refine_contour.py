@@ -391,8 +391,11 @@ def refine_one(gray_f, mesh, adj, adj_edges, T0, K, iters, search, min_grad,
         step = float(np.linalg.norm(Tn[:3, 3] - T[:3, 3]))
         T = Tn
         rms = float(np.sqrt(np.mean(np.einsum("ij,ij->i", project(P3, T, K) - q, n2) ** 2)))
+        # ★ `--polarity auto` 는 **프레임마다** 안/밖 밝기로 정해진다 — 무엇으로 정해졌는지 안
+        #   남기면 «설정이 다른데 결과가 같다» 를 나중에 설명할 수 없다(배선 감사 ①이 실제로 걸렸다:
+        #   `A1`(auto)과 `Ed`(dark_out)이 검정 몸체에서 매 프레임 같은 판정이라 결과가 동일했다).
         hist.append({"iter": it, "n_corr": int(len(P3)), "rms_px": round(rms, 4),
-                     "step_mm": round(step, 4)})
+                     "step_mm": round(step, 4), "polarity_used": pol})
         if step < 0.01:
             break
     return T, hist
@@ -538,7 +541,8 @@ def main(argv: list[str] | None = None) -> int:
                 pose_json(T, "contour_fullres(rejected)", {"iters": hist}), indent=2))
         rows.append({"frame": f.name, "n_corr": hist[-1]["n_corr"] if hist else 0,
                      "rms_px": hist[-1]["rms_px"] if hist else None, "moved_mm": moved,
-                     "moved_deg": round(moved_deg, 4), "gated": gated})
+                     "moved_deg": round(moved_deg, 4), "gated": gated,
+                     "polarity_used": hist[-1].get("polarity_used") if hist else None})
         # GT 가 있으면 **참 실루엣에서 잰 부호 있는 잔차**를 남긴다 — 정합기가 아니라
         # *관측 edge 자체*가 얼마나 밀려 있는지의 척도다 (sim 전용).
         T_gt = load_pose_mm(f / "pose_gt.json")

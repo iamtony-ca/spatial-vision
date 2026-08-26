@@ -127,8 +127,10 @@ STEREO_MODEL = "weights/ngc_foundationstereo/deployable_foundation_stereo_s_dyna
 MODES = {
     "quick":   {"arms": "0", "cost": "−40초 (더 싸다)",
                 "what": "정합 팔 전부 뺀다. A3·I3·T3 만 — 「끝까지 도는가」 + 분할 3종 비교"},
-    "default": {"arms": "4~6", "cost": "기준",
-                "what": "현행 배포 후보 — A1(배포본)·A2a·A2b·A4 (+I1 +T1)"},
+    "default": {"arms": "9", "cost": "기준",
+                "what": "A1·A2a·A2b·A4 + A3 (+`--ism` I1·I3 · `--sam3-text` T1·T3) = **9팔**. "
+                        "🔴 A1 은 **sim 배포본**이고 실물에서는 참조가 전부 실패했다(§38-1) — "
+                        "실물 기준선은 `combo` 의 RH1 이다"},
     "contour": {"arms": "+5~6", "cost": "+50~60초",
                 "what": "정합·게이트 축: 탐색폭 16/32px · 게이트 0/0.75/3.0° · `--fix-z` 반대쪽. "
                         "🔴 실물 «t 가 10mm 밀린다» 가 갈리는 축이고 FP 재계산이 없다"},
@@ -153,10 +155,11 @@ MODES = {
                 "what": "SAM3 **참조 거리대 스윕** (`--refs-sweep n30black,n40black,…`) + `--n-refs` 1/5. "
                         "🔴 참조는 거리 종속이라 틀리면 조용히 무너진다 — «실제 거리가 몇인가» 를 "
                         "데이터가 답하게 한다"},
-    "wide":    {"arms": "+13~14", "cost": "+3~4분",
-                "what": "= default + contour + init + cascade + select + edge. **실물 초반 권장**. "
-                        "⚠️ `refs` 는 뺀다(비용 자릿수가 다르고 초기값이 달라지는 비교라 성격이 다르다) "
-                        "— 필요하면 `--mode wide,refs`"},
+    "wide":    {"arms": "23 (총)", "cost": "+3~4분",
+                "what": "= default + contour + init + cascade + select + edge → **총 23팔**. "
+                        "**실물 초반 권장**. ⚠️ `refs`·`combo` 는 뺀다(refs 는 비용 자릿수가 다르고 "
+                        "초기값이 달라지는 비교, combo 는 §38 실물 체인이라 성격이 다르다) "
+                        "— 필요하면 `--mode wide,refs,combo`"},
     # ★★★ 유일하게 **실물에서 검증된** 구성이다 (사용자, 다른 PC · RESULTS §38).
     #     참조 기반 SAM3(A그룹)가 실물에서 **전부 실패**했고, 텍스트 마스크 + `--primary full` +
     #     **stage2 on** + 하이브리드(R=coarse·t=refined)가 «눈으로 오차가 분간 안 되는» 수준을 냈다.
@@ -165,9 +168,11 @@ MODES = {
                 "what": "**실물 검증 체인**: 텍스트 full 마스크 → `pose_fp --primary full` "
                         "(**stage2 on**) × `--input-scale 0.75/0.5` × `--flange-mask-proj hull` "
                         "+ 하이브리드. 🔴 `--sam3-text` 필요 · 0.75 는 `expandable_segments` 필요(§38-4)"},
-    "all":     {"arms": "전부", "cost": "+4~6분",
-                "what": "quick 을 뺀 전부 (refs 스윕 + combo 포함). ★ **`--ism`·`--sam3-text` 도 자동으로 켠다** "
-                        "— «all» 은 경로도 전부라는 뜻이다"},
+    "all":     {"arms": "34 (+TF 2)", "cost": "+4~6분",
+                "what": "quick 을 뺀 전부 (refs 스윕 + combo 포함) → **총 34팔**. "
+                        "★ **`--ism`·`--sam3-text` 도 자동으로 켠다** — «all» 은 경로도 전부라는 뜻이다. "
+                        "🔴 **`--text-prompt-flange` 는 값이 필요해 자동으로 못 켠다** — 주면 TF 경로가 "
+                        "붙어 **36팔**(안 주면 러너가 경고한다)"},
 }
 
 # 거리대 → SAM3 참조. 🔴 참조는 **거리 종속**이라 틀리면 IoU 가 조용히 무너진다(§34-6).
