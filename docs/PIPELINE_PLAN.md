@@ -18,7 +18,7 @@
 > 🔴 **위 거리는 옛 sim 기하(fx 952~1200 @1280×720)다.** ZED X 2.2mm 확정 후 현행은
 > **원거리 0.55~0.70m(접근 유도 전용) / 근접 0.22~0.30m(여기서 최종 pose가 나온다)** 이고,
 > **위치를 알면 원거리를 생략**한다. → `RESULTS.md §34-11`, `docs/CAMERAS.md`
-> 전제: 대상 obj 의 3D CAD 를 보유 (`assets/cad/foup_300mm/`).
+> 전제: 대상 obj 의 3D CAD 를 보유 (`assets/cad/300mm_foup/`). ⚠️ **`foup_300mm/` 은 삭제된 구 경로**다(§1.1) — 현행은 `300mm_foup/`.
 
 **이 문서는 계획·설계 의도**만 담는다. **측정된 결과·검증 수치는 [`RESULTS.md`](RESULTS.md) 가 정본**이다
 (수치를 두 곳에 적으면 갈라진다). 라이선스는 [`LICENSES.md`](LICENSES.md), 배경 요구사항은
@@ -171,7 +171,8 @@ spatial_manipulation_ws/src/
     │   │                           #   **group_stats**(프레임×변형 표·그래프·**신호등 traffic.png**) /
     │   │                           #   **scale_check**(실루엣 기반 거리 — `baseline` 비의존, 교훈 #89) /
     │   │                           #   **hybrid_pose**(R=coarse·t=refined 초기값 §27-7 — GT 불필요) /
-    │   │                           #   perturb_depth / perturb_image / depth_budget / verify_randomization
+    │   │                           #   perturb_depth / perturb_image / **perturb_mask**(부품 결손 주입 §37-6) /
+    │   │                           #   depth_budget / verify_randomization
     │   └── viz/                    # ✅ overlay_pose(GT 없이도 동작, `--combine` 겹치기 + mm 눈금자) /
     │                               #   **seg_compare**(분할 + 그 pose, 크롭 없음) / diag_sheet(6패널) /
     │                               #   ref_sheet(SAM3 참조) / dim_sheet(치수 도면) / render_mesh /
@@ -186,8 +187,15 @@ spatial_manipulation_ws/src/
     │   │                           #   + GT-free 리포트·진단시트·오버레이(겹치기 포함)·분할+pose 대조
     │   │                           #   · 신호등(stats/traffic.png)·통계·실루엣 거리·run_meta 까지 낸다
     │   │                           #   `--limit-frames N` 으로 앞 N 장만 (새 설정 시험용)
-    │   │                           #   ★ `--mode` 로 후보 폭을 정한다: default 9팔 / wide 18 /
-    │   │                             all 30(+참조 스윕, --ism·--sam3-text 자동). `--list-modes`
+    │   │                           #   ★ `--mode` 로 후보 폭을 정한다: default **9** / wide **23** /
+    │   │                             all **34**(참조 스윕 + **combo** = §38 실물 검증 체인,
+    │   │                             --ism·--sam3-text 자동). `--list-modes`
+    │   │                           #   ★ `--text-prompt-flange` 로 **TF 경로**(텍스트 flange →
+    │   │                             `--primary flange`, §37-9) 추가 → **36팔**
+    │   ├── sam3_prompt_sweep.py   # ✅ **SAM3 텍스트 프롬프트 스윕** — 모델 1회 로드로 이미지 ×
+    │   │                           #   프롬프트 전수. GT-free 지표 + **육안 시트**(perfect/matrix)
+    │   │                           #   `--prompts-json` 목록 교체 · `--rebuild-sheets` 추론 없이
+    │   │                           #   재생성 · `--instances` 후보를 하나씩 (§37-2)
     │   ├── compare_runs.py         # ✅ 런 N개 비교 (설정 diff 먼저 → 지표) + 누적 실험 노트
     │   ├── audit_run.py            # ✅ **배선 감사** — «어느 팔의 숫자가 다른 팔 것은 아닌가» 7항목
     │   │                           #   러너가 자동으로 돌려 `report.md` 「배선 감사」 절에 넣는다
@@ -454,6 +462,7 @@ USD 자체를 옮기지 않는 이유:
 | ~~R9~~ | ~~flange 마스크를 segmentation 으로 못 얻는다~~ | ✅ **철회(2026-08-07)** — 구 CAD 의 형상 오류였다. 신 SEMI CAD 에서 ISM 0.921 / SAM3 0.954, 오선택·미검출 0 (RESULTS § 신 CAD 전환) |
 | **R5** | **body 는 제조사별 상이 + 투명 재질 존재** | ⚠️ **측정 완료(2026-08-10) — 원래 대응 원칙이 기각됐다.** 원칙은 *"body 는 coarse 전용, 정밀 앵커는 표준부만"* 이었다. 실제로 재보니(`RESULTS.md §20`, 두 번째 실물 CAD 포함) **반대**다: 원거리 `full` **+ refine** 은 body 불일치를 흡수하고(δ=10 에서 40/40, 실측 CAD 로 t 1.23mm), **근접 flange 단독은 δ=2mm 부터 90°/180° 로 뒤집힌다**(δ=5 에서 26.7/40). 이유 — **표준부로 좁히면 비표준 면적과 함께 방향 신호도 줄기 때문**이다(flange 의 방향 정보는 표면의 3.5%·전부 경계). **refine 은 평행이동 편향은 고치지만 실패한 회전은 못 고친다.** 🔴 남은 문제는 **처방 충돌** — refine 을 CAD 불일치에는 켜야 하고 상관 depth 오차에는 꺼야 한다(R4). 어느 쪽이 지배적인지는 real 측정 대기. 후속 후보였던 **rim 밴드 정합**은 측정 후 **기각**(`RESULTS.md §21`) — 원거리 `full`+refine 은 **flange 중간부 불일치에도** δ=10 에서 40/40 이다 |
 | R6 | sim→real gap (depth bias, intrinsic 불일치) | ⚠️ **대폭 축소(2026-08-12)** — 실측 intrinsic 을 sim 이 **7자리로 재현**하고, rectified 를 소비하므로 **왜곡 축이 구조적으로 닫힌다**. 배경·재질(R15)·depth 노이즈·CAD 불일치·모션블러·AE 도 측정 완료. **남은 것은 실사진(실텍스처·실조명)뿐** |
+| 🔴🔴 **R16** | **sim 에서 만든 SAM3 exemplar 참조가 실물에서 쓸 수 없다** | 🔴 **확정(2026-08-26, 사용자 실물)** — 다른 PC 의 실물 데이터에서 **참조 기반 SAM3 가 전부 실패**했다(`RESULTS.md §38-1`). R14·R15 가 «참조는 배포 조건에 종속된다» 로 예고한 것의 **최종 형태**다 — sim 렌더는 실물의 배포 조건이 아니다. ★ **처방은 텍스트 프롬프트**(T·TF·COMBO 경로)이고, 낱말은 `tools/sam3_prompt_sweep.py` 로 **배포할 사진에서 고른다**(§37). A그룹은 이제 **배포 후보가 아니라 대조군**이다 |
 | **R15** | **외관 도메인 갭 (배경·재질)** | ⚠️ **측정 완료(2026-08-08)** — HDRI 14 + 바닥 텍스처 50 + 몸체 PBR(`top_flange` 고정) 하에서 **ISM 경로 40/40 유지**. **SAM3 exemplar 는 IoU 0.862 → 0.382 붕괴**하고, randomize 안 된 flange 에 달라붙는다(예측 픽셀 57%가 flange). **참조를 배포 조건에서 재생성하면 0.872 / 40/40 으로 회복**. → exemplar 자산은 배포 조건에 종속된다 |
 | **R7** | **ONNX(상업 경로) 고해상도 OOM** | ⚠️ **완화(2026-08-12)** — `--scale` 로 추론만 줄이고 disparity 는 원본 해상도로 복원한다. 1920×1200 은 `--scale 0.5` 로 운용 중(0.81s/frame). 🔴 그런데 **`--scale` 을 더 줄이면 중앙값은 멀쩡한데 R최대가 180° 로 터진다** → 속도용으로 쓰면 안 된다(`RESULTS.md §34-12c`). 타일 추론·TensorRT EP 는 여전히 미검증 |
 | **R18** | **FoundationPose 가 고해상도에서 OOM** | ✅ **해소(2026-08-12)** — 내부가 crop 을 **원본 크기로 되돌리며** 가설 수만큼 warp 해 메모리가 원본 픽셀 수에 비례한다(1920×1200 에서 31GB 초과). §22(crop→160×160 리샘플) 근거로 **`pose_fp --input-scale 0.5`** 를 넣었고 0.5 vs 0.75 결과가 구분 불가임을 확인 |

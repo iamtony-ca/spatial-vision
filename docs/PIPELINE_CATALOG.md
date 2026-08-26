@@ -1082,7 +1082,13 @@ A2~A4 대조군은 추가 촬영 0 이다 → §9.1★c.
 > → **hand-eye 가 존재하지 않는다** · **1 사이클 촬영 2회 이상은 후순위**.
 > P0~P9 트리(§9.1)는 로봇이 생긴 뒤의 전체 지도로 그대로 두고, **여기가 지금의 실행 목록**이다.
 
-#### (a) A그룹 — 근접 단독 = 배포 구성 [A] 그 자체
+#### (a) A그룹 — 근접 단독 = **sim** 배포 구성 [A]
+
+🔴🔴 **2026-08-26 정정 — A그룹은 실물에서 전부 실패했다**(§38-1). 아래 «배포본» 표기는 **sim GT
+기준**이고, 실물에서 실제로 통과한 것은 **COMBO**(텍스트 full · `--primary full` · stage2 on ·
+하이브리드, `--mode combo`)다. A 는 이제 **대조군**으로 읽는다 — 「A 가 무너지고 T·COMBO 가 살면
+원인은 «참조» 지 «SAM3» 가 아니다」를 가르는 자리다.
+
 
 **촬영 «한 벌»(근접 1장)이면 A1~A4 가 전부 오프라인 재계산으로 나온다. 플래그만 바꾼다.**
 
@@ -1118,7 +1124,8 @@ envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
     --note "형광등 2등, FOUP 정면, 1차 시도" --true-distance-mm 280      # 뒤 둘은 선택
 #   --mode : 후보를 얼마나 넓게 펼치나 (`--list-modes`). 기본 `default` = 9팔.
 #           `wide` = 18팔(정합·게이트·초기값·캐스케이드·select·edge) — **실물 초반 권장**
-#           `all`  = 30팔 (+ 참조 거리대 스윕. `--ism`·`--sam3-text` 도 자동으로 켠다)
+#           `all`  = **34팔** (참조 스윕 + 실물 검증 COMBO. `--ism`·`--sam3-text` 자동)
+#                    `--text-prompt-flange` 를 주면 **36팔**(TF 경로, §37-9)
 #   --limit-frames N : 앞 N 장만 (새 설정을 처음 시험할 때)
 # 여러 번 돌린 뒤 — 설정 diff 를 먼저 내고 지표를 나란히 놓는다
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
@@ -1147,7 +1154,7 @@ envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index
 
 | # | 후보 | 바뀌는 스위치 | sim 기준(ZED X 기하) | 촬영 | GT-free 판정 |
 |---|---|---|---|---|---|
-| **A1** | ★**배포본** | 근접 0.22~0.30m → SAM3 `flange` → `pose_fp --no-stage2 --input-scale 0.5` → `refine_contour --outer-only` → 게이트 1.5° | **R 0.273° / t 0.770 / 119-120 · 2.6s** | **1** | 기준선 |
+| **A1** | ★**sim 배포본** (실물 ❌ §38-1) | 근접 0.22~0.30m → SAM3 `flange` → `pose_fp --no-stage2 --input-scale 0.5` → `refine_contour --outer-only` → 게이트 1.5° | **R 0.273° / t 0.770 / 119-120 · 2.6s** | **1** | 기준선 |
 | **A2** | **홀 전략 3종** | `--outer-only`(P9) / `--keep-hole-mm 25`(P7) / `--hole-center-mm 25`(P8) | P9 0.241 / P7 0.294 (`r2`) | **0** | **후퇴율만 비교** — 셋 비슷(~20%)이면 P7, 홀 쓰는 것만 급증(>60%)이면 **P9** (§9.1f) |
 | **A3** | **정합 on/off** | `refine_contour` 생략 | ×1.66 이득 | **0** | **좌우 투영 \|Δdx\| 가 정합 후 줄어야 한다**(`eval.lr_consistency`). 늘면 **외곽 융기가 CAD 와 다르다** — §9.1★z ①의 실증이고 **게이트가 못 막는 축**이다. ⚠️ sim 의 «이득 배수» 는 GT 가 필요해 실물에선 못 쓴다 |
 | **A4** | **FP `refine` on/off** | `--no-stage2` 유무 | coarse 0.510 / refined 0.656 | **0** | 후퇴율 낮은 쪽 채택(§32 판정 절차). 급등 = CAD 불일치 |

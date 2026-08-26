@@ -227,7 +227,9 @@ def main(argv: list[str] | None = None) -> int:
     #      0.55m 원거리 crop 919px, 근접 flange crop 400px 이므로 0.5 배까지 안전하다.
     ap.add_argument("--input-scale", type=float, default=1.0,
                     help="FP 에 넣기 전 rgb/depth/mask 와 K 를 함께 축소한다(<1). "
-                         "출력 pose 는 3D 미터라 영향 없다. 1920×1200 은 0.5 필요(OOM)")
+                         "출력 pose 는 3D 미터라 영향 없다. 🔴 1920×1200 상한은 **0.75** — 단 "
+                         "`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 가 있어야 한다"
+                         "(env.sh 가 상설로 건다). 없으면 0.5. 1.0 은 불가 (RESULTS §38-4)")
     ap.add_argument("--mask-hub-r-mm", type=float, default=0.0,
                     help="밴드에 중심 홀 주변 원판을 더한다(build_rim_obj --hub-r-mm 과 같은 값)")
     args = ap.parse_args(argv)

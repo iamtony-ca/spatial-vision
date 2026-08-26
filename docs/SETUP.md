@@ -432,7 +432,7 @@ envs/pose/bin/python tools/run_group_a.py \
     --mode wide \
     --note "형광등 2등, 0.28m, 1차" --true-distance-mm 280
 
-# ④′ 🔴🔴 **이게 실물에서 실제로 칠 한 줄이다 — 「후보를 전부 펼친다」 30팔.**
+# ④′ 🔴🔴 **이게 실물에서 실제로 칠 한 줄이다 — 「후보를 전부 펼친다」 34팔 (+TF 면 36).**
 #    ★ `--ism`·`--sam3-text` 는 **`--mode all` 이 자동으로 켠다**(그 둘은 모드가 아니라 별도
 #      플래그라, 안 켜지면 경로 둘이 통째로 빠져 30 → 24 가 된다)
 #    ★ `--preset` 과 `--text-prompt` 를 **개체 몸체 색**에 함께 맞춘다 (아래 표)
@@ -473,7 +473,7 @@ SAM3 경로는 **텍스트뿐**이다(`RESULTS.md §38-1`). A그룹은 대조군
 
 **소요 (실측, RTX 5090 · 콜드 스타트 포함)** — 🔴 프레임 수보다 **모드**가 지배한다:
 
-| | 기본 `default` (9팔) | `--mode all` (30팔) |
+| | 기본 `default` (9팔) | `--mode all` (34팔·+TF 36) |
 |---|---|---|
 | **8프레임** (실물 운용 규모) | ~1.5분 | **~7분** |
 | 20프레임 | 5~6분 | **13.4분** (실측 799·804·816초, 3회) |
@@ -503,7 +503,7 @@ SAM3 경로는 **텍스트뿐**이다(`RESULTS.md §38-1`). A그룹은 대조군
 어긋나고 그건 «편향» 이 아니라 «다른 것을 쟀다» 다.
 ★ **`--mode`** — **후보 파이프라인을 얼마나 넓게 펼치나**(`--list-modes`). 기본 `default` = 9팔로
 지금까지와 같다. **`wide` = 18팔**(정합·게이트·초기값·캐스케이드·select·edge) 이 **실물 초반 권장**이고,
-**`all` = 30팔**(+ 참조 거리대 스윕 · `--ism`·`--sam3-text` 자동 — ④′)이다. 20프레임 기준 wide +3~4분 · all +4~6분.
+**`all` = 34팔**(참조 거리대 스윕 + **실물 검증 COMBO** 포함 · `--ism`·`--sam3-text` 자동 — ④′), **`--text-prompt-flange` 를 주면 36팔**(TF 경로). `wide` = 23팔. 실측: 10프레임 `all`+TF **약 11분**(콜드 스타트 포함).
 ⚠️ **`all` 은 «구현된 모드 전부» 이지 «가능한 파이프라인 전부» 가 아니다** — 미구현 축(prompt·band·
 stereo·jitter)과 **hand-eye 가 필요한 넷**(P1 2단계 · P2 G9 · P3 5시점 융합 · P4 G9+G10)은 빠진다.
 뒤의 넷은 `cam1_T_cam2` 가 있어야 성립하는데 로봇이 없으면 그 값이 **부정확한 게 아니라 존재하지 않는다.**
@@ -518,6 +518,8 @@ stereo·jitter)과 **hand-eye 가 필요한 넷**(P1 2단계 · P2 G9 · P3 5시
 | `--dry-run` | 무엇이 돌지 **명령만** 찍어 본다 |
 | `--stereo-scale` | ONNX 입력 배율. 🔴 기본 0.5 — 1280×720 초과에서 OOM(§34-12) |
 | `--text-select` | T그룹 인스턴스 선택 규칙(`center`/`score`). 🔴 `center` 는 «카메라가 타깃을 겨눈다» 는 씬 규약에 기댄다(교훈 #15) |
+| **`--text-prompt-flange`** | **TF 경로**를 켠다 — flange 를 **낱말로** 뽑아 `pose_fp --primary flange` (§37-9). 주면 `seg_txtf`·`fp_txtf`·`TF1`·`TF3` 이 생기고 `--sam3-text` 도 자동으로 켜진다. 🔴 `--mode all` 이라도 **이걸 안 주면 TF 가 빠진다**(값이 필요해 자동으로 못 켠다 — 러너가 경고한다) |
+| **`--text-conf-flange`** | TF 검출 임계값(기본 `0.15`). flange 는 작아 점수가 낮게 나오는 경향이 있다 — 미검출이면 내리되 **오버레이로 무엇을 집었는지 확인**한다 |
 | `--overlay-frames` / `--overlay-mask-alpha` / `--diag-all` | 시트에 넣을 프레임 수 / 마스크 투명도 / 진단 시트를 전 프레임에 |
 | `--refs-sweep` | `--mode refs` 가 돌 참조 프리셋 목록(쉼표). **안 주면 `--preset` 과 같은 외관의 모든 거리대**를 자동으로 잡는다. 🔴 없는 프리셋은 종료코드 2 로 거부 — 조용히 빠지면 «스윕했다고 믿는 반쪽 런» 이 된다 |
 | `--refs-sweep-nrefs` | `--mode refs` 에서 흔들 `--n-refs` 값(기본 `1,5`) |
@@ -572,7 +574,7 @@ stereo·jitter)과 **hand-eye 가 필요한 넷**(P1 2단계 · P2 G9 · P3 5시
 | **`bootstrap.sh` 가 Blender 받다 `HTTPError: 401 authenticationrequired`** | **사내망 프록시**가 가로챈 응답이다 — `download.blender.org` 는 인증이 없다 | **무시해도 된다.** `SKIP_BLENDER=1 bash envs/bootstrap.sh` → **§9.1** |
 | `uv venv` 가 에러로 멈춤 | uv 0.9+ 는 기존 venv 에서 멈춘다 | `bootstrap.sh` 가 `--allow-existing` 을 준다. 완전 재생성은 해당 디렉토리를 지우고 실행 |
 | `capture_sim` 이 실패했는데 종료코드 0 | Isaac 의 `fastShutdown` 이 `SystemExit` 을 삼킨다 | 이미 `os._exit(code)` 로 강제해 뒀다. 산출물 개수를 함께 확인할 것 |
-| FoundationPose OOM (1920×1200) | crop 을 원본 크기로 되돌리며 warp 한다 | **`pose_fp --input-scale 0.5` 필수** |
+| FoundationPose OOM (1920×1200) | crop 을 원본 크기로 되돌리며 warp 한다. **프레임마다 메모리가 쌓인다** — 앞 2장은 되고 뒤에서 죽는다 | `pose_fp --input-scale` **≤0.75** + **`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`**(`env.sh` 가 상설). 없으면 0.5 까지만. `1.0` 은 불가 (§38-4) |
 | ONNX stereo 가 1280×720 이상에서 OOM | Softmax 단일 버퍼 10.2GB | `--scale` 로 줄인다(1920×1200 은 0.5) |
 | 스테이지 1회 실행에 40초 | **콜드 스타트** — ONNX 세션 31.5s + FP 7.1s | 배포에서는 **상주 서버 + IPC** 가 필요하다(`RESULTS.md §34-12b`) |
 | **스테레오가 미칠 듯이 느리다 / `Failed to load library libonnxruntime_providers_cuda.so … libcublasLt.so.12`** | `source envs/env.sh` 를 안 했다 → `LD_LIBRARY_PATH` 에 `envs/cuda/lib64` 가 없어 ONNX 가 **조용히 CPU 로 폴백**한다(결과는 맞고 속도만 죽는다) | `source envs/env.sh` 먼저. `run_group_a.py` 는 이제 **종료코드 2 로 차단**한다(의도적이면 `--allow-cpu`) → 횡단 정리 #80 |
