@@ -9552,3 +9552,59 @@ sim 에서 이미 같은 결론이 있었다 — §37-5: *"프롬프트가 pose 
 - **실패 사유 분포**(`report.md`)를 보면 문턱 문제인지 프롬프트 문제인지 갈린다:
   `no detection` 위주 → `--confidence` · `area …` 위주 → `--full-area-min`(§39-2).
 
+
+## ★★★★ 39-18. 실물 2차 (**50cm**) — 통과 70/136. **81개의 부분집합이고 신규가 0 이다** (2026-08-28)
+
+같은 조건(`--confidence 0.05 --full-area-min 0.005`)으로 **50cm 촬영**에 136개를 다시 돌렸다.
+1차와 마찬가지로 **갈린 이미지 없음** — 갈리는 축은 «통과하느냐» 하나다.
+
+### 39-18a. ★ 통과 집합이 «중첩(nested)» 으로 줄었다
+
+**70개 전부가 1차 81개 안에 있고, 새로 올라온 것은 0 개**다(유지 70 · 탈락 11 · 신규 0).
+
+이건 우연이 아니면 **프롬프트의 통과 여부가 «하나의 잠재 축»(검출 견고성)으로 정렬돼 있다**는 뜻이다 —
+조건이 어려워지면 약한 것부터 순서대로 떨어진다(Guttman 척도꼴). 그래서:
+- ✅ **좁히기가 성립한다** — 라운드를 거듭해도 «이번엔 A 가 죽고 B 가 살아나는» 뒤집힘이 없다면
+  교집합을 계속 취해도 정보를 잃지 않는다.
+- 🔴 **다만 «신규 0» 은 «50cm 이 1차보다 어렵다» 는 뜻이기도 하다.** 1차 촬영 집합이 무엇이었는지에
+  따라 읽기가 달라진다 — 1차가 50cm 을 **포함**했다면 부분집합인 게 당연하고(더 많은 이미지 = 더 어렵다),
+  **포함하지 않았다면** 50cm 이 독립적으로 더 어려운 조건이라는 뜻이다. ⚠️ **이 구분은 기록해 둬야 한다.**
+- ⚠️ 그리고 **중첩은 두 라운드로 확인된 게 아니다** — 다음 라운드에서 «신규» 가 나오면 즉시 기각된다.
+
+### 39-18b. 1차 통과 → 50cm 탈락 11개
+
+
+- 웹 37위 · `f078` — `cube shaped sealed plastic wafer canister`
+- 웹 28위 · `f030` — `cube shaped sealed polycarbonate wafer pod`
+- 웹 87위 · `f106` — `substrate carrier, a cube shaped plastic case`
+- 웹 8위 · `f051` — `cube shaped sealed polymer wafer pod`
+- 웹 37위 · `f031` — `blocky semiconductor plastic wafer pod`
+- 웹 46위 · `f073` — `blocky sealed semiconductor plastic wafer pod`
+- 웹 64위 · `f117` — `boxy sealed plastic wafer container`
+- 웹 8위 · `f026` — `cube shaped sealed resin wafer pod`
+- 웹 112위 · `f071` — `blocky silicon plastic wafer pod`
+- 웹 107위 · `f072` — `cube shaped silicon plastic wafer pod`
+- 웹 108위 · `f134` — `plastic box with wafers inside`
+
+🔴 **웹 8.5위 둘(`cube shaped sealed polymer wafer pod` · `cube shaped sealed resin wafer pod`)이
+여기서 떨어졌다.** 웹 상위권이라고 안전하지 않다 — 재질어(`polymer`·`resin`·`polycarbonate`)를
+바꾼 변형이 **탈락 11개 중 3개**이고, `silicon` 계열이 2개다.
+§39-5 규칙 ⑫(*"재질어는 바꿔도 된다"*)는 **웹사진에서 낸 것**이고 실물에서는 그만큼 자유롭지 않다.
+⚠️ 버린 게 아니라 **대기**다 — 조건을 되돌리면 1순위 복귀 후보이고 `real_pass70_50cm.json` 의
+`_dropped_r1` 에 남겨 뒀다.
+
+### 39-18c. 웹 서열과의 관계는 1차와 같은 모양이다
+
+| 웹 237 순위 | 50cm 통과 |
+|---|---|
+| 1~20위 | 17/22 (77%) |
+| 21~40위 | 14/18 (78%) |
+| 41~68위 | 12/27 (44%) |
+| 69~100위 | 16/32 (50%) |
+| **101~136위** | **10/35 (29%)** |
+
+상위 40위 **31/40(78%)** ↔ 하위 36위 **29%**. 1차(90% ↔ 37%)보다 전체적으로 내려갔지만 **기울기는 같다.**
+★ `real-validated` 는 1차와 동일 — `boxy plastic object` ✅ / `front opening unified pod` ❌.
+
+→ **`assets/prompts/real_pass70_50cm.json`**. 다음 라운드는 이 파일을 `--prompts-json` 으로 준다.
+
