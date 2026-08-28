@@ -87,7 +87,7 @@ envs/seg_sam3/bin/python tools/sam3_prompt_sweep.py \
 |---|---|
 | `--confidence 0.05` | **낮게 두고 점수를 기록**한다. 임계값은 사후에 정하는 편이 낫다(§35-2m-2). 🔴 기본 0.15 로 두면 «맞는데 자신감만 낮은» 마스크가 «미검출» 로 사라진다 |
 | `--full-area-min 0.005` | 🔴 **기본 0.10 은 «흰 배경 · 물체가 화면의 46%» 인 사진 기준**이다. 클린룸·로드포트 전경처럼 배경이 있으면 **맞는 마스크를 떨어뜨린다**(§39-2). 실물 사진에서 FOUP 이 화면을 크게 채우면 0.05~0.10 으로 올려도 된다 — **먼저 0.005 로 돌리고 `report.md` 의 실패 사유 분포를 보고 정한다** |
-| `--prompts-json` | `assets/prompts/real_testset.json` = `full` 136 · `flange` 21. 🔴 **정렬은 237장 통합 서열**이고 slug 은 프롬프트에 붙박이다 |
+| `--prompts-json` | 🔴 **현행은 `assets/prompts/real_current.json` = 4개**(§39-30e): **A** `cube shaped sealed plastic wafer pod`(양쪽 1위) · **W** `plastic cube shaped sealed wafer pod`(웹 1위) · **B** `boxy sealed plastic wafer pod`(실물 3위) · **C** `a boxy plastic object`(🔴 **대조군** — 도메인어 없음, 성능 서열에 섞어 읽지 말 것). 넷이 **어순(A↔W)·형상어(A↔B)·도메인어(A·B↔C)** 세 축을 본다. 넓힐 때는 `real_final12`(12) → `real_pass37` → `real_pass58` → `real_testset`(136). ⚠️ **넓히는 이유는 «오선택 축을 열 때» 와 «개체·조명이 바뀔 때» 뿐**이다. slug 은 프롬프트에 붙박이라 파일이 바뀌어도 이름이 유지된다 |
 
 **예상**: 40장 × 136개 = 5,440 추론 ≈ **17분**(웹 실측 5,372 추론 = 986초). 산출물 **10~20GB**
 (오버레이 PNG 가 대부분). 🔴 디스크를 먼저 확인할 것 — `df -h`.

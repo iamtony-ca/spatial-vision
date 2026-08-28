@@ -1,0 +1,358 @@
+{
+ "_note": "🟢🟢 **현행 실험군 4개 — 이 파일을 `--prompts-json` / `--text-prompt` 의 출처로 쓴다.** (2026-08-28 사용자 확정: *\"앞으로는 4개의 프롬프트로 테스트한다\"*) 번호·이름이 붙은 다른 `real_*.json` 은 **이력 스냅샷**이다. 🔴 바꿀 때는 이 파일을 덮어쓰고 직전 상태를 이름 있는 파일로 남긴다.",
+ "_why": "프롬프트는 pose 를 거의 안 바꾼다(§37-5·§18·§37-6·§39-20) — 남는 값어치는 «검출» 뿐이고, **팔 수가 곧 선택 편향**이라(§35-2o-4, 팔 ≥8 경고) pose 실험은 3~4개가 상한이다. 12개 전체는 `real_final12.json`(=`real_current.json`)에 백업으로 남는다.",
+ "_axes": "★ 넷이 **세 축**을 동시에 본다 — **어순**(A↔W) · **형상어**(A↔B) · **도메인어**(A·B↔C). 🔴 셋 다 «표기 차이» 로 보이지만 실제로 마스크가 다르다: 웹 237장에서 A↔W 는 153/237, A↔B 는 130/237 만 동일하다(최소 IoU 0.000). ⚠️ 완전히 같은 것은 **대소문자뿐**이고 그건 이 넷에 없다(§39-13d).",
+ "_control": "🔴 `a boxy plastic object` 는 대조군이다 — 이게 무너지는 조건이 곧 도메인어의 값어치가 드러나는 조건이다(§39-25a).",
+ "_when_to_widen": "**오선택 축을 열 때**(여러 FOUP 이 함께 있는 장면 · 로드포트 전경)와 **개체·조명이 바뀔 때** 12개로 되돌아온다(§39-30b).",
+ "_lineage": "`real_current.json`(12) 에서 골랐다. 계보는 그 파일의 `_lineage`.",
+ "_target": "🔴 `--target full` 전용.",
+ "_count": "full 4개 · flange 21개 (원본 그대로, 미검증)",
+ "full": [
+  [
+   "f002",
+   "MS:shape",
+   "cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.977,
+    "rounds": [
+     "§37-14",
+     "§37-15",
+     "§37-16"
+    ],
+    "slug_orig": "ms1_cubeshaped",
+    "human_79": 77,
+    "rank_old": 2,
+    "ok158": 158,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 1,
+    "real_pos": {
+     "r1": 1,
+     "r2": 1,
+     "r3": 2
+    },
+    "web_rank_237": 2.5,
+    "web_ok237": 235,
+    "role": "A — 웹 2.5위·실물 1위. **양쪽 1위**이자 기준선"
+   }
+  ],
+  [
+   "f005",
+   "PL:plastic",
+   "plastic cube shaped sealed wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.973,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "pl2",
+    "human_79": 78,
+    "rank_old": 5,
+    "ok158": 158,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 14,
+    "real_pos": {
+     "r1": 12,
+     "r2": 19,
+     "r3": 13
+    },
+    "web_rank_237": 1.0,
+    "web_ok237": 236,
+    "role": "W — **웹 1위**(사람 판정 78/79, 최고). A 와 «어순» 만 다르다"
+   }
+  ],
+  [
+   "f007",
+   "M:adjfuse",
+   "boxy sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.957,
+    "rounds": [
+     "§37-13",
+     "§37-14",
+     "§37-15-1"
+    ],
+    "slug_orig": "m6_boxy_pod",
+    "human_79": 73,
+    "rank_old": 7,
+    "ok158": 157,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 3,
+    "real_pos": {
+     "r1": 6,
+     "r2": 5,
+     "r3": 4
+    },
+    "web_rank_237": 28.0,
+    "web_ok237": 230,
+    "role": "B — **실물 3위**. 형상어가 `boxy` 로 다르다"
+   }
+  ],
+  [
+   "f019",
+   "R:article",
+   "a boxy plastic object",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.895,
+    "rounds": [
+     "§37-13"
+    ],
+    "slug_orig": "r1_a_boxy",
+    "human_79": 71,
+    "rank_old": 19,
+    "ok158": 153,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 11,
+    "real_pos": {
+     "r1": 18,
+     "r2": 14,
+     "r3": 8
+    },
+    "web_rank_237": 70.0,
+    "web_ok237": 224,
+    "role": "C — 🔴 **대조군**. 도메인 낱말이 없다 (성능 서열에 섞지 말 것)"
+   }
+  ]
+ ],
+ "flange": [
+  [
+   "g001",
+   "AF:fuse",
+   "black square plastic handling flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.742,
+    "slug_orig": "af05"
+   }
+  ],
+  [
+   "g002",
+   "control",
+   "top mounting plate with a hole",
+   {
+    "origin": "real-validated",
+    "web": "9/9",
+    "score_min": 0.695,
+    "slug_orig": "c1_mounting"
+   }
+  ],
+  [
+   "g003",
+   "PF:material",
+   "plastic black square top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.648,
+    "slug_orig": "pf2_pre"
+   }
+  ],
+  [
+   "g004",
+   "HF:head",
+   "black square plastic top cover",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.621,
+    "slug_orig": "hf4_cover"
+   }
+  ],
+  [
+   "g005",
+   "control",
+   "black top flange on top of the plastic box",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.59,
+    "slug_orig": "c3_topflange"
+   }
+  ],
+  [
+   "g006",
+   "HF:head",
+   "black square plastic top cap",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.582,
+    "slug_orig": "hf5_cap"
+   }
+  ],
+  [
+   "g007",
+   "SF:shape",
+   "flat black plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.57,
+    "slug_orig": "sf2_flat"
+   }
+  ],
+  [
+   "g008",
+   "SF:shape",
+   "square black plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.535,
+    "slug_orig": "sf1_square"
+   }
+  ],
+  [
+   "g009",
+   "control",
+   "black square bracket on top",
+   {
+    "origin": "real-validated",
+    "web": "9/9",
+    "score_min": 0.531,
+    "slug_orig": "c2_bracket"
+   }
+  ],
+  [
+   "g010",
+   "PF:material",
+   "black square top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.531,
+    "slug_orig": "pf1_noplastic"
+   }
+  ],
+  [
+   "g011",
+   "NF:fuse+anchor",
+   "black square plastic top flange on top",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.498,
+    "slug_orig": "nf4"
+   }
+  ],
+  [
+   "g012",
+   "AF:fuse",
+   "black flat plastic top plate",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.455,
+    "slug_orig": "af09"
+   }
+  ],
+  [
+   "g013",
+   "HF:head",
+   "black square plastic top plate",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.342,
+    "slug_orig": "hf1_plate"
+   }
+  ],
+  [
+   "g014",
+   "AF:fuse",
+   "black square plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.264,
+    "slug_orig": "af03"
+   }
+  ],
+  [
+   "g015",
+   "NF:fuse+anchor",
+   "black square plastic top flange on top of the box",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.238,
+    "slug_orig": "nf3"
+   }
+  ],
+  [
+   "g016",
+   "PF:material",
+   "black plastic square top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.215,
+    "slug_orig": "pf3_mid"
+   }
+  ],
+  [
+   "g017",
+   "HF:head",
+   "black square plastic top bracket",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.183,
+    "slug_orig": "hf2_bracket"
+   }
+  ],
+  [
+   "g018",
+   "AF:fuse",
+   "flat black square plastic cover",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.175,
+    "slug_orig": "af08"
+   }
+  ],
+  [
+   "g019",
+   "HF:head",
+   "black square plastic top coupling",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.111,
+    "slug_orig": "hf7_coupling"
+   }
+  ],
+  [
+   "g020",
+   "HF:head",
+   "black square plastic top disc",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.067,
+    "slug_orig": "hf8_disc"
+   }
+  ],
+  [
+   "g021",
+   "SF:shape",
+   "rectangular black plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.051,
+    "slug_orig": "sf5_rect"
+   }
+  ]
+ ],
+ "_snapshot": "현재 내용 = `real_top4.json` (2026-08-28). 직전 = `real_final12.json`(12개, 백업)."
+}

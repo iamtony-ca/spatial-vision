@@ -1171,6 +1171,14 @@ envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index
 ★★★ **T 를 돌리기 전에 «낱말» 부터 고른다 — `tools/sam3_prompt_sweep.py`** (`RESULTS.md §37`).
 T 의 성능은 전적으로 프롬프트가 정하는데, 지금 쓰는 낱말은 **sim 검정 몸체에서 고른 것**이다.
 실사진 왼쪽 이미지만 모아 스윕을 먼저 돌린다 — **분할만이라 수십 초**이고 추가 촬영이 0 이다.
+
+> 🟢🟢 **2026-08-28 — 이 절차를 다 돌렸고 프롬프트 축은 닫혔다** (`RESULTS.md §39`).
+> 웹 237장 + 실물 3런(1차·50cm·28cm)으로 **136 → 81 → 70 → 58 → 12 → 4** 로 좁혔다.
+> **현행 4개는 `assets/prompts/real_current.json`** — `cube shaped sealed plastic wafer pod`(A, 양쪽 1위) ·
+> `plastic cube shaped sealed wafer pod`(W, 웹 1위) · `boxy sealed plastic wafer pod`(B, 실물 3위) ·
+> `a boxy plastic object`(C, 🔴 **대조군** — 도메인어 없음). 넷이 **어순·형상어·도메인어** 세 축을 본다.
+> **복붙 순서는 `docs/RUNBOOK_PROMPT_SWEEP.md`**, 서열 표는 `docs/PROMPT_RANKING.md`.
+> ⚠️ **다시 스윕을 도는 조건은 «오선택 축을 열 때»(다중 인스턴스·로드포트 전경)와 «개체·조명이 바뀔 때» 뿐**이다.
 - 🔴 **색 지정 프롬프트는 조건부다** — 제 색에서만 걸리고 아니면 **조용히 검출 0**.
   몸체 색을 모르거나 투톤이면 **무조건부 프롬프트**를 쓴다(§37-3).
 - 🔴 **약어는 안 통하고 풀어 쓰면 통한다.** 같은 규칙이 `flange` 프롬프트에도 성립한다(§37-3·§37-4).

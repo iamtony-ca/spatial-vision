@@ -14,7 +14,7 @@ from pathlib import Path
 SRC = Path("assets/prompts/real_testset.json")
 OUT = Path("docs/PROMPT_RANKING.md")
 
-HEAD = """# 실물 테스트 프롬프트 `full` — **237장 통합 서열**
+HEAD = """# 실물 테스트 프롬프트 `full` — **237장 통합 서열 + 실물 3런**
 
 > 이 파일은 **`assets/prompts/real_testset.json` 의 렌더링**이다. 수치의 정본은 그 JSON 의 메타이고,
 > 실험 경위·해석의 정본은 **`docs/RESULTS.md §39`** 다. 갱신은 `tools/prompt_ranking_md.py`.
@@ -36,8 +36,8 @@ HEAD = """# 실물 테스트 프롬프트 `full` — **237장 통합 서열**
 - **동점이 매우 많다** — 1~2위 차는 무의미하고 수십 위 규모만 읽는다.
   30~110위는 사실상 **평지**다(ok237 이 229→209 로 20장 차이인데 그 안에 78개가 들어 있다).
 - **slug(`f001`…)은 프롬프트에 붙박이라 순서대로가 아니다** — 마스크·라벨·군집이 slug 로 참조된다.
-- **웹사진 서열이다.** 실물(ZED X)에서 확인된 것은 `origin`이 `real-validated` 인 **2개뿐**이고
-  둘 다 **78위·87위**다 — 🔴 **상위 N 컷으로 자르면 그 둘이 잘린다**(§39-15).
+- **웹사진 서열이다.** 🔴 **상위 N 컷으로 자르면 안 된다**(§39-15·§39-21) — 실물 3런을 통과한 58개 중
+  **22개(38%)가 웹 60위 밖**이고, 실물 11·12위가 웹 70·93위다.
 """
 
 
@@ -49,18 +49,43 @@ def main() -> int:
 
     t = json.load(open(a.src))["full"]
     t = sorted(t, key=lambda x: (x[3]["rank_237"], -x[3]["human_79"]))
-    L = [HEAD, f"## 서열 ({len(t)}개)", "",
-         "| 순위 | 237 | 79장 | 158장 | score | 옛 | Δ | 실물 | slug | 프롬프트 |",
-         "|---:|---:|---:|---:|---:|---:|---:|:-:|---|---|"]
+
+    # ★ 실물 3런 결과를 열로 붙인다 — 「웹 순위」와 「실물 순위」는 **다른 것을 잰다**(§39-19a)
+    real = {}
+    p = Path("assets/prompts/real_pass58.json")
+    if p.exists():
+        real = {x[0]: x[3] for x in json.loads(p.read_text())["full"]}
+    cur = []
+    p = Path("assets/prompts/real_current.json")
+    if p.exists():
+        cur = [(x[2], x[3].get("role", "")) for x in json.loads(p.read_text())["full"]]
+
+    L = [HEAD]
+    if cur:
+        L += ["## 🟢 현행 실험군 — `assets/prompts/real_current.json`", "",
+              f"**{len(cur)}개.** pose 까지 돌리는 팔은 이것뿐이다. 넓히는 조건은 "
+              "«오선택 축을 열 때»·«개체·조명이 바뀔 때» 뿐(§39-30).", "",
+              "| 프롬프트 | 역할 |", "|---|---|"]
+        L += [f"| `{s}` | {r} |" for s, r in cur]
+        L += [""]
+    L += [f"## 서열 ({len(t)}개)", "",
+          "🔴 **`실물` 열은 웹 열과 다른 것을 잰다** — 웹은 «사람이 판정한 마스크 품질», "
+          "실물은 «전 이미지 통과 → `score` 최소값» 즉 **검출 여유**다. 실물에서는 갈린 이미지가 "
+          "0장이라 품질 축이 **측정되지 않았다**(§39-19a). 빈칸 = 실물 3런에서 **탈락**.", "",
+          "| 순위 | 237 | 79장 | 158장 | score | 옛 | Δ | **실물** | slug | 프롬프트 |",
+          "|---:|---:|---:|---:|---:|---:|---:|---:|---|---|"]
     for x in t:
         m = x[3]
         d = f"{m['delta']:+.0f}"
         d = f"**{d}**" if abs(m["delta"]) >= 30 else d
-        real = "★" if "real" in str(m.get("origin", "")) else ""
+        rr = real.get(x[0])
+        rcol = f"**{rr['real_rank']}**" if rr else "—"
         L.append(f"| {m['rank_237']:.0f} | **{m['ok237']}** | {m['human_79']}/79 | "
-                 f"{m['ok158']}/158 | {m['score_min']:.3f} | {m['rank_old']} | {d} | {real} | "
+                 f"{m['ok158']}/158 | {m['score_min']:.3f} | {m['rank_old']} | {d} | {rcol} | "
                  f"`{x[0]}` | `{x[2]}` |")
-    L += ["", "★ = 실물 ZED X 사진에서 사용자가 눈으로 확인한 것(`origin: real-validated`).", ""]
+    L += ["", f"**실물** = 실물 3런(1차·50cm·28cm) **전부 통과한 {len(real)}개**의 평균 순위. "
+              "빈칸은 어느 라운드에선가 떨어진 것 — 버린 게 아니라 **대기**다"
+              "(`real_pass58.json` 등의 `_dropped*`).", ""]
     Path(a.out).write_text("\n".join(L))
     print(f"→ {a.out}  ({len(t)}행)")
     return 0
