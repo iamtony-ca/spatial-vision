@@ -448,6 +448,20 @@ envs/pose/bin/python tools/run_group_a.py \
 #    → 실물 검증 COMBO(RP1·RP2·RP3·**RH1**, §38) + TF(TF1·TF3) + A/I/T + 정합·참조 축이
 #      **한 런에서 나란히** 나온다. 실측 소요: 10프레임 약 11분 (콜드 스타트 포함)
 
+# ④″ 🔴🔴 **sim 참조(exemplar)를 빼고 나머지 전부 — 실물 권장 (§38-8).**
+#    exemplar 는 실물에서 **전부 실패**했다(§38-1). 그런데 36팔 중 **26팔이 그 경로를 초기값으로**
+#    쓰므로 그냥 빼면 정합·게이트·엣지 축이 통째로 사라진다 → `--no-exemplar` 가 **옮긴다.**
+#    ★ 옮겨진 팔에는 **접미사**가 붙는다(`Cs16@T` …) — 다른 런의 같은 이름과 **바꿔 읽지 말 것**
+#    ★ `--preset` 이 필요 없다 (참조를 안 쓴다)
+envs/pose/bin/python tools/run_group_a.py \
+    --in runs/real01 --out runs/real01_Anoex \
+    --no-exemplar --mode all \
+    --text-prompt "boxy plastic object" --text-conf 0.10 \
+    --text-prompt-flange "black square bracket on top of the box" \
+    --note "참조 제외 · 전팔" --true-distance-mm 280
+#    → **23팔** (I·T·TF·COMBO + 정합 12종@T + IX1). 실측: 5프레임 4.1분
+#    ⚠️ exemplar 를 «대조군» 으로 한 번은 보고 싶으면 ④′ 를 따로 돌린다
+
 # ⑤ 두 번째 런부터 — 설정 diff 를 먼저 내고 지표를 나란히 (누적 실험 노트)
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
 ```

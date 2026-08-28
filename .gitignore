@@ -88,6 +88,13 @@ docs/semi/SEMI E47.1*
 docs/papers/
 docs/cam/
 
+# ── 웹에서 긁어 온 FOUP 사진 ──────────────────────────────────────────────────
+# 🔴 **재배포 권리가 없다** — 사내 프롬프트 스윕용 표본이고 전부 남의 저작물이다.
+#    출처 URL 은 manifest.json 에 남으므로 `tools/fetch_foup_images.py` 로 다시 받을 수 있다.
+#    (`assets/real_imgs/` 의 나머지 9장은 기존대로 남긴다 — 문서의 수치가 그 9장 기준이다.)
+assets/real_imgs/web/
+!assets/real_imgs/web/manifest.json
+
 # ── 릴리스 패키징 산출물 ──────────────────────────────────────────────────────
 # `envs/pack_assets.sh` 가 만드는 tarball. **GitHub Release 로 올리는 것이지 커밋하는 게 아니다**
 # — 커밋하면 정확히 그 스크립트가 피하려던 «히스토리에 영구히 쌓이는» 문제가 된다.

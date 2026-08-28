@@ -254,16 +254,37 @@ THR = {"moved_mm_warn": 10.0, "moved_mm_bad": 20.0, "moved_deg_bad": 10.0,
 
 
 def _rz(vals: list) -> np.ndarray:
-    """강건 z-score (중앙값·MAD). **런 자기 자신이 기준**이라 sim↔real 갭에 면역이다."""
+    """강건 z-score (중앙값·MAD). **런 자기 자신이 기준**이라 sim↔real 갭에 면역이다.
+
+    🔴 **MAD 가 0 이면 눈이 먼다** (2026-08-27 수정). 값의 **과반이 똑같으면** MAD=0 이 되어
+    나머지가 아무리 튀어도 전부 `z=0` 을 돌려줬다 — `n_corr`·`valid_frac` 처럼 값이 뭉치는
+    열에서 실제로 생긴다(«이상치가 없다» 가 아니라 «이상치를 못 본다» 다).
+    → MAD=0 이면 **IQR** 로 물러난다(값의 과반만 뭉친 흔한 경우가 여기서 회복된다).
+
+    🔴 **표준편차로는 물러나지 않는다.** 표본 std 기반 z 는 구조적으로 `(n−1)/√n` 을 못 넘어서
+    **n < 14 면 3.5 문턱에 원리적으로 도달할 수 없다**(n=7 이면 최대 2.27). 이상치가 스스로
+    std 를 부풀리는 masking 이다 — 우리 런은 5~40프레임이라 정확히 그 구간에 있다.
+
+    ★ MAD·IQR 이 **둘 다 0** = 핵심이 완전히 뭉쳤다 → «몇 σ» 가 정의되지 않는다. 이때는
+      **중앙값의 1% 를 1σ 로** 본다(상대 편차 규칙). 그러면 `[10]*6+[30]` 은 z=200 으로 잡히고
+      `[1.0]*4+[0.999]`(유효율 0.1% 차)는 z=0.1 로 안 잡힌다 — 3.5σ ≈ **중앙값의 3.5% 차이**다.
+      ⚠️ 중앙값이 0 인 열에서는 이 규칙이 무뎌진다(절대 하한 1.0 을 쓴다). 우리 지표엔 그런 열이 없다.
+    """
     v = np.array([np.nan if x is None else float(x) for x in vals], float)
     ok = np.isfinite(v)
     if ok.sum() < 3:
         return np.zeros_like(v)
     med = np.median(v[ok])
     mad = np.median(np.abs(v[ok] - med))
-    if mad <= 1e-9:
-        return np.where(ok, 0.0, 0.0)
-    return np.where(ok, 0.6745 * (v - med) / mad, 0.0)
+    scale = mad / 0.6745 if mad > 1e-9 else 0.0
+    if scale <= 0.0:                                    # ← MAD 축퇴. IQR 로 물러난다
+        q1, q3 = np.percentile(v[ok], [25, 75])
+        scale = (q3 - q1) / 1.349 if (q3 - q1) > 1e-9 else 0.0
+    if scale <= 0.0:                                    # ← 둘 다 축퇴. 상대 편차 규칙
+        if not np.any(np.abs(v[ok] - med) > 1e-12):
+            return np.zeros_like(v)                     # 진짜로 전부 같다 = 이상치 없음
+        scale = 0.01 * max(abs(med), 1.0)
+    return np.where(ok, (v - med) / scale, 0.0)
 
 
 def traffic(long_rows: list[dict], cap_rows: list[dict], variants: list[str]) -> dict:

@@ -177,11 +177,20 @@ def main(argv: list[str] | None = None) -> int:
         v = [abs(r[key]) for r in rows if key in r]
         return round(float(np.median(v)), 4) if v else None
 
+    # 🔴 **`n_frames` 는 «중앙값을 낸 프레임 수» 여야 한다** (2026-08-27 수정).
+    #    한쪽 대응점이 20 미만이면 그 프레임엔 `ddx_px` 가 없는데, 예전에는 행을 그대로 세어서
+    #    «20프레임 중앙값» 이라고 표시된 값이 실제로는 6프레임일 수 있었다. 중앙값 함수는
+    #    키 있는 행만 쓰므로 **표시된 n 과 실제 n 이 어긋난다** — 지표 자체보다 위험한 종류다.
+    n_done = sum(1 for r in rows if "ddx_px" in r)
+    bad = [r["frame"] for r in rows if "ddx_px" not in r]
     summary = {
         "stage": "lr_consistency",
         "pose": str(pdir / args.pose_name), "mesh": args.mesh,
         "outer_only": args.outer_only, "z_shift_mm": args.z_shift_mm,
-        "n_frames": len(rows),
+        "n_frames": n_done,                       # ★ 중앙값의 분모
+        "n_rows": len(rows),                      # 시도한 프레임 수
+        "n_incomplete": len(bad),                 # 한쪽 대응점 <20 이라 Δdx 를 못 낸 프레임
+        "incomplete_frames": bad[:20],
         "median": {k: med(k) for k in ("dx_L", "dy_L", "dx_R", "dy_R", "ddx_px", "ddy_px", "dz_mm")},
         # ★ 서열화에 쓸 값 — 부호가 섞여 상쇄되면 안 되므로 **절댓값의 중앙값**이다
         "abs_median": {k: absmed(k) for k in ("dx_R", "dy_R", "ddx_px", "dz_mm")},
@@ -191,8 +200,20 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     name = f"lr_consistency{'_' + args.tag if args.tag else ''}.json"
     (out_dir / name).write_text(json.dumps(summary, indent=2, ensure_ascii=False))
-    a = summary["abs_median"]
-    print(f"  → {out_dir / name}  |R 어긋남| {a['dx_R']}px  |Δdx| {a['ddx_px']}px  |dz| {a['dz_mm']}mm")
+    a, s = summary["abs_median"], summary["median"]
+    print(f"  → {out_dir / name}  n {n_done}/{len(rows)}  "
+          f"|R 어긋남| {a['dx_R']}px  |Δdx| {a['ddx_px']}px  |dz| {a['dz_mm']}mm")
+    # 🔴 **부호 있는 값을 같이 찍는다.** 절댓값만 보면 «한쪽으로 쏠린 편향» 이 안 보인다 —
+    #    실측: Z 를 −5mm 밀어도 |dz| 는 2.00 → 2.75 로 거의 안 변하는데 부호 있는 중앙값은
+    #    +0.84 → −1.45 로 갈린다. 계통 편향(캘리브레이션)은 정확히 이 축에 온다.
+    print(f"     부호 있는 중앙  Δdx {s['ddx_px']:+}px  dz {s['dz_mm']:+}mm"
+          + ("   ← 부호가 쏠렸다 = 계통 편향 의심"
+             if (s["ddx_px"] is not None and a["ddx_px"] and abs(s["ddx_px"]) > 0.7 * a["ddx_px"])
+             else ""))
+    if bad:
+        print(f"  ⚠️ 대응점 부족으로 Δdx 를 못 낸 프레임 {len(bad)}개: {', '.join(bad[:5])}"
+              + (" …" if len(bad) > 5 else "")
+              + "  — 중앙값의 분모는 이만큼 작다.")
     return 0
 
 

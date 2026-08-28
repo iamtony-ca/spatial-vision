@@ -1,0 +1,54 @@
+{
+  "_note": "4차 스윕 후보 — `full` 전용. 3차(§37-11)에서 **닻이 최대 지렛대**(42→75/90)로 드러났는데 정작 닻은 2개만 시험했다. 이번엔 **닻 축을 넓히고**, 미시험 문형(목적절·장문)을 연다.",
+  "_design": "① 닻 확장 5×5=25 (서술어는 3차에서 a0 성적이 갈린 것으로 골라 닻 효과가 보이게) ② 목적절 `for ~` 8 (완전 미시험 문형) ③ 장문 4 (길이 한계) ④ 대조군 2.",
+  "_key_control": "🔴 **`a7` = ` on a table` 이 이번 설계의 핵심 대조군이다.** 형상 정보가 **하나도 없는** 닻이라, a1~a6 의 이득이 «형상어를 붙여서» 인지 «문장이 길어지고 자연스러워져서» 인지 가른다. a7 이 a1 만큼 살리면 우리가 지금까지 «형상 닻» 이라 부른 것은 **문장 형태 효과**였던 것이다.",
+  "_limit": "🔴 3차와 같은 한계 — 9장이 전부 흰 배경 단일 물체라 **오선택은 못 잰다**. 검출 선별일 뿐이다.",
+  "full": [
+    ["c_boxy",              "control",                "boxy plastic object"],
+    ["c_sealed_a1",         "control",                "sealed wafer container, a boxy plastic object"],
+
+    ["d1_sealed__a3",       "D:sealed/A:a3plasticbox",   "sealed wafer container, a plastic box"],
+    ["d1_sealed__a4",       "D:sealed/A:a4cube",         "sealed wafer container, a cube shaped plastic case"],
+    ["d1_sealed__a5",       "D:sealed/A:a5handle",       "sealed wafer container, a square plastic box with a handle on the side"],
+    ["d1_sealed__a6",       "D:sealed/A:a6door",         "sealed wafer container, a sealed plastic box with a front door"],
+    ["d1_sealed__a7",       "D:sealed/A:a7table",        "sealed wafer container on a table"],
+
+    ["d2_fab__a3",          "D:fabcarrier/A:a3plasticbox", "semiconductor fab carrier, a plastic box"],
+    ["d2_fab__a4",          "D:fabcarrier/A:a4cube",       "semiconductor fab carrier, a cube shaped plastic case"],
+    ["d2_fab__a5",          "D:fabcarrier/A:a5handle",     "semiconductor fab carrier, a square plastic box with a handle on the side"],
+    ["d2_fab__a6",          "D:fabcarrier/A:a6door",       "semiconductor fab carrier, a sealed plastic box with a front door"],
+    ["d2_fab__a7",          "D:fabcarrier/A:a7table",      "semiconductor fab carrier on a table"],
+
+    ["d3_substrate__a3",    "D:substrate/A:a3plasticbox",  "substrate carrier, a plastic box"],
+    ["d3_substrate__a4",    "D:substrate/A:a4cube",        "substrate carrier, a cube shaped plastic case"],
+    ["d3_substrate__a5",    "D:substrate/A:a5handle",      "substrate carrier, a square plastic box with a handle on the side"],
+    ["d3_substrate__a6",    "D:substrate/A:a6door",        "substrate carrier, a sealed plastic box with a front door"],
+    ["d3_substrate__a7",    "D:substrate/A:a7table",       "substrate carrier on a table"],
+
+    ["d4_cleanroom__a3",    "D:cleanroom/A:a3plasticbox",  "cleanroom wafer container, a plastic box"],
+    ["d4_cleanroom__a4",    "D:cleanroom/A:a4cube",        "cleanroom wafer container, a cube shaped plastic case"],
+    ["d4_cleanroom__a5",    "D:cleanroom/A:a5handle",      "cleanroom wafer container, a square plastic box with a handle on the side"],
+    ["d4_cleanroom__a6",    "D:cleanroom/A:a6door",        "cleanroom wafer container, a sealed plastic box with a front door"],
+    ["d4_cleanroom__a7",    "D:cleanroom/A:a7table",       "cleanroom wafer container on a table"],
+
+    ["d5_transport__a3",    "D:transport/A:a3plasticbox",  "wafer transport container, a plastic box"],
+    ["d5_transport__a4",    "D:transport/A:a4cube",        "wafer transport container, a cube shaped plastic case"],
+    ["d5_transport__a5",    "D:transport/A:a5handle",      "wafer transport container, a square plastic box with a handle on the side"],
+    ["d5_transport__a6",    "D:transport/A:a6door",        "wafer transport container, a sealed plastic box with a front door"],
+    ["d5_transport__a7",    "D:transport/A:a7table",       "wafer transport container on a table"],
+
+    ["g1_for_si",           "G:purpose",              "plastic box for silicon wafers"],
+    ["g2_for_semi",         "G:purpose",              "plastic container for semiconductor wafers"],
+    ["g3_for_300mm",        "G:purpose",              "carrier for 300 mm silicon wafers"],
+    ["g4_for_carrying",     "G:purpose",              "boxy plastic object for carrying wafers"],
+    ["g5_for_seal_tr",      "G:purpose",              "sealed container for wafer transport"],
+    ["g6_for_storage",      "G:purpose",              "plastic pod for wafer storage"],
+    ["g7_for_cleanroom",    "G:purpose",              "box for carrying silicon wafers in a cleanroom"],
+    ["g8_used_to",          "G:purpose",              "container used to transport silicon wafers"],
+
+    ["h1_long_seal_door",   "H:long",                 "a sealed boxy plastic wafer carrier with a removable front door"],
+    ["h2_long_flange_door", "H:long",                 "a boxy plastic wafer carrier with a black flange on top and a door on the front"],
+    ["h3_long_that",        "H:long",                 "sealed plastic box that holds silicon wafers, with a door on the front and a flange on top"],
+    ["h4_long_fooup",       "H:long",                 "front opening unified pod, a sealed plastic wafer carrier with a black top flange"]
+  ]
+}

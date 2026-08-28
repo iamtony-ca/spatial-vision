@@ -1,0 +1,56 @@
+{
+  "_note": "5차 스윕 후보 — `full` 전용. 3·4차가 «닻(형상 동격절)이 최대 지렛대이고 맥락 닻은 무효» 를 밝혔다(§37-11·§37-12). 5차는 **아직 안 본 여섯 축**을 연다.",
+  "_axes": {
+    "S 어순": "지금까지 전부 `<도메인>, <형상>` 이었다. 뒤집으면? — 형상을 앞에 두고 도메인을 동격으로.",
+    "M 형용사 융합": "동격절을 쓰지 않고 **한 명사구 안에** 형상+도메인을 녹인다. 짧으면서 도메인 특이적일 수 있다.",
+    "K 닻 후보": "닻이 최대 지렛대인데 닻 자체는 «이미 검증된 형상어» 중에서만 골랐다. **닻으로 쓸 형상어를 새로 탐색**한다(단독 성능 측정).",
+    "R 관사": "`a` / `the` / 무관사. 완전 미시험 축이고 비용이 거의 0 이다.",
+    "X 배제·대비": "`not a cardboard box` 처럼 **다른 사물을 배제**하는 문형 — distractor 목적에 가장 직접적인데 한 번도 안 해봤다. SAM3 가 부정을 접지하는지 자체가 미지수다.",
+    "B 브랜드": "약어 규칙(`FOUP` 0/9)의 대조군. 제조사명이 붙으면 달라지나."
+  },
+  "_limit": "🔴 3·4차와 같다 — 9장이 전부 흰 배경 단일 물체라 **오선택은 못 잰다**. 검출 선별일 뿐이다. X축(배제 구문)조차 여기서는 «검출되는가» 만 볼 수 있다.",
+  "full": [
+    ["c_boxy",             "control",        "boxy plastic object"],
+    ["c_sealed_cube",      "control",        "sealed wafer container, a cube shaped plastic case"],
+
+    ["s1_cube_sealed",     "S:order",        "a cube shaped plastic case, a sealed wafer container"],
+    ["s2_cube_silicon",    "S:order",        "a cube shaped plastic case, a silicon wafer carrier"],
+    ["s3_cube_fab",        "S:order",        "a cube shaped plastic case, a semiconductor fab carrier"],
+    ["s4_cube_substrate",  "S:order",        "a cube shaped plastic case, a substrate carrier"],
+    ["s5_cube_cleanroom",  "S:order",        "a cube shaped plastic case, a cleanroom wafer container"],
+
+    ["m1_cube_wafer",      "M:adjfuse",      "cube shaped plastic wafer container"],
+    ["m2_sealed_cube",     "M:adjfuse",      "sealed cube shaped wafer carrier"],
+    ["m3_boxy_wafer",      "M:adjfuse",      "boxy plastic wafer carrier"],
+    ["m4_square_wafer",    "M:adjfuse",      "square plastic wafer carrier"],
+    ["m5_cubic_sealed",    "M:adjfuse",      "cubic sealed wafer container"],
+    ["m6_boxy_pod",        "M:adjfuse",      "boxy sealed plastic wafer pod"],
+    ["m7_cube_semi",       "M:adjfuse",      "cube shaped semiconductor wafer carrier"],
+    ["m8_boxy_substrate",  "M:adjfuse",      "boxy plastic substrate carrier"],
+
+    ["k1_cube_case",       "K:anchor",       "cube shaped case"],
+    ["k2_cubic_container", "K:anchor",       "cubic plastic container"],
+    ["k3_square_case",     "K:anchor",       "square plastic case"],
+    ["k4_boxy_container",  "K:anchor",       "boxy plastic container"],
+    ["k5_rect_case",       "K:anchor",       "rectangular plastic case"],
+    ["k6_blocky",          "K:anchor",       "blocky plastic object"],
+    ["k7_plastic_cube",    "K:anchor",       "plastic cube"],
+    ["k8_sixsided",        "K:anchor",       "six sided plastic box"],
+
+    ["r1_a_boxy",          "R:article",      "a boxy plastic object"],
+    ["r2_the_boxy",        "R:article",      "the boxy plastic object"],
+    ["r3_a_cube",          "R:article",      "a cube shaped plastic case"],
+    ["r4_the_cube",        "R:article",      "the cube shaped plastic case"],
+    ["r5_a_sealed",        "R:article",      "a sealed wafer container"],
+    ["r6_the_sealed",      "R:article",      "the sealed wafer container"],
+
+    ["x1_not_cardboard",   "X:contrast",     "plastic wafer carrier, not a cardboard box"],
+    ["x2_rather_crate",    "X:contrast",     "sealed plastic box rather than a crate"],
+    ["x3_only_carrier",    "X:contrast",     "only the plastic wafer carrier"],
+    ["x4_not_cabinet",     "X:contrast",     "plastic wafer carrier, not a metal cabinet"],
+
+    ["b1_entegris_foup",   "B:brand",        "Entegris FOUP"],
+    ["b2_a300",            "B:brand",        "A300 wafer carrier"],
+    ["b3_entegris_pod",    "B:brand",        "Entegris wafer carrier pod"]
+  ]
+}

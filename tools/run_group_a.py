@@ -328,12 +328,19 @@ def build_steps(a) -> list[Step]:
               "--in", a.in_dir, "--out", st, "--scale", a.stereo_scale,
               "--model", STEREO_MODEL],
              st, "meta_stereo.json", per_frame=True),
+    ]
+    # ── SAM3 exemplar (A그룹) — `--no-exemplar` 면 통째로 뺀다 ──────────────────────────
+    # 🔴 sim 참조는 실물에서 전부 실패했다(§38-1). 대조군으로 돌릴 값어치는 있지만 **필수가 아니다.**
+    if not a.no_exemplar:
+        steps += [
         Step("seg", f"segment flange (SAM3 exemplar, {refs_name})",
              [PY["sam3"], "-m", "spatial_vision.stages.segment_sam3",
               "--in", a.in_dir, "--out", seg, "--target", "flange",
               "--refs", refs, "--n-refs", a.n_refs, "--refs-mode", a.refs_mode]
              + (["--prompts-file", obj / "sam3_prompts.json"] if a.use_prompts_file else []),
              seg, "meta_segment_flange.json"),
+        ]
+    steps += [
         # 🔵 **진단 전용** — pose 에는 안 쓴다. 근접에서 `full` 을 뽑을 SAM3 참조가 없으므로
         #    사진 참조가 필요 없는 **ISM(CAD 템플릿)** 을 쓴다. 타깃 지정은 flange 마스크로 한다
         #    («동일 인스턴스가 여럿이면 시스템이 정해줘야 한다» — `--select center` 는 교훈 #15).
@@ -342,8 +349,14 @@ def build_steps(a) -> list[Step]:
               "--in", a.in_dir, "--out", o / "seg_full", "--target", "full",
               "--templates", obj / "ism_full", "--cad", obj / "full.ply",
               "--depth", "stereo", "--depth-dir", st,
-              "--select", "exemplar", "--exemplar-dir", seg],
+              # 🔴 `--select exemplar` 는 flange 마스크(=exemplar 산출물)로 타깃을 지목한다.
+              #    exemplar 를 안 돌리면 그게 없으므로 `score` 로 물러난다 — **조용히가 아니라 로그로**.
+              *(["--select", "exemplar", "--exemplar-dir", seg] if not a.no_exemplar
+                else ["--select", "score"])],
              o / "seg_full", "meta_segment_full.json", optional=True),
+    ]
+    if not a.no_exemplar:
+        steps += [
         Step("fp_ns2", "FoundationPose --no-stage2 (배포본 초기값)",
              [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
               "--in", a.in_dir, "--out", ns2, "--no-stage2"] + fp_common,
@@ -352,7 +365,7 @@ def build_steps(a) -> list[Step]:
              [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
               "--in", a.in_dir, "--out", s2] + fp_common,
              s2, "meta_pose.json"),
-    ]
+        ]
 
     # ── ISM 경로 (I그룹) — CAD 템플릿 단독, SAM3 비의존 ────────────────────────────────────────
     # 🔴 A그룹과 **한 군데도 공유하지 않는다**(stereo depth 만 공유). 분할도 pose 도 따로 간다.
@@ -480,7 +493,21 @@ def build_steps(a) -> list[Step]:
     #    → 정합·게이트 축은 사실상 공짜다. 여기부터 넓힌다.
     #
     # (id, 설명, 초기 pose 디렉토리, 초기 pose 파일명, 추가 플래그)
-    arms = [
+    # ── 정합·게이트·엣지 축의 «기준 경로» ────────────────────────────────────────────
+    # 🔴 이 축의 팔들은 전부 **같은 초기값** 위에 서야 한다 — 그래야 «정합 플래그만» 의 효과가 남는다.
+    #    기본은 `fp_ns2`(exemplar)인데, 실물에서는 그 경로가 죽는다(§38-1) → `--contour-base` 로 옮긴다.
+    #    ⚠️ 옮기면 **팔 이름에 접미사**를 붙인다: 다른 런의 같은 이름과 «바꿔 읽지 말라» 는 표시다(교훈 #88).
+    CBASE = {"ns2": (ns2, "pose_coarse.json", ""),
+             "txt": (o / "fp_txt", "pose_coarse.json", "@T"),
+             "txtf": (o / "fp_txtf", "pose_coarse.json", "@TF"),
+             "ism": (o / "fp_ism", "pose_coarse.json", "@I"),
+             "combo": (o / "fp_c075", "pose_refined.json", "@C")}
+    cb_dir, cb_name, cb_sfx = CBASE[a.contour_base]
+    if cb_sfx:
+        print(f"    ★ 정합 축 기준 경로 = **{cb_dir.name}/{cb_name}** → 팔 이름에 `{cb_sfx}` 를 붙인다",
+              flush=True)
+
+    arms = [] if a.no_exemplar else [
         ("A1", "홀 제외  --outer-only            ← 배포본 [A]/P9", ns2, "pose_coarse.json",
          ["--outer-only"]),
         ("A2a", "홀 윤곽  +--keep-hole-mm 25      (규격부/P7h)", ns2, "pose_coarse.json",
@@ -505,6 +532,17 @@ def build_steps(a) -> list[Step]:
     modes = set(a.mode)
     if "quick" in modes:                     # 「끝까지 도는가」 + 분할 3종만. 정합 팔 0
         arms = []
+
+    # ★ 정합·게이트·엣지 축은 **경로가 아니라 노브** 를 재는 팔이다 — 기준 경로 위로 옮긴다.
+    #   A1/I1/T1/TF1 은 «경로 자체» 가 정체성이라 **건드리지 않는다**.
+    CONTOUR_FAMILY = {"Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "Ccas",
+                      "Ed", "Eb", "Ea", "Eg3", "Eg05"}
+
+    def _rebase(arm):
+        sid, lbl, d, nm, fl = arm
+        if not cb_sfx or sid not in CONTOUR_FAMILY:
+            return arm
+        return (sid + cb_sfx, f"{lbl}  [{a.contour_base}]", cb_dir, cb_name, fl)
 
     # ── contour : 정합·게이트 축 (FP 재계산 0 · 팔당 5초) ───────────────────────────
     #    실물 초반에 **가장 값어치 있는 축**이다 — «t 가 10mm 밀린다» 는 여기서 갈린다.
@@ -535,7 +573,10 @@ def build_steps(a) -> list[Step]:
     # ── init : 초기값 축 (§27-7 — 회전은 coarse, 평행이동은 refined) ────────────────
     #    ★ **단일 시점 경로가 R 1.5배 좋아진다**(0.367 → 0.245). hand-eye·다중시점 불필요.
     #    ⚠️ clean 한정 — 오염이면 refined 가 붕괴한다(§26-4). §32 판정 절차가 그걸 걸러 준다.
-    if "init" in modes:
+    if "init" in modes and a.no_exemplar:
+        print("    ⚠️ `--no-exemplar` — `init`(H1) 은 exemplar 의 coarse+refined 가 필요해 뺀다. "
+              "같은 역할은 **COMBO 의 RH1**(`--mode combo`)이 한다(§38-7)", flush=True)
+    elif "init" in modes:
         hyb = o / "fp_hyb"
         steps.append(Step("fp_hyb", "하이브리드 초기값 (R=coarse · t=refined, §27-7)",
                           [PY["pose"], "-m", "spatial_vision.eval.hybrid_pose",
@@ -552,7 +593,7 @@ def build_steps(a) -> list[Step]:
     if "cascade" in modes:
         c1, c2 = o / "Ccas_s1", o / "Ccas_s2"
         for sid, pdir, pname, extra, outd in (
-                ("Ccas_s1", ns2, "pose_coarse.json", ["--search-px", "32", "--per-edge", "4"], c1),
+                ("Ccas_s1", cb_dir, cb_name, ["--search-px", "32", "--per-edge", "4"], c1),
                 ("Ccas_s2", c1, "pose_refined.json", ["--search-px", "12", "--per-edge", "4"], c2)):
             steps.append(Step(sid, f"캐스케이드 {sid[-2:]} (게이트 off)",
                               [PY["pose"], "-m", "spatial_vision.stages.refine_contour",
@@ -562,7 +603,7 @@ def build_steps(a) -> list[Step]:
                               outd, "meta_contour.json"))
         arms.append(("Ccas", "캐스케이드 32→12→8 (§35-2k-3)", c2, "pose_refined.json",
                      ["--outer-only", "--search-px", "8", "--per-edge", "8",
-                      "--gate-ref-dir", str(ns2), "--gate-ref-name", "pose_coarse.json"]))
+                      "--gate-ref-dir", str(cb_dir), "--gate-ref-name", cb_name]))
 
     # ── edge : 정합기가 **어느 밝기 경계를 잡는가** (FP 재계산 0 · 팔당 5초) ───────────
     #    🔴 **검정 몸체의 핵심 문제를 직접 겨냥한다.** §35-2i 에서 GT 초기값 검증으로 갈랐듯이,
@@ -649,6 +690,9 @@ def build_steps(a) -> list[Step]:
                           af, "meta_pose.json"))
         arms.append(("IX1", "ISM full · select exemplar + 정합 (I1 은 select score)",
                      af, "pose_coarse.json", ["--outer-only"]))
+    # ★ 스텝을 만들기 **전에** 기준 경로로 옮긴다 — 순서가 바뀌면 접미사가 안 붙는다.
+    arms = [_rebase(x) for x in arms]
+
     for sid, desc, pdir, pname, extra in arms:
         d = Path(a.out) / sid
         steps.append(Step(sid, desc,
@@ -660,7 +704,7 @@ def build_steps(a) -> list[Step]:
     # 좌우 투영 일관성 — 전부 **같은 잣대**(외곽 실루엣)로 채점한다
     # ⚠️ 정합 «전» 도 채점한다 — 이득 배수(정합 후/전)를 내려면 분모가 있어야 한다.
     #    A3 = SAM3 경로의 정합 전, I3 = ISM 경로의 정합 전. **경로마다 자기 분모를 쓴다.**
-    lr = [("A3", ns2, "pose_coarse.json")]
+    lr = [] if a.no_exemplar else [("A3", ns2, "pose_coarse.json")]
     if a.ism:
         lr.append(("I3", o / "fp_ism", "pose_coarse.json"))
     if a.sam3_text:
@@ -690,7 +734,7 @@ def build_steps(a) -> list[Step]:
     #    로 오진한 전례가 있다 → **실행 직전에 실제로 pose 를 낸 팔만** 넘긴다.
     #    ★ **FP 원본(coarse)도 경로마다 넣는다** — 정합 전/후를 한 시트에서 봐야 «정합이 무엇을
     #      했는가» 가 보인다. 예전에는 A 경로의 coarse 하나만 있었다.
-    ov_cands = [f"{ns2}:pose_coarse.json"] \
+    ov_cands = ([] if a.no_exemplar else [f"{ns2}:pose_coarse.json"]) \
         + ([f"{o / 'fp_ism'}:pose_coarse.json"] if a.ism else []) \
         + ([f"{o / 'fp_txt'}:pose_coarse.json"] if a.sam3_text else []) \
         + ([f"{o / 'fp_txtf'}:pose_coarse.json"] if a.text_prompt_flange else []) \
@@ -729,7 +773,7 @@ def build_steps(a) -> list[Step]:
     # ★★ **분할 겹쳐 비교** — 러너는 분할이 3~4종 동시에 돈다. 따로 보면 «어느 것이 엉뚱한 물체를
     #    집었나» 를 비교할 수 없다. 🔴 실물 50cm 에서 ISM 이 화면 가장자리의 작은 물체를 집었고
     #    (면적 0.64% · 이탈 0.56) 텍스트만 맞게 집은 사례가 있다 — 그 판정을 눈으로 하는 도구다.
-    seg_cands = [f"{seg}:mask_flange.png:A_exemplar_flange"] \
+    seg_cands = ([] if a.no_exemplar else [f"{seg}:mask_flange.png:A_exemplar_flange"]) \
         + ([f"{o / 'seg_ism'}:mask_full.png:I_ISM_full"] if a.ism else []) \
         + ([f"{o / 'seg_txt'}:mask_full.png:T_text_full"] if a.sam3_text else []) \
         + ([f"{o / 'seg_txtf'}:mask_flange.png:TF_text_flange"] if a.text_prompt_flange else []) \
@@ -738,7 +782,7 @@ def build_steps(a) -> list[Step]:
     #    «마스크부터 엉뚱한 걸 잡았다» 와 «마스크는 맞는데 pose 가 틀렸다» 가 안 갈린다.
     #    처방이 정반대(분할 재설정 vs depth·초기값·CAD)라 이 구분이 실물에서 제일 비싸다.
     #    🔴 크롭을 안 하는 시트라 **가장자리 오선택도 화면에 남는다** — 그게 이 도구의 존재 이유다.
-    segp_cands = [f"{ns2}:pose_coarse.json:A_pose"] \
+    segp_cands = ([] if a.no_exemplar else [f"{ns2}:pose_coarse.json:A_pose"]) \
         + ([f"{o / 'fp_ism'}:pose_coarse.json:I_pose"] if a.ism else []) \
         + ([f"{o / 'fp_txt'}:pose_coarse.json:T_pose"] if a.sam3_text else []) \
         + ([f"{o / 'fp_txtf'}:pose_coarse.json:TF_pose"] if a.text_prompt_flange else []) \
@@ -768,7 +812,11 @@ def build_steps(a) -> list[Step]:
                                "--seg-full", _live_seg([o / "seg_full", o / "seg_ism",
                                                         o / "seg_txt"],
                                                        "mask_full.png", o / "seg_full"),
-                               "--seg-flange", seg,
+                               # 🔴 exemplar 를 안 돌리면 `seg` 가 없다 → 텍스트 flange 로,
+                               #    그것도 없으면 `seg` 를 그대로 둔다(패널이 «없음» 으로 뜬다).
+                               "--seg-flange", _live_seg(
+                                   ([o / "seg"] if not a.no_exemplar else [])
+                                   + [o / "seg_txtf"], "mask_flange.png", seg),
                                "--depth-dir", st,
                                # fallback = FP 산출물. 정합 팔이 0 이어도 «FP 가 나왔나» 는 봐야 한다.
                                "--pose-dir", _live_pose_dir(
@@ -807,11 +855,11 @@ def build_steps(a) -> list[Step]:
     #    자기 디렉토리가 없어 통계 한 벌에서 통째로 빠져 있었다 — 「분석용 CSV 에 승자가 없는」
     #    상태였다. `--alias` 로 실제 pose 위치를 알려 준다.
     combo_on = "combo" in set(a.mode) and a.sam3_text
-    stat_ids = [sid for sid, *_ in arms] + ["A3"] \
+    stat_ids = [sid for sid, *_ in arms] + ([] if a.no_exemplar else ["A3"]) \
         + (["I3"] if a.ism else []) + (["T3"] if a.sam3_text else []) \
         + (["TF3"] if a.text_prompt_flange else []) \
         + (["RP1", "RP2", "RP3", "RH1"] if combo_on else [])
-    stat_alias = ["A3=fp_ns2:pose_coarse.json"] \
+    stat_alias = ([] if a.no_exemplar else ["A3=fp_ns2:pose_coarse.json"]) \
         + (["I3=fp_ism:pose_coarse.json"] if a.ism else []) \
         + (["T3=fp_txt:pose_coarse.json"] if a.sam3_text else []) \
         + (["TF3=fp_txtf:pose_coarse.json"] if a.text_prompt_flange else []) \
@@ -1729,7 +1777,18 @@ def next_steps(v: dict, diag: dict, a) -> list[str]:
        그건 이 목록에 없다 — **목록이 비었다고 «문제 없음» 이 아니다.**
     """
     med, out = diag.get("median", {}), []
-    a1, a3 = v.get("A1", {}), v.get("A3", {})
+    # 🔴 **«정합 후 / 정합 전» 짝을 하드코딩하지 않는다** (2026-08-27, 교훈 #88 재발 방지).
+    #    `--no-exemplar` 런에는 A1·A3 이 아예 없어서 아래 편향 경보 셋이 **통째로 꺼져 있었다**
+    #    — 경보가 «안 뜬 것» 과 «못 뜬 것» 이 구분되지 않는다. 살아 있는 짝을 고르고 이름을 밝힌다.
+    #    ⚠️ 짝은 **같은 경로 안에서** 골라야 한다(A1↔A3, T1↔T3 …). 경로를 섞으면 §22 유효
+    #    해상도가 달라 «정합 이득» 이 아니라 «메쉬 차이» 를 재게 된다.
+    PAIRS = [("A1", "A3"), ("T1", "T3"), ("I1", "I3"), ("TF1", "TF3")]
+    pair = next((p for p in PAIRS if v.get(p[0], {}).get("lr_ddx") is not None
+                 and v.get(p[1], {}).get("lr_ddx") is not None), None)
+    if pair is None:                       # 좌우 지표가 없으면 이름만이라도 살아 있는 쪽으로
+        pair = next((p for p in PAIRS if p[0] in v and p[1] in v), ("A1", "A3"))
+    a1, a3 = v.get(pair[0], {}), v.get(pair[1], {})
+    P = f"{pair[0]}↔{pair[1]}"
 
     if not a.true_distance_mm and med.get("z_mm"):
         out.append(("촬영 0 · 인자만", "`--true-distance-mm <줄자값>` 을 주고 `--report-only` 로 재리포트 — "
@@ -1748,14 +1807,24 @@ def next_steps(v: dict, diag: dict, a) -> list[str]:
                     "depth 패널을 본다. **열린 항목 #1**(반투명 본체 관통) 판정."))
     if a1.get("lr_ddx") is not None and a3.get("lr_ddx") is not None \
             and a1["lr_ddx"] > a3["lr_ddx"] * 1.1:
-        out.append(("촬영 0 · 육안", "정합이 좌우 일관성을 **악화**시켰다 — 실물 flange 최외곽에 "
+        out.append(("촬영 0 · 육안", f"정합이 좌우 일관성을 **악화**시켰다({P}) — 실물 flange 최외곽에 "
                     "**융기가 있는지 눈으로 확인**한다(§29 최악 축, 게이트가 못 막는다). "
                     "융기가 CAD 와 다르면 **정합을 끄는 편이 안전**하다."))
     sg = a1.get("lr_ddx_signed")
     if sg is not None and a1.get("lr_ddx") and abs(sg) > 0.7 * a1["lr_ddx"]:
-        out.append(("촬영 0 · 확인", f"좌우 Δdx 부호가 한쪽으로 쏠렸다({sg:+.2f}px) — **계통 편향**이다. "
+        out.append(("촬영 0 · 확인", f"[{pair[0]}] 좌우 Δdx 부호가 한쪽으로 쏠렸다({sg:+.2f}px) — **계통 편향**이다. "
                     "`cam.json` 의 `disto` 가 전부 0 인지(= rectified 인지), 해상도가 프로파일과 "
                     "같은지부터 확인한다. **게이트·refine 어느 것도 이 축을 못 고친다.**"))
+    # 🔴 **부호 있는 `dz` 를 따로 본다** (2026-08-27). 리포트가 `|dz|` 만 보여주면 «한쪽으로
+    #    쏠린 Z 편향» 이 안 보인다 — 실측: Z 를 −5mm 밀어도 `|dz|` 는 2.00 → 2.75 로 거의
+    #    안 변하는데 부호 있는 중앙은 +0.84 → −1.45 로 갈린다. 캘리브레이션 오류는 이 축에 온다.
+    #    ⚠️ 기준선 편향이 0 이 아니다(§35: 융기 라운드 때문) — **절대값이 아니라 «쏠렸는가» 로** 읽는다.
+    sz = a1.get("lr_dz_signed")
+    if sz is not None and a1.get("lr_dz") and abs(sz) > 0.7 * a1["lr_dz"] and abs(sz) >= 1.0:
+        out.append(("촬영 0 · 확인", f"[{pair[0]}] 좌우 일관성이 말하는 **Z 편향이 한쪽으로 쏠렸다**({sz:+.2f}mm) — "
+                    "`stats/distance.png` 의 4다리를 함께 본다. **실루엣만 갈라지면 `baseline`, "
+                    "셋이 붙고 줄자만 다르면 `fx`** 다(교훈 #89). 🔴 `fx` 오차는 실루엣으로도 "
+                    "못 잡는다 — 줄자(`--true-distance-mm`) 또는 §7.5c 상대 GT 뿐이다."))
     if diag.get("n_frames", 0) < 20:
         out.append(("촬영 1 (연속)", f"프레임 {diag.get('n_frames')}장 → **20~40장 연속 촬영**. "
                     "꼬리가 보이고(교훈 #58) **반복도**(sim 에 대응물 없는 지표)까지 공짜로 나온다."))
@@ -1853,28 +1922,43 @@ def report(a) -> int:
             a.true_distance_mm = float(prev["true_distance_mm"])
             print(f"    · 줄자 {a.true_distance_mm:.0f}mm 를 `run_meta.json` 에서 물려받았다 "
                   f"(`--true-distance-mm` 미지정)", flush=True)
-    diag = capture_diag(in_dir, root / "st", root / "seg", root / "fp_ns2")
-    ids = ["A1", "A2a", "A2b", "A4"] + (["I1"] if a.ism else []) \
-        + (["T1"] if a.sam3_text else [])
-    # ★ `--mode` 로 늘어난 팔은 **디스크에 실제로 있는 것만** 집는다 — 리포트만 다시 낼 때
-    #   (`--report-only`) 모드 인자를 안 줘도 그 런의 팔이 그대로 나온다.
-    ids += [k for k in ("Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "H1", "Ccas", "IX1",
-                        "TF1", "Ed", "Eb", "Ea", "Eg3", "Eg05")
-            if (root / k / "meta_contour.json").exists() and k not in ids]
+    # 🔴 `fp_ns2`(exemplar)를 박아 두면 `--no-exemplar` 런에서 **거리 다리 FP z 가 전부 빈다**
+    #    — 그림은 그려지는데 선이 하나 없어서 «독립 관측이 없다» 를 알아채기 어렵다(교훈 #88 의 형태).
+    #    살아 있는 pose 를 고르고 **무엇을 골랐는지 리포트에 적는다**(`capture_pose_dir`).
+    cap_pose = _live_pose_dir([root / d for d in ("fp_ns2", "fp_txt", "fp_ism", "fp_c075",
+                                                 "fp_txtf")], root / "fp_ns2")
+    cap_seg = _live_seg([root / "seg", root / "seg_txtf"], "mask_flange.png", root / "seg")
+    diag = capture_diag(in_dir, root / "st", Path(cap_seg), cap_pose)
+    # 🔴 **팔은 CLI 플래그가 아니라 «디스크» 로 판정한다** (2026-08-27, 교훈 #88 재발).
+    #    예전에는 `A1·A2a·A2b·A4` 가 **무조건** 들어가고 `I1`·`T1` 은 `--ism`·`--sam3-text`
+    #    **플래그가 있을 때만** 들어갔다. 그 결과 두 가지가 동시에 틀렸다:
+    #      ① `--no-exemplar` 런에서 **없는 A 팔 4개가 빈 행으로** 표에 찍힌다.
+    #      ② `--report-only` 는 그 플래그를 안 받으므로 **디스크에 있는 I·T 경로가 통째로 빠진다**
+    #         — 실측: 23팔로 돈 런이 리포트에는 **12팔**로 나왔다.
+    #    ②가 더 나쁘다. «없는 것» 이 아니라 «안 읽은 것» 인데 표에서 구분이 안 된다.
+    KNOWN = ("A1", "A2a", "A2b", "A4", "I1", "T1",
+             "Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "H1", "Ccas", "IX1",
+             "TF1", "Ed", "Eb", "Ea", "Eg3", "Eg05")
+    ids = [k for k in KNOWN if (root / k / "meta_contour.json").exists()]
+    # ★ `--contour-base` 로 **초기값을 옮긴** 팔은 이름에 접미사가 붙는다(`Cs16@T` 식).
+    #   정적 목록으로는 절대 안 잡히므로 디스크를 훑는다. 🔴 접미사를 무시하고 합치면 안 된다 —
+    #   초기값이 다른 팔을 같은 이름으로 비교하게 된다(교훈 #82·#88).
+    ids += sorted(d.name for d in root.iterdir()
+                  if d.is_dir() and "@" in d.name and d.name.split("@")[0] in KNOWN
+                  and (d / "meta_contour.json").exists() and d.name not in ids)
+    # ★ 캐스케이드 중간 단계(`Ccas_s1`·`Ccas_s2`)는 **최종 팔이 아니다** — 표에서 뺀다.
+    ids = [k for k in ids if not k.startswith("Ccas_s")]
     # ★ `refs` 스윕 팔은 이름이 런마다 다르다 — **디스크를 훑어** 집는다(정적 목록으로 못 적는다).
     ids += sorted(d.name for d in root.iterdir()
                   if d.is_dir() and (d.name.startswith("R_") or
                                      (d.name.startswith("Rn") and d.name[2:].isdigit()))
                   and (d / "meta_contour.json").exists() and d.name not in ids)
     v = {sid: read_variant(root, sid) for sid in ids}
-    v["A3"] = read_variant(root, "A3")                       # 정합 없음 — lr 만 있다
-    if a.ism:
-        v["I3"] = read_variant(root, "I3")                   # ISM 경로의 정합 전 (I1 의 분모)
-    if a.sam3_text:
-        v["T3"] = read_variant(root, "T3")                   # 텍스트 경로의 정합 전 (T1 의 분모)
-    # 🔴 TF 는 **디스크로 탐지**한다 — `--report-only` 는 `--text-prompt-flange` 없이 돌 수 있다.
-    if (root / "fp_txtf").exists():
-        v["TF3"] = read_variant(root, "TF3")                 # 텍스트 flange 경로의 정합 전
+    # 「정합 전」 팔들 — 자기 디렉토리가 없고 **`lr` 파일과 상류 FP 디렉토리로만** 존재를 안다.
+    # 이 셋이 각 경로의 «정합 이득» 분모다. 없으면 그 경로의 A3↔A1 식 비교가 성립하지 않는다.
+    for sid, src in (("A3", "fp_ns2"), ("I3", "fp_ism"), ("T3", "fp_txt"), ("TF3", "fp_txtf")):
+        if (root / src).exists() or (root / "lr" / f"lr_consistency_{sid}.json").exists():
+            v[sid] = read_variant(root, sid)
     # COMBO — 실물 검증 체인. 정합이 없어 자기 디렉토리가 없다(lr 만 있다).
     for k in ("RP1", "RP2", "RP3", "RH1"):
         if (root / "lr" / f"lr_consistency_{k}.json").exists():
@@ -2246,7 +2330,7 @@ def report(a) -> int:
          "true_distance_mm": a.true_distance_mm,
          # 🔴 «이 z 가 어느 경로에서 나왔나» 를 반드시 남긴다 — `scale_check` 는 다른 경로(`fp_ism`)의
          #    pose 를 쓸 수 있어서, 출처를 모르면 하류가 **두 경로의 z 를 빼는** 사고를 낸다(교훈 #26).
-         "capture_pose_dir": "fp_ns2",
+         "capture_pose_dir": cap_pose.name,
          "capture": diag, "variants": v}, indent=2, ensure_ascii=False),
         encoding="utf-8")
     # 그림 3종은 **「직접 분석할 것」 의 맨 앞**에 꽂는다 — 가장 먼저 볼 것이 가장 먼저 나와야 한다.
@@ -2314,6 +2398,20 @@ def main(argv: list[str] | None = None) -> int:
     # 🔴 기본값을 **비워 둔다.** 켜면 분할 1 + FP 1 스텝이 늘고(10프레임 ≈ 31초), 무엇보다
     #    `--primary flange` 는 마스크가 조금만 어긋나도 90° 로 뒤집혀(§32-1) **다른 팔과 성질이
     #    다른 실패**를 낸다. 값어치는 §22 의 t 3배인데, 그게 실제로 나오는지부터 확인해야 한다.
+    # 🔴🔴 sim 에서 만든 exemplar 참조는 **실물에서 전부 실패했다**(§38-1). 그런데 그 경로가
+    #    정합·게이트·엣지 축 전부의 **초기값**이라(36팔 중 26팔) 그냥 빼면 축이 통째로 사라진다.
+    #    → **빼는 게 아니라 옮긴다**: 참조 스텝을 건너뛰고 정합 축을 `--contour-base` 위에 세운다.
+    ap.add_argument("--no-exemplar", action="store_true",
+                    help="🔴 SAM3 **exemplar(sim 참조) 경로를 통째로 뺀다** — `seg`·`fp_ns2`·`fp_s2`·"
+                         "`fp_hyb` 스텝과 A1·A2a·A2b·A3·A4·H1 팔, `--mode refs` 가 사라진다. "
+                         "정합·게이트·엣지 축은 `--contour-base` 위로 옮겨지고 팔 이름에 접미사가 붙는다. "
+                         "`--preset` 도 필요 없어진다 (§38-1)")
+    ap.add_argument("--contour-base", default=None, choices=["ns2", "txt", "txtf", "ism", "combo"],
+                    help="정합·게이트·엣지 팔의 **초기값 경로**. 기본은 `ns2`(exemplar), "
+                         "`--no-exemplar` 면 `txt`. txt=텍스트 full · txtf=텍스트 flange · "
+                         "ism=CAD 템플릿 · combo=§38 실물 체인(stage2 on). "
+                         "🔴 `ns2` 가 아니면 팔 이름에 접미사가 붙는다 — 다른 런의 같은 이름과 "
+                         "**바꿔 읽지 말라는 표시**다(교훈 #88)")
     ap.add_argument("--text-prompt-flange", default=None,
                     help="TF그룹 프롬프트 (flange 를 낱말로). 주면 `seg_txtf`·`fp_txtf`·TF1·TF3 이 생긴다. "
                          "실사진 스윕 1순위: \"black top flange on top of the plastic box\" (RESULTS §37-4b). "
@@ -2406,6 +2504,22 @@ def main(argv: list[str] | None = None) -> int:
         print("    ⚠️ `--text-prompt-flange` 가 없어 **TF 경로(TF1·TF3)가 빠진다.** "
               "켜려면 예: --text-prompt-flange \"black square bracket on top of the box\" "
               "(RESULTS §37-9b — 프롬프트는 배포할 사진으로 다시 고를 것)")
+    if a.no_exemplar:
+        a.contour_base = a.contour_base or "txt"
+        if a.contour_base in ("txt", "combo"):
+            a.sam3_text = True
+        if a.contour_base == "txtf" and not a.text_prompt_flange:
+            print("    🔴 `--contour-base txtf` 인데 `--text-prompt-flange` 가 없다 — 그 경로가 "
+                  "안 만들어진다"); return 2
+        if a.contour_base == "ism":
+            a.ism = True
+        if a.contour_base == "combo":
+            a.mode = list(dict.fromkeys(a.mode + ["combo"]))
+        if "refs" in a.mode:
+            print("    ⚠️ `--no-exemplar` 이므로 `--mode refs`(참조 스윕)를 뺀다 — 참조가 대상이다")
+            a.mode = [m for m in a.mode if m != "refs"]
+    else:
+        a.contour_base = a.contour_base or "ns2"
     if a.text_prompt_flange and not a.sam3_text:
         # 🔴 조용히 무시하면 «돌렸는데 팔이 없다» 가 된다 — 켜 주고 이유를 말한다.
         a.sam3_text = True

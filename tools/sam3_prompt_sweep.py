@@ -129,6 +129,10 @@ C_OTH = (220, 220, 60)     # 나머지 인스턴스
 C_TXT = (255, 255, 255)
 
 
+# `--ref-full-slug` 기본값. 🔴 «주었는가» 를 판별해야 해서 상수로 뺀다 —
+#   `--rebuild-sheets` 는 참조를 재계산하지 못하므로 함께 주면 **막아야** 한다.
+PARSER_DEFAULT_REF = "s_boxy,d_fooup_long,s_cube"
+
 def sha8(p: Path) -> str:
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -208,6 +212,13 @@ def ref_metrics(m: np.ndarray, body: np.ndarray | None) -> dict:
             "rel_area": a / float(body.sum())}
 
 
+FULL_AREA = (0.10, 0.92)   # `full` 마스크 면적비 허용 구간. --full-area-min/max 로 바꾼다.
+# 🔴 기본값 0.10 은 **흰 배경 단일 물체 9장**(물체가 화면의 ~46%)에 맞춰 잡은 것이다.
+#    클린룸·로드포트 전경처럼 FOUP 이 화면의 1~8% 인 사진에서는 **맞게 집은 마스크를 떨어뜨린다**
+#    (웹 237장 예비 스윕에서 상위 프롬프트의 «실패» 7장이 전부 이 경우였다).
+#    → 배경이 있는 데이터에서는 하한을 낮춰야 한다. 문턱은 **데이터에 딸린 값**이다.
+
+
 def plausible(target: str, mt: dict, n_inst: int, rm: dict | None = None) -> tuple[bool, str]:
     """«눈으로 볼 값어치가 있는가» 를 거르는 **휴리스틱**. 순위가 아니라 필터다.
 
@@ -218,7 +229,7 @@ def plausible(target: str, mt: dict, n_inst: int, rm: dict | None = None) -> tup
     if n_inst == 0:
         return False, "no detection"
     if target == "full":
-        if not (0.10 <= mt["area_frac"] <= 0.92):
+        if not (FULL_AREA[0] <= mt["area_frac"] <= FULL_AREA[1]):
             return False, f"area {mt['area_frac']:.3f}"
         if mt["cc_main_frac"] < 0.80:
             return False, f"fragmented cc_main {mt['cc_main_frac']:.2f}"
@@ -321,6 +332,7 @@ def grid_sheet(cells: list[np.ndarray], ncol: int, cw: int, ch: int,
 
 # ── 본체 ────────────────────────────────────────────────────────────────────────
 def main(argv=None) -> int:
+    global FULL_AREA
     ap = argparse.ArgumentParser(description="SAM3 텍스트 프롬프트 스윕 (실사진)")
     ap.add_argument("--imgs", default="assets/real_imgs", help="이미지 디렉토리 또는 파일들")
     ap.add_argument("--out", required=True)
@@ -330,11 +342,16 @@ def main(argv=None) -> int:
                     help="낮게 두고 점수를 기록한다 — 임계값은 사후에 정하는 편이 낫다(§35-2m-2)")
     ap.add_argument("--select", default="score", choices=["score", "center", "largest"])
     ap.add_argument("--max-inst", type=int, default=12, help="오버레이에 그릴 인스턴스 상한")
-    ap.add_argument("--ref-full-slug", default="s_boxy,d_fooup_long,s_cube",
+    ap.add_argument("--ref-full-slug", default=PARSER_DEFAULT_REF,
                     help="flange 판정의 **물체 기준 프레임**으로 쓸 full 프롬프트 slug (쉼표, 합집합). "
                          "GT 가 아니라 대리 기준이다 — 이게 틀리면 flange 판정도 함께 틀린다. "
                          "여러 개를 합치는 이유는 프롬프트 하나가 상면을 빠뜨려도 다른 게 덮으라고")
     ap.add_argument("--limit-prompts", type=int, default=0, help="앞 N 개만 (시험용)")
+    ap.add_argument("--full-area-min", type=float, default=FULL_AREA[0],
+                    help="`full` 판정의 마스크 면적비 하한. 🔴 기본 0.10 은 흰 배경 단일 물체 "
+                         "기준이라 **배경이 있는 사진에서 맞는 마스크를 떨어뜨린다**")
+    ap.add_argument("--full-area-max", type=float, default=FULL_AREA[1],
+                    help="`full` 판정의 마스크 면적비 상한")
     ap.add_argument("--appearance", default=None,
                     help="몸체 외관 라벨 JSON {파일명|stem: black|orange|clear|twotone}. "
                          "기본은 이미지 디렉토리의 appearance.json")
@@ -352,7 +369,18 @@ def main(argv=None) -> int:
                          "시트 구성을 바꿀 때 60초짜리 재추론을 안 하려고 (모델도 안 올린다)")
     a = ap.parse_args(argv)
 
+    FULL_AREA = (a.full_area_min, a.full_area_max)
+
     if a.rebuild_sheets:
+        # 🔴 **`--rebuild-sheets` 는 판정을 재계산하지 않는다** — `results.json` 의 `ok`/`why` 를
+        #    그대로 다시 그릴 뿐이다. 그래서 `--ref-full-slug` 를 함께 주면 «참조를 고쳐 다시 냈다»
+        #    고 착각하게 된다(실제로 그렇게 적은 적이 있다). 조용히 무시하지 말고 **막는다.**
+        if a.ref_full_slug != PARSER_DEFAULT_REF:
+            print("🔴 `--rebuild-sheets` 는 **판정을 재계산하지 않는다** — `--ref-full-slug` 는 "
+                  "적용되지 않는다.\n"
+                  "   참조를 바꾸려면 **전체를 다시 돌려야 한다**(추론이 다시 필요하다). "
+                  "시트만 다시 그릴 것이면 `--ref-full-slug` 를 빼고 실행할 것.")
+            return 2
         return rebuild_sheets(Path(a.out))
 
     if a.instances:
@@ -362,7 +390,14 @@ def main(argv=None) -> int:
     if a.prompts_json:
         global PROMPTS
         raw = json.loads(Path(a.prompts_json).read_text())
-        PROMPTS = {k: [tuple(x) for x in v] for k, v in raw.items() if not k.startswith("_")}
+        # ★ 항목은 `[slug, 범주, 프롬프트]` 인데, 장부·실험군 파일은 **네 번째로 메타**(출처·score·
+        #   라운드)를 달고 다닌다. 앞 셋만 쓰고 **뒤는 버린다** — 메타 때문에 도구가 죽으면
+        #   «기록을 남기는 것» 과 «그 파일을 그대로 돌리는 것» 이 배타가 된다.
+        PROMPTS = {k: [tuple(x[:3]) for x in v] for k, v in raw.items() if not k.startswith("_")}
+        bad = {k: [x for x in v if len(x) < 3] for k, v in raw.items() if not k.startswith("_")}
+        if any(bad.values()):
+            print(f"   🔴 항목이 3개 미만인 것이 있다 {bad} — `[slug, 범주, 프롬프트]` 여야 한다")
+            return 2
         print(f"   프롬프트 목록 {a.prompts_json} → " +
               " · ".join(f"{k} {len(v)}개" for k, v in PROMPTS.items()))
 
@@ -372,8 +407,17 @@ def main(argv=None) -> int:
     (root / "sheets").mkdir(parents=True, exist_ok=True)
 
     p = Path(a.imgs)
-    exts = {".jpg", ".jpeg", ".png", ".bmp"}
+    exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
     imgs = sorted([q for q in p.iterdir() if q.suffix.lower() in exts]) if p.is_dir() else [p]
+    if p.is_dir():
+        # 🔴 «조용히 빠지는» 파일이 있으면 안 된다 — `.webp` 14장이 목록에 없어서 237장
+        #    스윕이 223장으로 돌았고 로그만 봐서는 알 수 없었다. 건너뛴 것은 반드시 센다.
+        skip = [q.name for q in p.iterdir()
+                if q.is_file() and q.suffix.lower() not in exts
+                and q.suffix.lower() not in {".json", ".md", ".txt", ".csv"}]
+        if skip:
+            print(f"   ⚠️ 이미지가 아니라고 판단해 건너뛴 파일 {len(skip)}개: "
+                  f"{sorted(skip)[:6]}{' …' if len(skip) > 6 else ''}")
     if not imgs:
         print(f"🔴 이미지가 없다: {a.imgs}")
         return 1
@@ -440,9 +484,23 @@ def main(argv=None) -> int:
     ref_full: dict[str, np.ndarray] = {}
     ref_slugs = {s.strip() for s in a.ref_full_slug.split(",") if s.strip()}
     known = {s for s, _, _ in PROMPTS["full"]}
-    if "flange" in targets and not (ref_slugs & known):
-        print(f"   🔴 `--ref-full-slug {a.ref_full_slug}` 중 아는 slug 이 없다 → "
-              "flange 판정이 약한 대체(이미지 기준 cy)로 떨어진다")
+    # 🔴 **«하나도 못 찾을 때만» 경고하면 안 된다** (2026-08-27 수정). 셋 중 하나만 매칭돼도
+    #    기준 프레임이 참조 한 장으로 만들어져 **flange 통과가 21 → 0 으로 무너졌다** —
+    #    그런데 경고가 없어서 «flange 프롬프트가 다 나빠졌다» 로 읽힐 뻔했다(§37-2 의 «3개 미만이면
+    #    약해진다» 가 조용히 발생한 것). **몇 개가 잡혔는지, 무엇이 못 잡혔는지** 항상 찍는다.
+    if "flange" in targets:
+        hit, miss = sorted(ref_slugs & known), sorted(ref_slugs - known)
+        if not hit:
+            print(f"   🔴🔴 `--ref-full-slug {a.ref_full_slug}` 중 **아는 slug 이 없다** → "
+                  "flange 판정이 약한 대체(이미지 기준 cy)로 떨어진다. 이 런의 flange 결과는 무효다.")
+        else:
+            mark = "🔴" if len(hit) < 3 else "   ·"
+            print(f"   {mark} flange 기준 `full` 참조 **{len(hit)}개** 잡힘 {hit}"
+                  + (f" · 못 잡음 {miss}" if miss else ""))
+            if len(hit) < 3:
+                print("      🔴 **3개 미만이면 물체 기준 프레임이 약해진다**(§37-2) — 참조 하나가 "
+                      "한 이미지에서 어긋나면 그 이미지의 flange 가 전부 탈락한다. "
+                      "`--ref-full-slug` 를 목록에 실제로 있는 slug 으로 고칠 것.")
 
     stems = []
     for ip in imgs:
@@ -462,9 +520,33 @@ def main(argv=None) -> int:
                 ts = time.time()
                 # ★ 프롬프트마다 set_image 를 다시 한다 — state 재사용은 프롬프트 간
                 #   오염 여부가 검증되지 않았다. 신뢰성 > 속도(이 스윕은 1회성이다).
-                with torch.autocast("cuda", dtype=torch.bfloat16):
-                    st = processor.set_image(pil)
-                    out = processor.set_text_prompt(state=st, prompt=prompt)
+                # 🔴 **큰 사진 한 장이 스윕 전체를 죽인다** (2026-08-28). SAM3 는 마스크를
+                #    «원본 해상도 × 제안 수» 로 내므로 6000×4000 짜리 웹사진에서
+                #    `_forward_grounding` 의 sigmoid 가 14.5GB 를 한 번에 잡고 OOM 이 난다
+                #    (79장 중 43번째에서 죽어 앞의 42장 결과가 results.json 없이 남았다).
+                #    → **그 프롬프트만 반으로 줄여 다시** 시도하고, 줄인 사실을 행에 남긴다.
+                #    전역 상한(`--max-side`)으로 하지 않는 이유는 **필요 없는 이미지까지
+                #    해상도가 바뀌어** 다른 런과 비교가 깨지기 때문이다.
+                shrink, out = 1.0, None
+                while True:
+                    try:
+                        pil_i = pil if shrink == 1.0 else pil.resize(
+                            (max(1, int(pil.width * shrink)), max(1, int(pil.height * shrink))),
+                            Image.BILINEAR)
+                        with torch.autocast("cuda", dtype=torch.bfloat16):
+                            st = processor.set_image(pil_i)
+                            out = processor.set_text_prompt(state=st, prompt=prompt)
+                        break
+                    except torch.OutOfMemoryError:
+                        torch.cuda.empty_cache()
+                        if shrink <= 0.25:
+                            print(f"   🔴 [{stem}] {slug} — 0.25배에서도 OOM, 이 칸은 «미검출» 로 "
+                                  "기록된다. 🔴 **그 프롬프트만 불리해지므로 서열에서 빼야 한다**")
+                            out = {"masks": None, "scores": None}
+                            break
+                        shrink *= 0.5
+                        print(f"   ⚠️ [{stem}] {slug} OOM → {shrink:.2f}배로 재시도 "
+                              f"({pil.width}x{pil.height})")
                 dt = time.time() - ts
                 t_inf += dt
                 n_done += 1
@@ -474,13 +556,14 @@ def main(argv=None) -> int:
 
                 rec = {"image": stem, "appearance": app[stem], "target": t, "slug": slug,
                        "category": cat, "prompt": prompt, "n_inst": n_inst,
-                       "img_w": W, "img_h": H, "sec": round(dt, 3)}
+                       "img_w": W, "img_h": H, "sec": round(dt, 3), "shrink": shrink}
 
                 if n_inst == 0:
                     rec.update({"score": 0.0, "score_max": 0.0, "area_frac": 0.0,
                                 "n_cc": 0, "cc_main_frac": 0.0, "solidity": 0.0,
                                 "bbox_fill": 0.0, "cx": 0.0, "cy": 0.0,
-                                "border_frac": 0.0, "ok": 0, "why": "no detection"})
+                                "border_frac": 0.0, "ok": 0,
+                                "why": "oom" if shrink <= 0.25 else "no detection"})
                     ovp = root / "ov" / stem / t / f"{slug}.png"
                     cv2.imwrite(str(ovp), banner(bgr, f"[{slug}] {prompt}", "검출 0 (no detection)"))
                     ov_cache[(t, stem, slug)] = ovp
@@ -493,6 +576,12 @@ def main(argv=None) -> int:
                 m = _np(masks)
                 m = m.squeeze(1) if m.ndim == 4 else m
                 m = m > 0.5 if m.dtype != bool else m
+                if m.shape[1:] != (H, W):
+                    # OOM 재시도로 줄여 넣은 경우 — **원본 해상도로 되돌린다**. 안 되돌리면
+                    # 저장 마스크 크기가 다른 칸과 달라져 IoU 비교·오버레이가 조용히 깨진다.
+                    m = np.stack([cv2.resize(x.astype(np.uint8), (W, H),
+                                             interpolation=cv2.INTER_NEAREST).astype(bool)
+                                  for x in m])
                 s = _np(scores).reshape(-1)
                 k = select_index(m, s, a.select, 0.3)
 
@@ -523,7 +612,13 @@ def main(argv=None) -> int:
                                                    a.max_inst))
                 ov_cache[(t, stem, slug)] = ovp
 
-        print(f"   [{stem}] 누적 {n_done} 추론 · {time.time() - t0:.0f}s")
+        torch.cuda.empty_cache()      # 이미지마다 비운다 — 해상도가 제각각이라 파편화가 쌓인다
+        # 🔴 **끝에 한 번만 쓰면 안 된다** — OOM 으로 43번째에서 죽었을 때 앞의 42장이
+        #    `results.json` 없이 마스크만 남아 지표(score·area·why)가 통째로 날아갔다.
+        #    `fetch_foup_images.py` 의 manifest 와 **같은 함정**이다. 이미지마다 쓴다.
+        (root / "results_partial.json").write_text(
+            json.dumps({"meta": {"partial": True, "images_done": len(stems)}, "rows": rows}))
+        print(f"   [{stem}] 누적 {n_done} 추론 · {time.time() - t0:.0f}s", flush=True)
 
     perf, cons = make_sheets(root, rows, stems, targets, ov_cache)
     fl_ref = flange_coverage(root, rows, stems, perf) if "flange" in targets else None
@@ -532,6 +627,7 @@ def main(argv=None) -> int:
     write_csv(root, rows)
 
     meta = {"note": a.note, "confidence": a.confidence, "select": a.select,
+            "full_area": list(FULL_AREA),
             "appearance_src": ap_src, "ref_full_slug": a.ref_full_slug,
             "flange_ref_slug": fl_ref,
             "images": [{"file": str(q), "key": name[q], "appearance": app[name[q]],
