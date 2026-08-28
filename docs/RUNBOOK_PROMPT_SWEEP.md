@@ -117,6 +117,35 @@ envs/pose/bin/python tools/prompt_sweep_diff.py rank \
     --md-out docs/PROMPT_RANKING_real.md
 ```
 
+### 3c. 🔴 「갈린 이미지가 0장」이면 — 판정할 게 없다. **다른 축을 본다**
+
+실물 1차에서 실제로 이랬다: **갈린 이미지 0장 · 전 이미지 통과 83/136**.
+즉 **검출만 되면 어느 프롬프트든 같은 마스크**를 내고, 갈리는 것은 **«검출·판정을 통과하느냐» 하나**다.
+(sim 에서도 같은 결론이었다 — §37-5: *"갈리는 것은 검출률뿐인데 그게 곧 KPI 다"*.)
+
+이때 ②③은 돌릴 값이 없고, 대신:
+
+```bash
+# 전 이미지 통과한 것의 slug 만 txt 로  (기본 출력 = <run>/pass_slugs_full.txt)
+envs/pose/bin/python tools/prompt_sweep_diff.py slugs --run runs/psweep_real01
+# 프롬프트·통과수·score 까지 같이:            --with-prompt
+# 다음 라운드에 그대로 먹일 부분집합 json:      --json-out assets/prompts/real_pass83.json
+# 문턱을 낮춰 더 넓게:                        --min-pass 38
+```
+
+- 🔴 **도구를 못 당겨왔으면 파일명만으로도 된다** — `sheets/perfect/` 의 이름에 slug 이 들어 있다:
+  ```bash
+  ls runs/psweep_real01/sheets/perfect/ | sed -n 's/^full__[0-9]*__\(f[0-9]*\)\.png$/\1/p' > slugs.txt
+  ```
+  (위 CLI 와 **완전히 같은 목록**임을 기존 런에서 확인했다.)
+- ★ 그다음 좁히는 축은 **`score` 최소값 = «미검출까지의 여유»** 다. 통과 수가 같으면 이걸로 고르고,
+  **고른 값이 곧 `--text-conf` 의 근거**가 된다. 🔴 단 **품질 순위로 읽지 말 것**(교훈 #90·#100).
+- 🔴 **«전 이미지 통과» 는 «맞다» 가 아니다** — 형상 휴리스틱만 본 것이고, 웹 실측에서 그런 프롬프트가
+  사람 기준 **92위**였다(§39-11d). **`sheets/perfect__full.png` 를 눈으로 봐서 «다 같이 틀린» 게
+  아닌지** 확인하는 절차가 여기서는 유일한 방어다.
+- ⚠️ 통과 못 한 것들의 **실패 사유 분포**를 `report.md` 에서 본다. `no detection` 이 대부분이면
+  `--confidence` 문제이고, `area …` 가 대부분이면 `--full-area-min` 이 데이터와 안 맞는 것이다(§39-2).
+
 - **`사람`**(판정한 이미지) 과 **`합의`**(나머지 이미지에서 «자기를 뺀 나머지의 과반과 합의하는가») 를
   **따로** 낸다. 🔴 **자가 다르다 — 어긋나면 `사람` 을 믿는다.**
 - `--combine human` 이면 사람 라벨만으로 매긴다.

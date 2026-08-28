@@ -1,0 +1,1955 @@
+{
+ "_note": "🟢 **실물 ZED X 사진에서 «전 이미지 통과» 한 81개**만 남긴 실험군 (2026-08-28, 다른 PC 실행). 실물 이미지를 바꿔 가며 **점점 좁히는** 용도다 — 이 파일을 `--prompts-json` 으로 그대로 쓴다.",
+ "_source": "`sam3_prompt_sweep.py --target full --prompts-json assets/prompts/real_testset.json --confidence 0.05 --full-area-min 0.005` (실물 1차). 🔴 그 런에서 **갈린 이미지가 0장**이었다 — 검출만 되면 마스크가 같고, 갈리는 축은 «통과하느냐» 하나다(§39-17).",
+ "_status": "🔴 **«전 이미지 통과» 는 «맞다» 가 아니다** — 형상 휴리스틱(면적·연결성·볼록성·경계)만 본 것이다. 웹 실측에서 그런 프롬프트가 사람 판정 92위였다(§39-11d). 마스크가 전부 같으므로 **«다 같이 틀렸을» 가능성**이 남고, 그건 `sheets/perfect__full.png` 육안으로만 본다.",
+ "_order": "실물 스윕의 출력 순서 그대로 = 통과 수 → `score` 최소값 내림차순. 🔴 **서열이 아니다** — `score` 는 «품질» 이 아니라 «미검출까지의 여유» 이고 그래서 **`--text-conf` 를 정하는 근거**로만 쓴다(교훈 #90·#100). 웹 서열은 `web_rank_237`·`web_ok237`·`human_79` 로 각 항목에 남겨 뒀다.",
+ "_narrowing": "좁히는 법: 사진을 바꿔 다시 돌리고 **이 파일을 `--prompts-json` 으로** 준다. 그다음 `tools/prompt_sweep_diff.py slugs --run <새런> --json-out <더좁힌.json>`. ★ 갈린 이미지가 생기면 그때부터는 `sheets`→`check`→`rank` 로 **육안 서열**을 낸다.",
+ "_target": "🔴 `--target full` 전용으로 만들었다. `flange` 는 원본에서 그대로 옮겨 놓았을 뿐 실물 통과와 무관하고, 쓰려면 `--ref-full-slug` 에 이 파일의 `full` slug 을 3개 준다(예 `f002,f005,f012`).",
+ "_count": "full 81개 (실물 통과) · flange 21개 (원본 그대로, 미검증)",
+ "full": [
+  [
+   "f002",
+   "MS:shape",
+   "cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.977,
+    "rounds": [
+     "§37-14",
+     "§37-15",
+     "§37-16"
+    ],
+    "slug_orig": "ms1_cubeshaped",
+    "human_79": 77,
+    "rank_old": 2,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 1,
+    "web_rank_237": 2.5,
+    "web_ok237": 235
+   }
+  ],
+  [
+   "f004",
+   "TY:ortho",
+   "CUBE SHAPED SEALED PLASTIC WAFER POD",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.977,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "ty3_allcaps",
+    "human_79": 77,
+    "rank_old": 4,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 2,
+    "web_rank_237": 2.5,
+    "web_ok237": 235
+   }
+  ],
+  [
+   "f010",
+   "R:article",
+   "a cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.953,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "r1",
+    "human_79": 74,
+    "rank_old": 10,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 3,
+    "web_rank_237": 20.0,
+    "web_ok237": 231
+   }
+  ],
+  [
+   "f014",
+   "R:article",
+   "the cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.934,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "r2",
+    "human_79": 73,
+    "rank_old": 14,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 4,
+    "web_rank_237": 28.0,
+    "web_ok237": 230
+   }
+  ],
+  [
+   "f070",
+   "CL:color",
+   "black cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.42,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "cl1_black",
+    "human_79": 76,
+    "rank_old": 70,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 5,
+    "web_rank_237": 5.0,
+    "web_ok237": 234
+   }
+  ],
+  [
+   "f007",
+   "M:adjfuse",
+   "boxy sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.957,
+    "rounds": [
+     "§37-13",
+     "§37-14",
+     "§37-15-1"
+    ],
+    "slug_orig": "m6_boxy_pod",
+    "human_79": 73,
+    "rank_old": 7,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 6,
+    "web_rank_237": 28.0,
+    "web_ok237": 230
+   }
+  ],
+  [
+   "f008",
+   "Q:orthography",
+   "Boxy sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.957,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "q1_capital",
+    "human_79": 73,
+    "rank_old": 8,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 7,
+    "web_rank_237": 28.0,
+    "web_ok237": 230
+   }
+  ],
+  [
+   "f022",
+   "SZ:size",
+   "large cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.887,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "sz1_large",
+    "human_79": 74,
+    "rank_old": 22,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 8,
+    "web_rank_237": 14.0,
+    "web_ok237": 232
+   }
+  ],
+  [
+   "f009",
+   "Q:orthography",
+   "boxy sealed plastic wafer pod.",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.957,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "q3_period",
+    "human_79": 73,
+    "rank_old": 9,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 9,
+    "web_rank_237": 28.0,
+    "web_ok237": 230
+   }
+  ],
+  [
+   "f013",
+   "P:context",
+   "boxy sealed plastic wafer pod on a table",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.934,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "p4_on_table",
+    "human_79": 71,
+    "rank_old": 13,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 10,
+    "web_rank_237": 46.0,
+    "web_ok237": 228
+   }
+  ],
+  [
+   "f057",
+   "S:order",
+   "a cube shaped plastic case, a semiconductor fab carrier",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.586,
+    "rounds": [
+     "§37-13"
+    ],
+    "slug_orig": "s3_cube_fab",
+    "human_79": 66,
+    "rank_old": 57,
+    "ok158": 153,
+    "real_pass": "all",
+    "real_pass_order": 11,
+    "web_rank_237": 87.0,
+    "web_ok237": 219
+   }
+  ],
+  [
+   "f005",
+   "PL:plastic",
+   "plastic cube shaped sealed wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.973,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "pl2",
+    "human_79": 78,
+    "rank_old": 5,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 12,
+    "web_rank_237": 1.0,
+    "web_ok237": 236
+   }
+  ],
+  [
+   "f040",
+   "D2:stack",
+   "cube shaped sealed silicon plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.781,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "d23",
+    "human_79": 71,
+    "rank_old": 40,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 13,
+    "web_rank_237": 37.0,
+    "web_ok237": 229
+   }
+  ],
+  [
+   "f029",
+   "MH2:head",
+   "cube shaped sealed plastic wafer magazine",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.852,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mh23_magazine",
+    "human_79": 76,
+    "rank_old": 29,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 14,
+    "web_rank_237": 5.0,
+    "web_ok237": 234
+   }
+  ],
+  [
+   "f001",
+   "B2:brand",
+   "Entegris cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.988,
+    "rounds": [
+     "§37-15",
+     "§37-16"
+    ],
+    "slug_orig": "b21",
+    "human_79": 70,
+    "rank_old": 1,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 15,
+    "web_rank_237": 46.0,
+    "web_ok237": 228
+   }
+  ],
+  [
+   "f017",
+   "R:article",
+   "the boxy plastic object",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.914,
+    "rounds": [
+     "§37-13",
+     "§37-14"
+    ],
+    "slug_orig": "r2_the_boxy",
+    "human_79": 65,
+    "rank_old": 17,
+    "ok158": 152,
+    "real_pass": "all",
+    "real_pass_order": 16,
+    "web_rank_237": 93.0,
+    "web_ok237": 217
+   }
+  ],
+  [
+   "f050",
+   "D2:stack",
+   "cube shaped sealed semiconductor plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.684,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "d21",
+    "human_79": 75,
+    "rank_old": 50,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 17,
+    "web_rank_237": 8.5,
+    "web_ok237": 233
+   }
+  ],
+  [
+   "f019",
+   "R:article",
+   "a boxy plastic object",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.895,
+    "rounds": [
+     "§37-13"
+    ],
+    "slug_orig": "r1_a_boxy",
+    "human_79": 71,
+    "rank_old": 19,
+    "ok158": 153,
+    "real_pass": "all",
+    "real_pass_order": 18,
+    "web_rank_237": 70.0,
+    "web_ok237": 224
+   }
+  ],
+  [
+   "f018",
+   "S2:shape",
+   "cube like sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.914,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "s23",
+    "human_79": 73,
+    "rank_old": 18,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 19,
+    "web_rank_237": 20.0,
+    "web_ok237": 231
+   }
+  ],
+  [
+   "f104",
+   "S:order",
+   "a cube shaped plastic case, a substrate carrier",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.183,
+    "rounds": [
+     "§37-13"
+    ],
+    "slug_orig": "s4_cube_substrate",
+    "human_79": 45,
+    "rank_old": 104,
+    "ok158": 136,
+    "real_pass": "all",
+    "real_pass_order": 20,
+    "web_rank_237": 130.0,
+    "web_ok237": 181
+   }
+  ],
+  [
+   "f012",
+   "PL:plastic",
+   "cube shaped plastic sealed wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.949,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "pl3",
+    "human_79": 77,
+    "rank_old": 12,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 21,
+    "web_rank_237": 5.0,
+    "web_ok237": 234
+   }
+  ],
+  [
+   "f023",
+   "C:grid/boxy.semi.case",
+   "boxy semiconductor plastic wafer case",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.875,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "c11",
+    "human_79": 66,
+    "rank_old": 23,
+    "ok158": 152,
+    "real_pass": "all",
+    "real_pass_order": 22,
+    "web_rank_237": 90.5,
+    "web_ok237": 218
+   }
+  ],
+  [
+   "f006",
+   "S2:shape",
+   "box shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.969,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "s22",
+    "human_79": 73,
+    "rank_old": 6,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 23,
+    "web_rank_237": 28.0,
+    "web_ok237": 230
+   }
+  ],
+  [
+   "f065",
+   "W:noun",
+   "cube shaped sealed plastic silicon wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.469,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "w2",
+    "human_79": 70,
+    "rank_old": 65,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 24,
+    "web_rank_237": 54.5,
+    "web_ok237": 227
+   }
+  ],
+  [
+   "f111",
+   "B:brand",
+   "Entegris FOUP wafer carrier",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.151,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "b6_ent_foup_wc",
+    "human_79": 56,
+    "rank_old": 111,
+    "ok158": 155,
+    "real_pass": "all",
+    "real_pass_order": 25,
+    "web_rank_237": 105.0,
+    "web_ok237": 211
+   }
+  ],
+  [
+   "f003",
+   "MS:shape",
+   "blocky sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.977,
+    "rounds": [
+     "§37-14",
+     "§37-15"
+    ],
+    "slug_orig": "ms3_blocky",
+    "human_79": 76,
+    "rank_old": 3,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 26,
+    "web_rank_237": 14.0,
+    "web_ok237": 232
+   }
+  ],
+  [
+   "f034",
+   "R:article",
+   "the boxy sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.824,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "r2_the_pod",
+    "human_79": 73,
+    "rank_old": 34,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 27,
+    "web_rank_237": 28.0,
+    "web_ok237": 230
+   }
+  ],
+  [
+   "f036",
+   "TY:ortho",
+   "cube-shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.82,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "ty4_hyphen",
+    "human_79": 71,
+    "rank_old": 36,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 28,
+    "web_rank_237": 37.0,
+    "web_ok237": 229
+   }
+  ],
+  [
+   "f011",
+   "TY:ortho",
+   "cubeshaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.953,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "ty2_nospace",
+    "human_79": 75,
+    "rank_old": 11,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 29,
+    "web_rank_237": 8.5,
+    "web_ok237": 233
+   }
+  ],
+  [
+   "f099",
+   "MH2:head",
+   "cube shaped sealed plastic wafer crate",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.204,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mh25_crate",
+    "human_79": 72,
+    "rank_old": 99,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 30,
+    "web_rank_237": 37.0,
+    "web_ok237": 229
+   }
+  ],
+  [
+   "f043",
+   "C:grid/cube.semi.pod",
+   "cube shaped semiconductor plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.742,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "c01",
+    "human_79": 76,
+    "rank_old": 43,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 31,
+    "web_rank_237": 14.0,
+    "web_ok237": 232
+   }
+  ],
+  [
+   "f066",
+   "MH2:head",
+   "cube shaped sealed plastic wafer shell",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.469,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mh28_shell",
+    "human_79": 61,
+    "rank_old": 66,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 32,
+    "web_rank_237": 87.0,
+    "web_ok237": 219
+   }
+  ],
+  [
+   "f027",
+   "C:grid/cube.semi.case",
+   "cube shaped semiconductor plastic wafer case",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.852,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "c06",
+    "human_79": 58,
+    "rank_old": 27,
+    "ok158": 155,
+    "real_pass": "all",
+    "real_pass_order": 33,
+    "web_rank_237": 102.5,
+    "web_ok237": 213
+   }
+  ],
+  [
+   "f110",
+   "D:siliconwafer/A:a1",
+   "silicon wafer carrier, a boxy plastic object",
+   {
+    "origin": "web-9/9(§37-11)",
+    "web": "9/9",
+    "score_min": 0.151,
+    "rounds": [
+     "§37-11"
+    ],
+    "slug_orig": "d2_siwafer__a1",
+    "human_79": 70,
+    "rank_old": 110,
+    "ok158": 154,
+    "real_pass": "all",
+    "real_pass_order": 34,
+    "web_rank_237": 70.0,
+    "web_ok237": 224
+   }
+  ],
+  [
+   "f016",
+   "MD:domain",
+   "boxy semiconductor plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.926,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "md1_semiconductor",
+    "human_79": 64,
+    "rank_old": 16,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 35,
+    "web_rank_237": 84.0,
+    "web_ok237": 220
+   }
+  ],
+  [
+   "f058",
+   "MH2:head",
+   "cube shaped sealed plastic wafer cassette",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.559,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mh21_cassette",
+    "human_79": 67,
+    "rank_old": 58,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 36,
+    "web_rank_237": 63.5,
+    "web_ok237": 225
+   }
+  ],
+  [
+   "f044",
+   "W:noun",
+   "cube shaped sealed plastic semiconductor wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.73,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "w3",
+    "human_79": 74,
+    "rank_old": 44,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 37,
+    "web_rank_237": 14.0,
+    "web_ok237": 232
+   }
+  ],
+  [
+   "f033",
+   "MH:head",
+   "boxy sealed plastic wafer case",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.824,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "mh3_case",
+    "human_79": 74,
+    "rank_old": 33,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 38,
+    "web_rank_237": 28.0,
+    "web_ok237": 230
+   }
+  ],
+  [
+   "f077",
+   "X:contrast",
+   "plastic wafer carrier, not a metal cabinet",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.324,
+    "rounds": [
+     "§37-13"
+    ],
+    "slug_orig": "x4_not_cabinet",
+    "human_79": 66,
+    "rank_old": 77,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 39,
+    "web_rank_237": 77.5,
+    "web_ok237": 222
+   }
+  ],
+  [
+   "f062",
+   "C:grid/cube.sealed.case",
+   "cube shaped sealed plastic wafer case",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.52,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "c05",
+    "human_79": 73,
+    "rank_old": 62,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 40,
+    "web_rank_237": 37.0,
+    "web_ok237": 229
+   }
+  ],
+  [
+   "f081",
+   "D:siliconwafer/A:a2",
+   "silicon wafer carrier with a door on the front",
+   {
+    "origin": "web-9/9(§37-11)",
+    "web": "9/9",
+    "score_min": 0.305,
+    "rounds": [
+     "§37-11"
+    ],
+    "slug_orig": "d2_siwafer__a2",
+    "human_79": 67,
+    "rank_old": 81,
+    "ok158": 154,
+    "real_pass": "all",
+    "real_pass_order": 41,
+    "web_rank_237": 81.5,
+    "web_ok237": 221
+   }
+  ],
+  [
+   "f109",
+   "MH:head",
+   "boxy sealed plastic wafer carrier",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.16,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "mh1_carrier",
+    "human_79": 57,
+    "rank_old": 109,
+    "ok158": 152,
+    "real_pass": "all",
+    "real_pass_order": 42,
+    "web_rank_237": 108.5,
+    "web_ok237": 209
+   }
+  ],
+  [
+   "f049",
+   "MD:domain",
+   "boxy silicon plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.691,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "md3_silicon",
+    "human_79": 75,
+    "rank_old": 49,
+    "ok158": 155,
+    "real_pass": "all",
+    "real_pass_order": 43,
+    "web_rank_237": 28.0,
+    "web_ok237": 230
+   }
+  ],
+  [
+   "f103",
+   "MH2:head",
+   "cube shaped sealed plastic wafer tote",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.187,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mh24_tote",
+    "human_79": 70,
+    "rank_old": 103,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 44,
+    "web_rank_237": 54.5,
+    "web_ok237": 227
+   }
+  ],
+  [
+   "f068",
+   "MH2:head",
+   "cube shaped sealed plastic wafer housing",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.434,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mh27_housing",
+    "human_79": 71,
+    "rank_old": 68,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 45,
+    "web_rank_237": 54.5,
+    "web_ok237": 227
+   }
+  ],
+  [
+   "f096",
+   "MH2:head",
+   "cube shaped sealed plastic wafer enclosure",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.21,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mh26_enclosure",
+    "human_79": 69,
+    "rank_old": 96,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 46,
+    "web_rank_237": 63.5,
+    "web_ok237": 225
+   }
+  ],
+  [
+   "f098",
+   "MH:head",
+   "boxy sealed plastic wafer box",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.207,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "mh4_box",
+    "human_79": 74,
+    "rank_old": 98,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 47,
+    "web_rank_237": 28.0,
+    "web_ok237": 230
+   }
+  ],
+  [
+   "f063",
+   "SZ:state",
+   "closed cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.475,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "sz4_closed",
+    "human_79": 70,
+    "rank_old": 63,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 48,
+    "web_rank_237": 58.5,
+    "web_ok237": 226
+   }
+  ],
+  [
+   "f037",
+   "R:article",
+   "a boxy sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.816,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "r1_a_pod",
+    "human_79": 74,
+    "rank_old": 37,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 49,
+    "web_rank_237": 20.0,
+    "web_ok237": 231
+   }
+  ],
+  [
+   "f020",
+   "PL:plastic",
+   "cube shaped sealed wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.895,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "pl1",
+    "human_79": 71,
+    "rank_old": 20,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 50,
+    "web_rank_237": 37.0,
+    "web_ok237": 229
+   }
+  ],
+  [
+   "f052",
+   "control",
+   "boxy plastic object",
+   {
+    "origin": "real-validated",
+    "web": "9/9",
+    "score_min": 0.645,
+    "rounds": [
+     "§37-11",
+     "§37-12",
+     "§37-13"
+    ],
+    "slug_orig": "c_boxy",
+    "human_79": 65,
+    "rank_old": 52,
+    "ok158": 154,
+    "real_pass": "all",
+    "real_pass_order": 51,
+    "web_rank_237": 87.0,
+    "web_ok237": 219
+   }
+  ],
+  [
+   "f048",
+   "MS:shape",
+   "cubic sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.703,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "ms4_cubic",
+    "human_79": 69,
+    "rank_old": 48,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 52,
+    "web_rank_237": 54.5,
+    "web_ok237": 227
+   }
+  ],
+  [
+   "f039",
+   "ABL:single",
+   "boxy sealed wafer pod",
+   {
+    "origin": "web-9/9(§37-15-1)",
+    "web": "9/9",
+    "score_min": 0.812,
+    "rounds": [
+     "§37-15-1"
+    ],
+    "slug_orig": "a3_no_plastic",
+    "human_79": 66,
+    "rank_old": 39,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 53,
+    "web_rank_237": 74.0,
+    "web_ok237": 223
+   }
+  ],
+  [
+   "f082",
+   "E:structure",
+   "plastic box with a removable front door",
+   {
+    "origin": "web-9/9(§37-11)",
+    "web": "9/9",
+    "score_min": 0.285,
+    "rounds": [
+     "§37-11"
+    ],
+    "slug_orig": "e1_frontdoor",
+    "human_79": 55,
+    "rank_old": 82,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 54,
+    "web_rank_237": 105.0,
+    "web_ok237": 211
+   }
+  ],
+  [
+   "f055",
+   "SZ:size",
+   "small cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.594,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "sz2_small",
+    "human_79": 70,
+    "rank_old": 55,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 55,
+    "web_rank_237": 54.5,
+    "web_ok237": 227
+   }
+  ],
+  [
+   "f042",
+   "ML:ablate",
+   "boxy plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.766,
+    "rounds": [
+     "§37-14",
+     "§37-15-1"
+    ],
+    "slug_orig": "ml4_no_sealed",
+    "human_79": 70,
+    "rank_old": 42,
+    "ok158": 155,
+    "real_pass": "all",
+    "real_pass_order": 56,
+    "web_rank_237": 63.5,
+    "web_ok237": 225
+   }
+  ],
+  [
+   "f114",
+   "G:purpose",
+   "boxy plastic object for carrying wafers",
+   {
+    "origin": "web-9/9(§37-12)",
+    "web": "9/9",
+    "score_min": 0.136,
+    "rounds": [
+     "§37-12"
+    ],
+    "slug_orig": "g4_for_carrying",
+    "human_79": 49,
+    "rank_old": 114,
+    "ok158": 151,
+    "real_pass": "all",
+    "real_pass_order": 57,
+    "web_rank_237": 120.0,
+    "web_ok237": 200
+   }
+  ],
+  [
+   "f086",
+   "D:frontopenpod/A:a1",
+   "front opening pod, a boxy plastic object",
+   {
+    "origin": "web-9/9(§37-11)",
+    "web": "9/9",
+    "score_min": 0.254,
+    "rounds": [
+     "§37-11"
+    ],
+    "slug_orig": "d1_fop__a1",
+    "human_79": 63,
+    "rank_old": 86,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 58,
+    "web_rank_237": 81.5,
+    "web_ok237": 221
+   }
+  ],
+  [
+   "f105",
+   "M:adjfuse",
+   "boxy plastic wafer carrier",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.181,
+    "rounds": [
+     "§37-13"
+    ],
+    "slug_orig": "m3_boxy_wafer",
+    "human_79": 68,
+    "rank_old": 105,
+    "ok158": 155,
+    "real_pass": "all",
+    "real_pass_order": 59,
+    "web_rank_237": 74.0,
+    "web_ok237": 223
+   }
+  ],
+  [
+   "f046",
+   "H:long",
+   "a sealed boxy plastic wafer carrier with a removable front door",
+   {
+    "origin": "web-9/9(§37-12)",
+    "web": "9/9",
+    "score_min": 0.715,
+    "rounds": [
+     "§37-12"
+    ],
+    "slug_orig": "h1_long_seal_door",
+    "human_79": 74,
+    "rank_old": 46,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 60,
+    "web_rank_237": 14.0,
+    "web_ok237": 232
+   }
+  ],
+  [
+   "f091",
+   "E:structure",
+   "sealed plastic box with a latching door",
+   {
+    "origin": "web-9/9(§37-11)",
+    "web": "9/9",
+    "score_min": 0.232,
+    "rounds": [
+     "§37-11"
+    ],
+    "slug_orig": "e5_latching",
+    "human_79": 57,
+    "rank_old": 91,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 61,
+    "web_rank_237": 100.5,
+    "web_ok237": 214
+   }
+  ],
+  [
+   "f078",
+   "MH2:head",
+   "cube shaped sealed plastic wafer canister",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.32,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mh22_canister",
+    "human_79": 73,
+    "rank_old": 78,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 62,
+    "web_rank_237": 37.0,
+    "web_ok237": 229
+   }
+  ],
+  [
+   "f079",
+   "MS:shape",
+   "square sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.314,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "ms2_square",
+    "human_79": 51,
+    "rank_old": 79,
+    "ok158": 155,
+    "real_pass": "all",
+    "real_pass_order": 63,
+    "web_rank_237": 114.5,
+    "web_ok237": 206
+   }
+  ],
+  [
+   "f102",
+   "H:long",
+   "sealed plastic box that holds silicon wafers, with a door on the front and a flange on top",
+   {
+    "origin": "web-9/9(§37-12)",
+    "web": "9/9",
+    "score_min": 0.188,
+    "rounds": [
+     "§37-12"
+    ],
+    "slug_orig": "h3_long_that",
+    "human_79": 62,
+    "rank_old": 102,
+    "ok158": 154,
+    "real_pass": "all",
+    "real_pass_order": 64,
+    "web_rank_237": 95.5,
+    "web_ok237": 216
+   }
+  ],
+  [
+   "f041",
+   "SZ:state",
+   "clean cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.777,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "sz3_clean",
+    "human_79": 71,
+    "rank_old": 41,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 65,
+    "web_rank_237": 46.0,
+    "web_ok237": 228
+   }
+  ],
+  [
+   "f133",
+   "D:fabcarrier/A:a1",
+   "semiconductor fab carrier, a boxy plastic object",
+   {
+    "origin": "web-9/9(§37-11)",
+    "web": "9/9",
+    "score_min": 0.055,
+    "rounds": [
+     "§37-11"
+    ],
+    "slug_orig": "d9_fab__a1",
+    "human_79": 59,
+    "rank_old": 133,
+    "ok158": 148,
+    "real_pass": "all",
+    "real_pass_order": 66,
+    "web_rank_237": 111.5,
+    "web_ok237": 207
+   }
+  ],
+  [
+   "f030",
+   "MT:material",
+   "cube shaped sealed polycarbonate wafer pod",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.844,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mt1_polycarb",
+    "human_79": 72,
+    "rank_old": 30,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 67,
+    "web_rank_237": 28.0,
+    "web_ok237": 230
+   }
+  ],
+  [
+   "f106",
+   "D:substrate/A:a4cube",
+   "substrate carrier, a cube shaped plastic case",
+   {
+    "origin": "web-9/9(§37-12)",
+    "web": "9/9",
+    "score_min": 0.173,
+    "rounds": [
+     "§37-12"
+    ],
+    "slug_orig": "d3_substrate__a4",
+    "human_79": 71,
+    "rank_old": 106,
+    "ok158": 148,
+    "real_pass": "all",
+    "real_pass_order": 68,
+    "web_rank_237": 87.0,
+    "web_ok237": 219
+   }
+  ],
+  [
+   "f047",
+   "C:grid/boxy.sili.case",
+   "boxy silicon plastic wafer case",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.707,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "c12",
+    "human_79": 57,
+    "rank_old": 47,
+    "ok158": 149,
+    "real_pass": "all",
+    "real_pass_order": 69,
+    "web_rank_237": 114.5,
+    "web_ok237": 206
+   }
+  ],
+  [
+   "f051",
+   "MT:material",
+   "cube shaped sealed polymer wafer pod",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.68,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mt2_polymer",
+    "human_79": 76,
+    "rank_old": 51,
+    "ok158": 157,
+    "real_pass": "all",
+    "real_pass_order": 70,
+    "web_rank_237": 8.5,
+    "web_ok237": 233
+   }
+  ],
+  [
+   "f031",
+   "C:grid/blocky.semi.pod",
+   "blocky semiconductor plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.836,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "c03",
+    "human_79": 74,
+    "rank_old": 31,
+    "ok158": 155,
+    "real_pass": "all",
+    "real_pass_order": 71,
+    "web_rank_237": 37.0,
+    "web_ok237": 229
+   }
+  ],
+  [
+   "f101",
+   "S:order",
+   "a cube shaped plastic case, a silicon wafer carrier",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.197,
+    "rounds": [
+     "§37-13"
+    ],
+    "slug_orig": "s2_cube_silicon",
+    "human_79": 38,
+    "rank_old": 101,
+    "ok158": 144,
+    "real_pass": "all",
+    "real_pass_order": 72,
+    "web_rank_237": 129.0,
+    "web_ok237": 182
+   }
+  ],
+  [
+   "f073",
+   "D2:stack",
+   "blocky sealed semiconductor plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.355,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "d22",
+    "human_79": 73,
+    "rank_old": 73,
+    "ok158": 155,
+    "real_pass": "all",
+    "real_pass_order": 73,
+    "web_rank_237": 46.0,
+    "web_ok237": 228
+   }
+  ],
+  [
+   "f080",
+   "R:article",
+   "the cube shaped plastic case",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.309,
+    "rounds": [
+     "§37-13"
+    ],
+    "slug_orig": "r4_the_cube",
+    "human_79": 65,
+    "rank_old": 80,
+    "ok158": 151,
+    "real_pass": "all",
+    "real_pass_order": 74,
+    "web_rank_237": 95.5,
+    "web_ok237": 216
+   }
+  ],
+  [
+   "f117",
+   "MH:head",
+   "boxy sealed plastic wafer container",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.122,
+    "rounds": [
+     "§37-14"
+    ],
+    "slug_orig": "mh2_container",
+    "human_79": 70,
+    "rank_old": 117,
+    "ok158": 155,
+    "real_pass": "all",
+    "real_pass_order": 75,
+    "web_rank_237": 63.5,
+    "web_ok237": 225
+   }
+  ],
+  [
+   "f026",
+   "MT:material",
+   "cube shaped sealed resin wafer pod",
+   {
+    "origin": "web-9/9(§37-16)",
+    "web": "9/9",
+    "score_min": 0.867,
+    "rounds": [
+     "§37-16"
+    ],
+    "slug_orig": "mt3_resin",
+    "human_79": 75,
+    "rank_old": 26,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 76,
+    "web_rank_237": 8.5,
+    "web_ok237": 233
+   }
+  ],
+  [
+   "f112",
+   "D:substrate/A:a5handle",
+   "substrate carrier, a square plastic box with a handle on the side",
+   {
+    "origin": "web-9/9(§37-12)",
+    "web": "9/9",
+    "score_min": 0.148,
+    "rounds": [
+     "§37-12"
+    ],
+    "slug_orig": "d3_substrate__a5",
+    "human_79": 65,
+    "rank_old": 112,
+    "ok158": 156,
+    "real_pass": "all",
+    "real_pass_order": 77,
+    "web_rank_237": 81.5,
+    "web_ok237": 221
+   }
+  ],
+  [
+   "f071",
+   "C:grid/blocky.sili.pod",
+   "blocky silicon plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.418,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "c04",
+    "human_79": 58,
+    "rank_old": 71,
+    "ok158": 149,
+    "real_pass": "all",
+    "real_pass_order": 78,
+    "web_rank_237": 111.5,
+    "web_ok237": 207
+   }
+  ],
+  [
+   "f072",
+   "C:grid/cube.sili.pod",
+   "cube shaped silicon plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.408,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "c02",
+    "human_79": 61,
+    "rank_old": 72,
+    "ok158": 149,
+    "real_pass": "all",
+    "real_pass_order": 79,
+    "web_rank_237": 107.0,
+    "web_ok237": 210
+   }
+  ],
+  [
+   "f015",
+   "S2:shape",
+   "boxlike sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.93,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "s24",
+    "human_79": 74,
+    "rank_old": 15,
+    "ok158": 158,
+    "real_pass": "all",
+    "real_pass_order": 80,
+    "web_rank_237": 14.0,
+    "web_ok237": 232
+   }
+  ],
+  [
+   "f134",
+   "E:context",
+   "plastic box with wafers inside",
+   {
+    "origin": "web-9/9(§37-11)",
+    "web": "9/9",
+    "score_min": 0.052,
+    "rounds": [
+     "§37-11"
+    ],
+    "slug_orig": "e7_wafers_inside",
+    "human_79": 63,
+    "rank_old": 134,
+    "ok158": 146,
+    "real_pass": "all",
+    "real_pass_order": 81,
+    "web_rank_237": 108.5,
+    "web_ok237": 209
+   }
+  ]
+ ],
+ "flange": [
+  [
+   "g001",
+   "AF:fuse",
+   "black square plastic handling flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.742,
+    "slug_orig": "af05"
+   }
+  ],
+  [
+   "g002",
+   "control",
+   "top mounting plate with a hole",
+   {
+    "origin": "real-validated",
+    "web": "9/9",
+    "score_min": 0.695,
+    "slug_orig": "c1_mounting"
+   }
+  ],
+  [
+   "g003",
+   "PF:material",
+   "plastic black square top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.648,
+    "slug_orig": "pf2_pre"
+   }
+  ],
+  [
+   "g004",
+   "HF:head",
+   "black square plastic top cover",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.621,
+    "slug_orig": "hf4_cover"
+   }
+  ],
+  [
+   "g005",
+   "control",
+   "black top flange on top of the plastic box",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.59,
+    "slug_orig": "c3_topflange"
+   }
+  ],
+  [
+   "g006",
+   "HF:head",
+   "black square plastic top cap",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.582,
+    "slug_orig": "hf5_cap"
+   }
+  ],
+  [
+   "g007",
+   "SF:shape",
+   "flat black plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.57,
+    "slug_orig": "sf2_flat"
+   }
+  ],
+  [
+   "g008",
+   "SF:shape",
+   "square black plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.535,
+    "slug_orig": "sf1_square"
+   }
+  ],
+  [
+   "g009",
+   "control",
+   "black square bracket on top",
+   {
+    "origin": "real-validated",
+    "web": "9/9",
+    "score_min": 0.531,
+    "slug_orig": "c2_bracket"
+   }
+  ],
+  [
+   "g010",
+   "PF:material",
+   "black square top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.531,
+    "slug_orig": "pf1_noplastic"
+   }
+  ],
+  [
+   "g011",
+   "NF:fuse+anchor",
+   "black square plastic top flange on top",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.498,
+    "slug_orig": "nf4"
+   }
+  ],
+  [
+   "g012",
+   "AF:fuse",
+   "black flat plastic top plate",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.455,
+    "slug_orig": "af09"
+   }
+  ],
+  [
+   "g013",
+   "HF:head",
+   "black square plastic top plate",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.342,
+    "slug_orig": "hf1_plate"
+   }
+  ],
+  [
+   "g014",
+   "AF:fuse",
+   "black square plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.264,
+    "slug_orig": "af03"
+   }
+  ],
+  [
+   "g015",
+   "NF:fuse+anchor",
+   "black square plastic top flange on top of the box",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.238,
+    "slug_orig": "nf3"
+   }
+  ],
+  [
+   "g016",
+   "PF:material",
+   "black plastic square top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.215,
+    "slug_orig": "pf3_mid"
+   }
+  ],
+  [
+   "g017",
+   "HF:head",
+   "black square plastic top bracket",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.183,
+    "slug_orig": "hf2_bracket"
+   }
+  ],
+  [
+   "g018",
+   "AF:fuse",
+   "flat black square plastic cover",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.175,
+    "slug_orig": "af08"
+   }
+  ],
+  [
+   "g019",
+   "HF:head",
+   "black square plastic top coupling",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.111,
+    "slug_orig": "hf7_coupling"
+   }
+  ],
+  [
+   "g020",
+   "HF:head",
+   "black square plastic top disc",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.067,
+    "slug_orig": "hf8_disc"
+   }
+  ],
+  [
+   "g021",
+   "SF:shape",
+   "rectangular black plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.051,
+    "slug_orig": "sf5_rect"
+   }
+  ]
+ ]
+}

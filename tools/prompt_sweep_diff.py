@@ -329,11 +329,61 @@ def cmd_rank(a) -> int:
     return 0
 
 
+# ── ④ slugs — 「통과한 프롬프트의 slug 만」 뽑는다 ────────────────────────────────
+def cmd_slugs(a) -> int:
+    """`report.md` 에는 프롬프트 전문만 있고 slug 이 없다. 다음 라운드에 그대로 먹일 수 있게
+    **slug 목록 txt** 와 (선택) **`--prompts-json` 으로 바로 쓸 부분집합 json** 을 낸다."""
+    run = Path(a.run)
+    d, rows, slugs, stems = load_run(run, a.target)
+    prm = prompt_map(rows)
+    ok = collections.Counter(r["slug"] for r in rows if r.get("ok"))
+    seen = collections.Counter(r["slug"] for r in rows)
+    need = len(stems) if a.min_pass is None else a.min_pass
+    keep = [s for s in slugs if ok[s] >= need]
+    # 정렬 = 통과 수 → score 최소값(= 미검출까지의 여유) 내림차순.
+    # 🔴 `score` 는 품질이 아니라 «필요한 문턱» 이다(교훈 #90·#100) — 이 순서를 서열로 읽지 말 것.
+    smin = {s: min((r.get("score", 0.0) for r in rows if r["slug"] == s), default=0.0)
+            for s in keep}
+    keep.sort(key=lambda s: (-ok[s], -smin[s], s))
+    print(f"이미지 {len(stems)}장 · 프롬프트 {len(slugs)}개 → **{need}장 이상 통과 {len(keep)}개**")
+    for s in keep[:10]:
+        print(f"   {s}  {ok[s]}/{seen[s]}  score최소 {smin[s]:.3f}  `{prm[s]}`")
+    if len(keep) > 10:
+        print(f"   … 그 외 {len(keep)-10}개")
+
+    out = Path(a.out) if a.out else run / f"pass_slugs_{a.target}.txt"
+    body = "\n".join(f"{s}\t{ok[s]}/{seen[s]}\t{smin[s]:.3f}\t{prm[s]}" for s in keep) \
+        if a.with_prompt else "\n".join(keep)
+    out.write_text(body + "\n")
+    print(f"\n→ {out}  ({len(keep)}줄"
+          + (", `slug<TAB>통과<TAB>score최소<TAB>프롬프트`)" if a.with_prompt else ")"))
+    if a.json_out:
+        src = json.load(open(a.src_json)) if a.src_json else None
+        if src:
+            cat = {x[0]: x[1] for x in src[a.target]}
+            meta = {x[0]: (x[3] if len(x) > 3 else {}) for x in src[a.target]}
+        else:
+            cat, meta = {}, {}
+        items = [[s, cat.get(s, "?"), prm[s],
+                  dict(meta.get(s, {}), pass_real=f"{ok[s]}/{seen[s]}")] for s in keep]
+        Path(a.json_out).write_text(json.dumps(
+            {"_note": f"`{run}` 에서 {need}장 이상 통과한 {len(keep)}개. "
+                      "🔴 **형상 휴리스틱 통과이지 «맞다» 가 아니다** — 서열은 육안 판정으로 낸다"
+                      "(교훈 #90·#100·§39-11d).",
+             "_from": str(run), a.target: items}, ensure_ascii=False, indent=1))
+        print(f"→ {a.json_out}  (다음 라운드에 `--prompts-json` 으로 그대로)")
+    if not a.min_pass and len(keep) > 8:
+        print(f"\n⚠️ **{len(keep)}개는 pose 팔로 걸기엔 많다** — 팔 ≥8 이면 선택 편향 경고(§35-2o-4).")
+    print("🔴 «전 이미지 통과» 는 1등의 근거가 못 된다 — 웹 실측에서 그런 프롬프트가 사람 기준 92위였다.")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name, fn in (("sheets", cmd_sheets), ("check", cmd_check), ("rank", cmd_rank)):
+    for name, fn in (("sheets", cmd_sheets), ("check", cmd_check), ("rank", cmd_rank),
+                     ("slugs", cmd_slugs)):
         p = sub.add_parser(name)
         p.add_argument("--run", required=True, help="스윕 산출 디렉토리 (`--out` 으로 준 것)")
         p.add_argument("--target", default="full", choices=["full", "flange"])
@@ -351,6 +401,16 @@ def main(argv=None) -> int:
             p.add_argument("--combine", default="sum", choices=["sum", "human"],
                            help="sum = 사람+합의 (전체 표본) · human = 사람 라벨만")
             p.add_argument("--md-out", default=None, help="표를 `runs/` 밖으로 뺄 경로")
+        if name == "slugs":
+            p.add_argument("--min-pass", type=int, default=None,
+                           help="이 장수 이상 통과한 것만. 기본은 **전 이미지 통과**")
+            p.add_argument("--out", default=None, help="txt 경로 (기본 `<run>/pass_slugs_<target>.txt`)")
+            p.add_argument("--with-prompt", action="store_true",
+                           help="`slug<TAB>통과<TAB>score최소<TAB>프롬프트` 로 (기본은 slug 만)")
+            p.add_argument("--json-out", default=None,
+                           help="다음 라운드에 `--prompts-json` 으로 먹일 부분집합 json")
+            p.add_argument("--src-json", default="assets/prompts/real_testset.json",
+                           help="--json-out 에 범주·메타를 물려줄 원본")
     a = ap.parse_args(argv)
     return a.fn(a)
 
