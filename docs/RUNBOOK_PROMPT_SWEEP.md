@@ -30,6 +30,40 @@ mkdir -p assets/real_imgs/zedx_2026xxxx
 # 여기에 **왼쪽 rectified 이미지만** 넣는다 (스윕은 분할만 하므로 right/cam.json 불필요)
 ```
 
+### 1a. 이미 `runs/<촬영>/frame_XXXX/` 로 들어와 있다면 — `left.png` 만 모은다
+
+🔴 **`--imgs` 를 촬영 디렉토리로 바로 겨누면 안 된다.** 스윕은 준 디렉토리를 **한 겹만** 훑으므로
+`frame_*/` 아래를 못 보고, 평평하게 펴 놓으면 `right.png` 까지 같이 읽는다.
+
+```bash
+SRC=runs/real_zedx_28cm                       # 촬영 디렉토리 (frame_0000/left.png …)
+DST=assets/real_imgs/zedx_2026xxxx
+mkdir -p "$DST"
+for f in "$SRC"/frame_*/left.png; do
+    cp "$f" "$DST/$(basename "$SRC")_$(basename "$(dirname "$f")").png"
+done
+ls "$DST" | wc -l                              # 프레임 수와 같아야 한다
+```
+
+**거리·조명이 다른 촬영을 한 번에** 보려면 그대로 여러 번 돌리면 된다 — 접두어가 달라 안 섞인다:
+
+```bash
+DST=assets/real_imgs/zedx_2026xxxx; mkdir -p "$DST"
+for SRC in runs/real_zedx_28cm runs/real_zedx_40cm runs/real_zedx_50cm; do
+    for f in "$SRC"/frame_*/left.png; do
+        cp "$f" "$DST/$(basename "$SRC")_$(basename "$(dirname "$f")").png"
+    done
+done
+ls "$DST" | wc -l
+```
+
+- 파일명이 `real_zedx_28cm_frame_0007.png` 가 되어 **거리·프레임이 이름에 남는다** — 나중에
+  «28cm 만 통과했다» 같은 층화를 파일명으로 할 수 있다.
+- 용량이 아까우면 `cp` 대신 **`ln -s "$(realpath "$f")"`** 로 심링크해도 스윕은 잘 읽는다.
+  🔴 다만 원본 촬영을 지우거나 옮기면 스윕이 통째로 깨진다.
+- ⚠️ **`left.png` 는 rectified BGR8 PNG** 여야 한다(`make_frame_from_zed.py` 가 그렇게 만든다).
+  raw 이미지를 넣으면 왜곡이 살아 있어 분할은 되지만 뒤의 pose 와 조건이 달라진다.
+
 - 확장자 `jpg jpeg png bmp webp` 만 읽는다. 그 외는 **건너뛰고 경고를 찍는다** — 그 줄을 반드시 확인할 것
   (`.webp` 14장이 조용히 빠져 237장 스윕이 223장으로 돈 적이 있다, §39-8).
 - **파일명이 곧 이름표**다. 거리·외관을 넣어 두면 나중에 층화해서 볼 수 있다
@@ -200,6 +234,11 @@ envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
 
 ```bash
 source envs/env.sh
+# runs/ 안의 촬영에서 left 만 모으기
+DST=assets/real_imgs/zedx_2026xxxx; mkdir -p "$DST"
+for SRC in runs/real_zedx_*; do for f in "$SRC"/frame_*/left.png; do
+    cp "$f" "$DST/$(basename "$SRC")_$(basename "$(dirname "$f")").png"; done; done
+
 envs/seg_sam3/bin/python tools/sam3_prompt_sweep.py --imgs <사진> --out runs/psweep_real01 \
     --target full --prompts-json assets/prompts/real_testset.json \
     --confidence 0.05 --full-area-min 0.005 --note "<메모>"
