@@ -1,56 +1,177 @@
 {
-  "_note": "7차 스윕 후보 — `full` 전용. 6차(§37-14)가 슬롯별 최적을 냈다: 형상 `cube shaped`=`blocky`(0.977) · 도메인 `sealed`(0.957)>`semiconductor`(0.926) · 핵명사 `pod`(0.957)>`case`(0.824). **그 조합은 아직 대부분 미시험**이다.",
-  "_design": {
-    "C 조합 격자": "형상 3 × 도메인 3 × 핵명사 2 = 18 중 **미시험 12**. 슬롯 효과가 **가산적인가 상호작용인가**를 본다 — 6차는 슬롯을 하나씩만 바꿨으므로 조합을 모른다.",
-    "D2 도메인 겹침": "`sealed` + `semiconductor` 를 함께. 6차 제거 실험에서 **더 쌓으면 나빠졌지만**(0.469) 그건 6낱말이었다. 5낱말 겹침은 미시험.",
-    "PL plastic 축": "`plastic` 을 빼면 6차에서 0.957→0.141 로 붕괴했다. **최강 문장에서도 그런가**, 그리고 **위치를 바꾸면**?",
-    "W wafer 대체": "`wafer` 를 빼면 0.063 이었다. `substrate`·`silicon wafer`·`semiconductor wafer` 로 바꾸면?",
-    "S2 새 형상어": "`cube shaped`·`blocky` 가 0.977 로 **동점 천장**이다. 더 나은 형상어가 있나.",
-    "B2 브랜드+최강": "브랜드는 단독으로 0.867 까지 갔다. 최강 문장 앞에 붙이면 더 오르나 방해하나.",
-    "X 쉼표 재확인": "🔴 **6차에서 쉼표가 19배 죽였다**(0.957→0.050). 최강 문장에서도 재현되는지 확인한다 — 한 번만 본 규칙은 규칙이 아니다.",
-    "R 관사": "6차에서 최강 문장에는 관사가 **약간 해로웠다**(0.957→0.82). 새 최강에서도 그런가."
-  },
-  "_limit": "🔴 3~6차와 같다 — 9장이 전부 흰 배경 단일 물체라 **오선택은 못 잰다**.",
-  "full": [
-    ["c_cube_pod",     "control",      "cube shaped sealed plastic wafer pod"],
-    ["c_blocky_pod",   "control",      "blocky sealed plastic wafer pod"],
-
-    ["c01",  "C:grid/cube.semi.pod",    "cube shaped semiconductor plastic wafer pod"],
-    ["c02",  "C:grid/cube.sili.pod",    "cube shaped silicon plastic wafer pod"],
-    ["c03",  "C:grid/blocky.semi.pod",  "blocky semiconductor plastic wafer pod"],
-    ["c04",  "C:grid/blocky.sili.pod",  "blocky silicon plastic wafer pod"],
-    ["c05",  "C:grid/cube.sealed.case", "cube shaped sealed plastic wafer case"],
-    ["c06",  "C:grid/cube.semi.case",   "cube shaped semiconductor plastic wafer case"],
-    ["c07",  "C:grid/cube.sili.case",   "cube shaped silicon plastic wafer case"],
-    ["c08",  "C:grid/blocky.sealed.case", "blocky sealed plastic wafer case"],
-    ["c09",  "C:grid/blocky.semi.case", "blocky semiconductor plastic wafer case"],
-    ["c10",  "C:grid/blocky.sili.case", "blocky silicon plastic wafer case"],
-    ["c11",  "C:grid/boxy.semi.case",   "boxy semiconductor plastic wafer case"],
-    ["c12",  "C:grid/boxy.sili.case",   "boxy silicon plastic wafer case"],
-
-    ["d21",  "D2:stack",     "cube shaped sealed semiconductor plastic wafer pod"],
-    ["d22",  "D2:stack",     "blocky sealed semiconductor plastic wafer pod"],
-    ["d23",  "D2:stack",     "cube shaped sealed silicon plastic wafer pod"],
-
-    ["pl1",  "PL:plastic",   "cube shaped sealed wafer pod"],
-    ["pl2",  "PL:plastic",   "plastic cube shaped sealed wafer pod"],
-    ["pl3",  "PL:plastic",   "cube shaped plastic sealed wafer pod"],
-
-    ["w1",   "W:noun",       "cube shaped sealed plastic substrate pod"],
-    ["w2",   "W:noun",       "cube shaped sealed plastic silicon wafer pod"],
-    ["w3",   "W:noun",       "cube shaped sealed plastic semiconductor wafer pod"],
-
-    ["s21",  "S2:shape",     "chunky sealed plastic wafer pod"],
-    ["s22",  "S2:shape",     "box shaped sealed plastic wafer pod"],
-    ["s23",  "S2:shape",     "cube like sealed plastic wafer pod"],
-    ["s24",  "S2:shape",     "boxlike sealed plastic wafer pod"],
-
-    ["b21",  "B2:brand",     "Entegris cube shaped sealed plastic wafer pod"],
-    ["b22",  "B2:brand",     "Shin-Etsu cube shaped sealed plastic wafer pod"],
-
-    ["x1",   "X:comma",      "cube shaped, sealed, plastic wafer pod"],
-
-    ["r1",   "R:article",    "a cube shaped sealed plastic wafer pod"],
-    ["r2",   "R:article",    "the cube shaped sealed plastic wafer pod"]
+ "_status": "⚪ **이력** — `full` 웹 스윕 라운드 후보(§37-11~§37-16). 문장을 넓히던 단계다. 현행은 `real_current.json`.",
+ "_note": "7차 스윕 후보 — `full` 전용. 6차(§37-14)가 슬롯별 최적을 냈다: 형상 `cube shaped`=`blocky`(0.977) · 도메인 `sealed`(0.957)>`semiconductor`(0.926) · 핵명사 `pod`(0.957)>`case`(0.824). **그 조합은 아직 대부분 미시험**이다.",
+ "_design": {
+  "C 조합 격자": "형상 3 × 도메인 3 × 핵명사 2 = 18 중 **미시험 12**. 슬롯 효과가 **가산적인가 상호작용인가**를 본다 — 6차는 슬롯을 하나씩만 바꿨으므로 조합을 모른다.",
+  "D2 도메인 겹침": "`sealed` + `semiconductor` 를 함께. 6차 제거 실험에서 **더 쌓으면 나빠졌지만**(0.469) 그건 6낱말이었다. 5낱말 겹침은 미시험.",
+  "PL plastic 축": "`plastic` 을 빼면 6차에서 0.957→0.141 로 붕괴했다. **최강 문장에서도 그런가**, 그리고 **위치를 바꾸면**?",
+  "W wafer 대체": "`wafer` 를 빼면 0.063 이었다. `substrate`·`silicon wafer`·`semiconductor wafer` 로 바꾸면?",
+  "S2 새 형상어": "`cube shaped`·`blocky` 가 0.977 로 **동점 천장**이다. 더 나은 형상어가 있나.",
+  "B2 브랜드+최강": "브랜드는 단독으로 0.867 까지 갔다. 최강 문장 앞에 붙이면 더 오르나 방해하나.",
+  "X 쉼표 재확인": "🔴 **6차에서 쉼표가 19배 죽였다**(0.957→0.050). 최강 문장에서도 재현되는지 확인한다 — 한 번만 본 규칙은 규칙이 아니다.",
+  "R 관사": "6차에서 최강 문장에는 관사가 **약간 해로웠다**(0.957→0.82). 새 최강에서도 그런가."
+ },
+ "_limit": "🔴 3~6차와 같다 — 9장이 전부 흰 배경 단일 물체라 **오선택은 못 잰다**.",
+ "full": [
+  [
+   "c_cube_pod",
+   "control",
+   "cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "c_blocky_pod",
+   "control",
+   "blocky sealed plastic wafer pod"
+  ],
+  [
+   "c01",
+   "C:grid/cube.semi.pod",
+   "cube shaped semiconductor plastic wafer pod"
+  ],
+  [
+   "c02",
+   "C:grid/cube.sili.pod",
+   "cube shaped silicon plastic wafer pod"
+  ],
+  [
+   "c03",
+   "C:grid/blocky.semi.pod",
+   "blocky semiconductor plastic wafer pod"
+  ],
+  [
+   "c04",
+   "C:grid/blocky.sili.pod",
+   "blocky silicon plastic wafer pod"
+  ],
+  [
+   "c05",
+   "C:grid/cube.sealed.case",
+   "cube shaped sealed plastic wafer case"
+  ],
+  [
+   "c06",
+   "C:grid/cube.semi.case",
+   "cube shaped semiconductor plastic wafer case"
+  ],
+  [
+   "c07",
+   "C:grid/cube.sili.case",
+   "cube shaped silicon plastic wafer case"
+  ],
+  [
+   "c08",
+   "C:grid/blocky.sealed.case",
+   "blocky sealed plastic wafer case"
+  ],
+  [
+   "c09",
+   "C:grid/blocky.semi.case",
+   "blocky semiconductor plastic wafer case"
+  ],
+  [
+   "c10",
+   "C:grid/blocky.sili.case",
+   "blocky silicon plastic wafer case"
+  ],
+  [
+   "c11",
+   "C:grid/boxy.semi.case",
+   "boxy semiconductor plastic wafer case"
+  ],
+  [
+   "c12",
+   "C:grid/boxy.sili.case",
+   "boxy silicon plastic wafer case"
+  ],
+  [
+   "d21",
+   "D2:stack",
+   "cube shaped sealed semiconductor plastic wafer pod"
+  ],
+  [
+   "d22",
+   "D2:stack",
+   "blocky sealed semiconductor plastic wafer pod"
+  ],
+  [
+   "d23",
+   "D2:stack",
+   "cube shaped sealed silicon plastic wafer pod"
+  ],
+  [
+   "pl1",
+   "PL:plastic",
+   "cube shaped sealed wafer pod"
+  ],
+  [
+   "pl2",
+   "PL:plastic",
+   "plastic cube shaped sealed wafer pod"
+  ],
+  [
+   "pl3",
+   "PL:plastic",
+   "cube shaped plastic sealed wafer pod"
+  ],
+  [
+   "w1",
+   "W:noun",
+   "cube shaped sealed plastic substrate pod"
+  ],
+  [
+   "w2",
+   "W:noun",
+   "cube shaped sealed plastic silicon wafer pod"
+  ],
+  [
+   "w3",
+   "W:noun",
+   "cube shaped sealed plastic semiconductor wafer pod"
+  ],
+  [
+   "s21",
+   "S2:shape",
+   "chunky sealed plastic wafer pod"
+  ],
+  [
+   "s22",
+   "S2:shape",
+   "box shaped sealed plastic wafer pod"
+  ],
+  [
+   "s23",
+   "S2:shape",
+   "cube like sealed plastic wafer pod"
+  ],
+  [
+   "s24",
+   "S2:shape",
+   "boxlike sealed plastic wafer pod"
+  ],
+  [
+   "b21",
+   "B2:brand",
+   "Entegris cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "b22",
+   "B2:brand",
+   "Shin-Etsu cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "x1",
+   "X:comma",
+   "cube shaped, sealed, plastic wafer pod"
+  ],
+  [
+   "r1",
+   "R:article",
+   "a cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "r2",
+   "R:article",
+   "the cube shaped sealed plastic wafer pod"
   ]
+ ]
 }

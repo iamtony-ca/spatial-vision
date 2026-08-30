@@ -1,48 +1,49 @@
 {
-  "_note": "🔴 **실물 ZED X 이미지로 돌려 사용자가 오버레이를 눈으로 보고 추린 목록** (2026-08-27). 이 프로젝트에서 프롬프트가 «실물에서» 검증된 유일한 기록이다. sim·웹사진 스윕(real_finalists.json)의 부분집합.",
-  "_shortlist": "★ **각 target 2개로 좁혔다** (사용자, 2026-08-27). flange 는 실물 통과 5개 중 `top mounting plate with a hole`·`black square bracket on top` 둘만 남겼다 — 나머지 셋(`… on top of the (plastic) box` 계열)은 `full` 스윕 이력으로 남는다(_dropped_flange). 좁힌 이유는 «성능» 이 아니라 **팔 수를 줄여 선택 편향을 낮추기 위해서**다(§35-2o-4).",
-  "_confirmed": "✅ 탈락한 `… on top of the plastic box` 두 문장은 **사용자가 확인**했다 (2026-08-27). 메모에서 잘려 있던 것을 복원한 뒤 원문과 일치함을 확인.",
-  "_source": "사용자 육안 판정 (다른 PC · ZED X 실물)",
-  "_caution": "🔴 **`flange` 프롬프트는 도메인을 넘어 전이되지 않는다**(교훈 #92·§37-10). 개체·조명이 바뀌면 다시 고른다 — 그때는 `full` 이 11개인 `real_finalists.json` 을 쓴다(flange 판정에 «물체 기준 프레임» 이 필요하다, §37-2). `full` 두 문장은 웹사진·sim·실물 세 데이터에서 같은 답이었다.",
-  "full": [
-    [
-      "s_boxy",
-      "descript",
-      "boxy plastic object"
-    ],
-    [
-      "d_fooup_long",
-      "domain",
-      "front opening unified pod"
-    ]
+ "_status": "⚪ **이력** — 웹 9장 시절의 `full` 후보(§37-3·§37-8·§37-10). 계보: `real_testset`(136) → `real_pass81` → `real_pass70_50cm` → `real_pass58` → `real_pass37` → `real_top15` → `real_final14` → `real_final12` → `real_final11` → **`real_top4` = 현행 `real_current`**",
+ "_note": "🔴 **실물 ZED X 이미지로 돌려 사용자가 오버레이를 눈으로 보고 추린 목록** (2026-08-27). 이 프로젝트에서 프롬프트가 «실물에서» 검증된 유일한 기록이다. sim·웹사진 스윕(real_finalists.json)의 부분집합.",
+ "_shortlist": "★ **각 target 2개로 좁혔다** (사용자, 2026-08-27). flange 는 실물 통과 5개 중 `top mounting plate with a hole`·`black square bracket on top` 둘만 남겼다 — 나머지 셋(`… on top of the (plastic) box` 계열)은 `full` 스윕 이력으로 남는다(_dropped_flange). 좁힌 이유는 «성능» 이 아니라 **팔 수를 줄여 선택 편향을 낮추기 위해서**다(§35-2o-4).",
+ "_confirmed": "✅ 탈락한 `… on top of the plastic box` 두 문장은 **사용자가 확인**했다 (2026-08-27). 메모에서 잘려 있던 것을 복원한 뒤 원문과 일치함을 확인.",
+ "_source": "사용자 육안 판정 (다른 PC · ZED X 실물)",
+ "_caution": "🔴 **`flange` 프롬프트는 도메인을 넘어 전이되지 않는다**(교훈 #92·§37-10). 개체·조명이 바뀌면 다시 고른다 — 그때는 `full` 이 11개인 `real_finalists.json` 을 쓴다(flange 판정에 «물체 기준 프레임» 이 필요하다, §37-2). `full` 두 문장은 웹사진·sim·실물 세 데이터에서 같은 답이었다.",
+ "full": [
+  [
+   "s_boxy",
+   "descript",
+   "boxy plastic object"
   ],
-  "flange": [
-    [
-      "c2_mounting",
-      "control",
-      "top mounting plate with a hole"
-    ],
-    [
-      "x_bracket__a0_top",
-      "D:bracket/A:a0_top",
-      "black square bracket on top"
-    ]
-  ],
-  "_dropped_flange": [
-    [
-      "x_bracket__a1_box",
-      "D:bracket/A:a1_box",
-      "black square bracket on top of the box"
-    ],
-    [
-      "x_tflangepl__a5_plastic",
-      "D:tflangepl/A:a5_plastic",
-      "top flange plate on top of the plastic box"
-    ],
-    [
-      "x_topplate__a5_plastic",
-      "D:topplate/A:a5_plastic",
-      "square top plate on top of the plastic box"
-    ]
+  [
+   "d_fooup_long",
+   "domain",
+   "front opening unified pod"
   ]
+ ],
+ "flange": [
+  [
+   "c2_mounting",
+   "control",
+   "top mounting plate with a hole"
+  ],
+  [
+   "x_bracket__a0_top",
+   "D:bracket/A:a0_top",
+   "black square bracket on top"
+  ]
+ ],
+ "_dropped_flange": [
+  [
+   "x_bracket__a1_box",
+   "D:bracket/A:a1_box",
+   "black square bracket on top of the box"
+  ],
+  [
+   "x_tflangepl__a5_plastic",
+   "D:tflangepl/A:a5_plastic",
+   "top flange plate on top of the plastic box"
+  ],
+  [
+   "x_topplate__a5_plastic",
+   "D:topplate/A:a5_plastic",
+   "square top plate on top of the plastic box"
+  ]
+ ]
 }

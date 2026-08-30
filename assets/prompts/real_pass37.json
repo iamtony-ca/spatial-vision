@@ -1,4 +1,5 @@
 {
+ "_status": "⚪ **이력** — `full` 좁히기 스냅샷. 계보: `real_testset`(136) → `real_pass81` → `real_pass70_50cm` → `real_pass58` → `real_pass37` → `real_top15` → `real_final14` → `real_final12` → `real_final11` → **`real_top4` = 현행 `real_current`**",
  "_note": "🟢 **실물 테스트 현행 실험군 37개** (2026-08-28, 사용자 지시). 실물 3런 통과 58개에서 **① 도메인 낱말이 없는 것 제외**(대표로 `a boxy plastic object` 하나만 유지) **② 웹 237 순위 60위 밖 제외** 를 적용했다.",
  "_lineage": "`real_testset`(136) → `real_pass81`(1차) → `real_pass70_50cm` → `real_pass58`(28cm) → **이 파일(37)**",
  "_exception": "🔴 `a boxy plastic object` 는 **웹 70위라 ②에 걸리지만 ①의 대표로 남긴 예외**다. 도메인 어휘에 기대지 않는 유일한 후보라 **다른 객체로 옮길 때의 값어치** 때문에 남겼다(§39-22c).",

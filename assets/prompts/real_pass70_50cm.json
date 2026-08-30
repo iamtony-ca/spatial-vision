@@ -1,8 +1,8 @@
 {
+ "_status": "⚪ **이력** — `full` 좁히기 스냅샷. 계보: `real_testset`(136) → `real_pass81` → `real_pass70_50cm` → `real_pass58` → `real_pass37` → `real_top15` → `real_final14` → `real_final12` → `real_final11` → **`real_top4` = 현행 `real_current`**",
  "_note": "🟢 **실물 ZED X «50cm» 사진에서 «전 이미지 통과» 한 70개** (2026-08-28, 다른 PC 2차). 실물 조건을 바꿔 가며 좁히는 중이고, 이 파일을 다음 라운드에 `--prompts-json` 으로 준다.",
  "_lineage": "`real_testset.json`(136) → `real_pass81.json`(실물 1차) → **이 파일(70)**. 🔴 **70개는 81개의 부분집합이고 신규가 0 이다** — 통과 집합이 «중첩» 으로 줄었다(§39-18).",
  "_source": "`sam3_prompt_sweep.py --target full --confidence 0.05 --full-area-min 0.005` · 50cm 촬영. 🔴 1차와 마찬가지로 **갈린 이미지가 없었다** — 갈리는 축은 «통과하느냐» 하나다.",
- "_status": "🔴 **«전 이미지 통과» 는 «맞다» 가 아니다** — 형상 휴리스틱만 본 것이다. 마스크가 전부 같으므로 **«다 같이 틀렸을» 가능성**이 남고, 그건 `sheets/perfect__full.png` 육안으로만 본다(교훈 #101).",
  "_order": "실물 스윕 출력 순 = 통과 수 → `score` 최소값 내림차순. 🔴 **서열이 아니다** — `score` 는 «미검출까지의 여유» 이고 **`--text-conf` 근거**로만 쓴다(교훈 #90·#100).",
  "_dropped_r1": "1차 통과 → 50cm 탈락 11개: `f078` · `f030` · `f106` · `f051` · `f031` · `f073` · `f117` · `f026` · `f071` · `f072` · `f134` — 다음에 조건을 되돌리면 1순위 복귀 후보다(버린 게 아니라 대기).",
  "_target": "🔴 `--target full` 전용. `flange` 는 원본 그대로이고 실물 통과와 무관하다 — 쓰려면 `--ref-full-slug f002,f005,f012`.",

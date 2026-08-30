@@ -1,175 +1,176 @@
 {
-  "_note": "8차 스윕 후보 — `full` 전용. 7차에서 웹사진 천장이 0.977~0.988 로 굳었다. 8차는 점수를 더 올리는 것보다 **아직 안 본 축을 넓게 여는 데** 목적이 있다 — 실물에서 눈으로 추릴 때 **후보의 «종류» 가 다양해야** 무엇이 통하는지 보이기 때문이다. 특히 색·핵명사·재질은 실물 개체(검정/주황/투명)에서 갈릴 가능성이 크다.",
-  "_design": {
-    "CL 색": "🔴 **실물 전이에 가장 직결된다.** §37 에 «색 지정 프롬프트는 조건부다 — 제 색에서만 걸리고 아니면 조용히 검출 0» 이라고 적혀 있다. 실물 몸체는 검정/주황/투명 3종이고 웹사진 9장도 그 셋 + 투톤이다. **최강 문장에 색을 넣으면 조건부성이 어떻게 되는가.**",
-    "MH2 핵명사 확장": "6·7차에서 `pod` 이 최강이고 핵명사 교체만으로 7.8배가 갈렸다. 아직 안 본 핵명사 8종.",
-    "MT 재질": "`plastic` 은 필수 축이었다(빼면 0.812로 하락). 도메인 재질어로 바꾸면?",
-    "SZ 크기·상태": "`300 mm` 는 죽었지만(0.097) `large`·`small` 같은 **일반 크기어**는 미시험.",
-    "LG 다국어": "SAM3 텍스트 인코더가 영어 외를 접지하는가. ⚠️ 시트 라벨은 cv2 라 **한글·일본어가 `??????` 로 찍힌다** — 판정은 표(`results.csv`)로 한다.",
-    "TY 표기 강건성": "오타·공백·하이픈·전체 대문자. 6차에서 대문자·마침표는 **무해**했고 쉼표만 해로웠다. 더 거친 변형은?",
-    "DX 지시 표현": "`a photo of ~` 같은 CLIP 계열 상투구가 SAM3 에도 듣는가."
-  },
-  "_limit": "🔴 3~7차와 같다 — 9장이 전부 흰 배경 단일 물체라 **오선택은 못 잰다**.",
-  "full": [
-    [
-      "c_cube",
-      "control",
-      "cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "c_entegris",
-      "control",
-      "Entegris cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "cl1_black",
-      "CL:color",
-      "black cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "cl2_orange",
-      "CL:color",
-      "orange cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "cl3_clear",
-      "CL:color",
-      "clear cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "cl4_transp",
-      "CL:color",
-      "transparent cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "mh21_cassette",
-      "MH2:head",
-      "cube shaped sealed plastic wafer cassette"
-    ],
-    [
-      "mh22_canister",
-      "MH2:head",
-      "cube shaped sealed plastic wafer canister"
-    ],
-    [
-      "mh23_magazine",
-      "MH2:head",
-      "cube shaped sealed plastic wafer magazine"
-    ],
-    [
-      "mh24_tote",
-      "MH2:head",
-      "cube shaped sealed plastic wafer tote"
-    ],
-    [
-      "mh25_crate",
-      "MH2:head",
-      "cube shaped sealed plastic wafer crate"
-    ],
-    [
-      "mh26_enclosure",
-      "MH2:head",
-      "cube shaped sealed plastic wafer enclosure"
-    ],
-    [
-      "mh27_housing",
-      "MH2:head",
-      "cube shaped sealed plastic wafer housing"
-    ],
-    [
-      "mh28_shell",
-      "MH2:head",
-      "cube shaped sealed plastic wafer shell"
-    ],
-    [
-      "mt1_polycarb",
-      "MT:material",
-      "cube shaped sealed polycarbonate wafer pod"
-    ],
-    [
-      "mt2_polymer",
-      "MT:material",
-      "cube shaped sealed polymer wafer pod"
-    ],
-    [
-      "mt3_resin",
-      "MT:material",
-      "cube shaped sealed resin wafer pod"
-    ],
-    [
-      "mt4_acrylic",
-      "MT:material",
-      "cube shaped sealed acrylic wafer pod"
-    ],
-    [
-      "sz1_large",
-      "SZ:size",
-      "large cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "sz2_small",
-      "SZ:size",
-      "small cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "sz3_clean",
-      "SZ:state",
-      "clean cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "sz4_closed",
-      "SZ:state",
-      "closed cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "lg1_ko",
-      "LG:lang-ko",
-      "웨이퍼 캐리어"
-    ],
-    [
-      "lg2_ja",
-      "LG:lang-ja",
-      "ウェーハキャリア"
-    ],
-    [
-      "lg3_de",
-      "LG:lang-de",
-      "Wafer-Behälter aus Kunststoff"
-    ],
-    [
-      "ty1_typo",
-      "TY:ortho",
-      "cube shaped sealed plastik wafer pod"
-    ],
-    [
-      "ty2_nospace",
-      "TY:ortho",
-      "cubeshaped sealed plastic wafer pod"
-    ],
-    [
-      "ty3_allcaps",
-      "TY:ortho",
-      "CUBE SHAPED SEALED PLASTIC WAFER POD"
-    ],
-    [
-      "ty4_hyphen",
-      "TY:ortho",
-      "cube-shaped sealed plastic wafer pod"
-    ],
-    [
-      "dx1_in_image",
-      "DX:deixis",
-      "the wafer pod in the image"
-    ],
-    [
-      "dx2_main",
-      "DX:deixis",
-      "the main object, a cube shaped sealed plastic wafer pod"
-    ],
-    [
-      "dx3_photo",
-      "DX:deixis",
-      "a photo of a cube shaped sealed plastic wafer pod"
-    ]
+ "_status": "⚪ **이력** — `full` 웹 스윕 라운드 후보(§37-11~§37-16). 문장을 넓히던 단계다. 현행은 `real_current.json`.",
+ "_note": "8차 스윕 후보 — `full` 전용. 7차에서 웹사진 천장이 0.977~0.988 로 굳었다. 8차는 점수를 더 올리는 것보다 **아직 안 본 축을 넓게 여는 데** 목적이 있다 — 실물에서 눈으로 추릴 때 **후보의 «종류» 가 다양해야** 무엇이 통하는지 보이기 때문이다. 특히 색·핵명사·재질은 실물 개체(검정/주황/투명)에서 갈릴 가능성이 크다.",
+ "_design": {
+  "CL 색": "🔴 **실물 전이에 가장 직결된다.** §37 에 «색 지정 프롬프트는 조건부다 — 제 색에서만 걸리고 아니면 조용히 검출 0» 이라고 적혀 있다. 실물 몸체는 검정/주황/투명 3종이고 웹사진 9장도 그 셋 + 투톤이다. **최강 문장에 색을 넣으면 조건부성이 어떻게 되는가.**",
+  "MH2 핵명사 확장": "6·7차에서 `pod` 이 최강이고 핵명사 교체만으로 7.8배가 갈렸다. 아직 안 본 핵명사 8종.",
+  "MT 재질": "`plastic` 은 필수 축이었다(빼면 0.812로 하락). 도메인 재질어로 바꾸면?",
+  "SZ 크기·상태": "`300 mm` 는 죽었지만(0.097) `large`·`small` 같은 **일반 크기어**는 미시험.",
+  "LG 다국어": "SAM3 텍스트 인코더가 영어 외를 접지하는가. ⚠️ 시트 라벨은 cv2 라 **한글·일본어가 `??????` 로 찍힌다** — 판정은 표(`results.csv`)로 한다.",
+  "TY 표기 강건성": "오타·공백·하이픈·전체 대문자. 6차에서 대문자·마침표는 **무해**했고 쉼표만 해로웠다. 더 거친 변형은?",
+  "DX 지시 표현": "`a photo of ~` 같은 CLIP 계열 상투구가 SAM3 에도 듣는가."
+ },
+ "_limit": "🔴 3~7차와 같다 — 9장이 전부 흰 배경 단일 물체라 **오선택은 못 잰다**.",
+ "full": [
+  [
+   "c_cube",
+   "control",
+   "cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "c_entegris",
+   "control",
+   "Entegris cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "cl1_black",
+   "CL:color",
+   "black cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "cl2_orange",
+   "CL:color",
+   "orange cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "cl3_clear",
+   "CL:color",
+   "clear cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "cl4_transp",
+   "CL:color",
+   "transparent cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "mh21_cassette",
+   "MH2:head",
+   "cube shaped sealed plastic wafer cassette"
+  ],
+  [
+   "mh22_canister",
+   "MH2:head",
+   "cube shaped sealed plastic wafer canister"
+  ],
+  [
+   "mh23_magazine",
+   "MH2:head",
+   "cube shaped sealed plastic wafer magazine"
+  ],
+  [
+   "mh24_tote",
+   "MH2:head",
+   "cube shaped sealed plastic wafer tote"
+  ],
+  [
+   "mh25_crate",
+   "MH2:head",
+   "cube shaped sealed plastic wafer crate"
+  ],
+  [
+   "mh26_enclosure",
+   "MH2:head",
+   "cube shaped sealed plastic wafer enclosure"
+  ],
+  [
+   "mh27_housing",
+   "MH2:head",
+   "cube shaped sealed plastic wafer housing"
+  ],
+  [
+   "mh28_shell",
+   "MH2:head",
+   "cube shaped sealed plastic wafer shell"
+  ],
+  [
+   "mt1_polycarb",
+   "MT:material",
+   "cube shaped sealed polycarbonate wafer pod"
+  ],
+  [
+   "mt2_polymer",
+   "MT:material",
+   "cube shaped sealed polymer wafer pod"
+  ],
+  [
+   "mt3_resin",
+   "MT:material",
+   "cube shaped sealed resin wafer pod"
+  ],
+  [
+   "mt4_acrylic",
+   "MT:material",
+   "cube shaped sealed acrylic wafer pod"
+  ],
+  [
+   "sz1_large",
+   "SZ:size",
+   "large cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "sz2_small",
+   "SZ:size",
+   "small cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "sz3_clean",
+   "SZ:state",
+   "clean cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "sz4_closed",
+   "SZ:state",
+   "closed cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "lg1_ko",
+   "LG:lang-ko",
+   "웨이퍼 캐리어"
+  ],
+  [
+   "lg2_ja",
+   "LG:lang-ja",
+   "ウェーハキャリア"
+  ],
+  [
+   "lg3_de",
+   "LG:lang-de",
+   "Wafer-Behälter aus Kunststoff"
+  ],
+  [
+   "ty1_typo",
+   "TY:ortho",
+   "cube shaped sealed plastik wafer pod"
+  ],
+  [
+   "ty2_nospace",
+   "TY:ortho",
+   "cubeshaped sealed plastic wafer pod"
+  ],
+  [
+   "ty3_allcaps",
+   "TY:ortho",
+   "CUBE SHAPED SEALED PLASTIC WAFER POD"
+  ],
+  [
+   "ty4_hyphen",
+   "TY:ortho",
+   "cube-shaped sealed plastic wafer pod"
+  ],
+  [
+   "dx1_in_image",
+   "DX:deixis",
+   "the wafer pod in the image"
+  ],
+  [
+   "dx2_main",
+   "DX:deixis",
+   "the main object, a cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "dx3_photo",
+   "DX:deixis",
+   "a photo of a cube shaped sealed plastic wafer pod"
   ]
+ ]
 }

@@ -34,6 +34,7 @@ import argparse
 import csv
 import hashlib
 import json
+import collections
 import re
 import sys
 import time
@@ -394,6 +395,9 @@ def main(argv=None) -> int:
         #   라운드)를 달고 다닌다. 앞 셋만 쓰고 **뒤는 버린다** — 메타 때문에 도구가 죽으면
         #   «기록을 남기는 것» 과 «그 파일을 그대로 돌리는 것» 이 배타가 된다.
         PROMPTS = {k: [tuple(x[:3]) for x in v] for k, v in raw.items() if not k.startswith("_")}
+        # ★ 4번째 원소는 «사전정보»(웹 채점 결과 등)다 — 버리지 말고 리포트 결정표에 쓴다.
+        PRIOR = {x[0]: (x[3] if len(x) > 3 else {})
+                 for v in raw.values() if isinstance(v, list) for x in v}
         bad = {k: [x for x in v if len(x) < 3] for k, v in raw.items() if not k.startswith("_")}
         if any(bad.values()):
             print(f"   🔴 항목이 3개 미만인 것이 있다 {bad} — `[slug, 범주, 프롬프트]` 여야 한다")
@@ -408,6 +412,7 @@ def main(argv=None) -> int:
 
     p = Path(a.imgs)
     exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+    PRIOR = locals().get("PRIOR", {})
     imgs = sorted([q for q in p.iterdir() if q.suffix.lower() in exts]) if p.is_dir() else [p]
     if p.is_dir():
         # 🔴 «조용히 빠지는» 파일이 있으면 안 된다 — `.webp` 14장이 목록에 없어서 237장
@@ -632,6 +637,7 @@ def main(argv=None) -> int:
             "flange_ref_slug": fl_ref,
             "images": [{"file": str(q), "key": name[q], "appearance": app[name[q]],
                         "sha8": sha8(q)} for q in imgs],
+            "prompt_prior": PRIOR,
             "n_inference": n_done, "sec_total": round(time.time() - t0, 1),
             "sec_inference": round(t_inf, 1), "ckpt": a.ckpt}
     (root / "results.json").write_text(json.dumps({"meta": meta, "rows": rows}, indent=2,
@@ -1143,6 +1149,105 @@ def write_report(root: Path, rows, stems, targets, meta, a, app, perf, cons):
                      f"{d['ndet']}/{d['n']} | {d['score_med']:.3f} | {d['inst_med']:.0f} | "
                      f"{d['area_med']:.3f} |")
         L += ["", f"→ `sheets/matrix__{t}.png`", ""]
+
+        # ── 🟢 결정용 종합표 ──────────────────────────────────────────────────
+        # 위 «서열» 표는 통과 수 하나로만 정렬한 것이라 **20개를 고를 수 없다.**
+        # 여기서는 결정에 실제로 쓰는 축을 한 표에 모은다:
+        #   ① 통과·검출 ② `score` **최소값**(= 미검출까지의 여유. 🔴 중앙값이 아니다, §39-13b)
+        #   ③ 형상 지표 중앙 ④ 주 실패 사유 ⑤ 웹 사전정보(있으면)
+        prior = (meta.get("prompt_prior") or {})
+        has_web = any(prior.get(d["slug"], {}).get("pooled") for d in agg)
+        L += [f"### 🟢 target = `{t}` — **결정용 종합표** (이 표만 보고 고를 수 있게)", "",
+              "정렬 = 통과 수 → `score` 최소값. 🔴 **이 순서가 «품질 서열» 은 아니다** — "
+              "통과는 형상 휴리스틱이고 `score` 는 문턱 여유다. 아래 «고르는 법» 을 따른다.", ""]
+        hdr = ["프롬프트", "통과", "검출", "score 최소", "score 중앙", "면적비 중앙"]
+        if t == "flange":
+            hdr += ["in_region 중앙", "rel_y 중앙"]
+        hdr += ["주 실패사유"]
+        if has_web:
+            hdr += ["웹 정답률", "웹 95%CI", "핵명사", "웹순위", "1위와 구분?"]
+        L += ["| " + " | ".join(hdr) + " |", "|" + "---|" * len(hdr)]
+        for d in agg:
+            g = [r for r in sub if r["slug"] == d["slug"]]
+            det = [r for r in g if r["n_inst"] > 0]
+            smin = min((r["score"] for r in det), default=0.0)
+            whys = [r["why"] for r in g if not r["ok"] and r.get("why")]
+            wtop = collections.Counter(
+                (w.split()[0] if w else "?") for w in whys).most_common(1)
+            cells = [f"`{d['prompt']}`", f"**{d['npass']}/{d['n']}**", f"{d['ndet']}/{d['n']}",
+                     f"**{smin:.3f}**", f"{d['score_med']:.3f}", f"{d['area_med']:.4f}"]
+            if t == "flange":
+                ir = [r["in_region"] for r in det if r.get("in_region") is not None]
+                ry = [r["rel_y"] for r in det if r.get("rel_y") is not None]
+                cells += [f"{np.median(ir):.2f}" if ir else "—",
+                          f"{np.median(ry):+.2f}" if ry else "—"]
+            cells += [f"{wtop[0][0]} ×{wtop[0][1]}" if wtop else "—"]
+            if has_web:
+                q = prior.get(d["slug"], {})
+                ci = q.get("ci95")
+                # ⚠️ `ci95` 는 자산에 따라 리스트일 수도 문자열일 수도 있다 — 둘 다 받는다
+                cells += [f"{q.get('pooled', '—')}",
+                          (f"[{ci[0]:.0f}, {ci[1]:.0f}]" if isinstance(ci, list)
+                           else (str(ci) if ci else "—")),
+                          f"`{q.get('head_noun', '—')}`",
+                          f"{q.get('rank_web', '—')}",
+                          ("🔴 구분됨(나쁨)" if q.get("sig_worse_than_1st") else "동률")
+                          if q else "—"]
+            L.append("| " + " | ".join(cells) + " |")
+        L += ["", "**열 읽는 법**", "",
+              "| 열 | 무엇 | 어떻게 쓰나 |", "|---|---|---|",
+              "| **통과** | 형상 휴리스틱을 넘긴 이미지 수 | 🔴 **1차 거름망일 뿐**이다. "
+              "«맞다» 가 아니라 «눈으로 볼 값어치가 있다» 다 |",
+              "| **검출** | 인스턴스를 하나라도 낸 이미지 수 | 통과 ≪ 검출 이면 «찾긴 했는데 "
+              "엉뚱한 것» — **오선택 대리 지표**다 |",
+              "| **`score` 최소** | 전 이미지 중 가장 낮은 자신감 | ★ **미검출까지의 여유**다. "
+              "이 값이 곧 `--text-conf` 근거가 된다. 🔴 중앙값이 아니라 **최소값**을 본다 |",
+              "| **면적비 중앙** | 화면 대비 마스크 면적 | 다른 것들과 크게 다르면 «다른 것을 집었다» |"]
+        if t == "flange":
+            L += ["| **in_region** | flange 가 «몸체 ∪ 몸체 바로 위» 에 든 비율 | 낮으면 "
+                  "몸체와 무관한 것을 집었다 |",
+                  "| **rel_y** | 몸체 bbox 안 상대 높이 (0=꼭대기, 음수=더 위) | 크면 "
+                  "«위» 가 아닌 것을 집었다 (문 링·손잡이) |"]
+        L += ["| **주 실패사유** | 떨어진 칸의 가장 흔한 이유 | `no` = 미검출(문턱) · "
+              "`area`/`rel_area` = 크기 · `rel_y` = 위치 · `solidity`/`fragmented` = 모양 |"]
+        if has_web:
+            L += ["| **웹 정답률·CI** | 웹 «어려운» 사진 3벌 합산 사람 판정 | **사전정보**다. "
+                  "실물과 어긋나면 실물을 믿는다(교훈 #92) |",
+                  "| **핵명사** | 문장의 중심 명사 | ★ **웹에서 유일하게 갈린 축**이다 — "
+                  "`plate` 89.8% · `bracket` 89.2% · `coupling` 89.0% ↔ **`flange` 79.4%**(§39-39). "
+                  "🔴 «flange» 자체가 도메인 낱말이라 불리하다 |",
+                  "| **1위와 구분?** | 웹에서 1위보다 유의하게 나쁜가 | 🔴 «동률» 이 다수다 — "
+                  "**웹 순위로 자르면 안 된다**(§39-39) |"]
+        L += [""]
+
+        # ── 결정 절차 ─────────────────────────────────────────────────────────
+        L += [f"### ✅ target = `{t}` — **top3 를 고르는 절차**", "",
+              "🔴 **표만 보고 정하지 않는다.** 숫자는 전부 GT-free 대리 지표다 — "
+              "마지막 한 걸음은 반드시 눈이다.", "",
+              "1. **탈락 1차** — `검출` 이 전체의 절반 미만이면 뺀다. "
+              "이 조건에서 안 보이는 문장이다.",
+              "2. **탈락 2차** — `통과 ≪ 검출` 인 것을 뺀다(예: 검출 20 · 통과 2). "
+              "**찾긴 하는데 엉뚱한 것**을 집는다 — 웹에서 `interface`·`fitting` 이 그랬다(§39-32).",
+              "3. **남은 것을 `score` 최소값 내림차순**으로 본다. 이것이 «미검출까지의 여유» 다. "
+              "🔴 품질 순위가 아니다 — 여유가 큰 것이 **문턱에 안 걸린다**는 뜻일 뿐이다.",
+              "4. **여기서 눈으로 본다** — `sheets/by_image__" + t + "__<img>.png` 를 "
+              "이미지 몇 장 열어 **상위 후보끼리 마스크를 비교**한다. "
+              "🔴 **한 프롬프트의 마스크를 «정답» 으로 삼지 말 것** — 자기 자신과 IoU 1.0 이라 "
+              "구조적으로 만점이 된다(웹에서 실측 8%p, 1위가 바뀌었다, §39-37).",
+              "5. **갈리는 이미지만 크게 보려면** `tools/prompt_sweep_diff.py sheets "
+              f"--run <out> --target {t}` → `check` → `rank --combine human`. "
+              "★ flange 는 거의 다 갈리므로 이 단계를 **실제로 하게 된다**(웹 237장 중 234장).",
+              "6. **3~4개로 줄인다.** 🔴 프롬프트 하나가 여러 경로에 들어가므로 "
+              "5개만 걸어도 pose 팔이 두 자릿수가 되고 선택 편향이 커진다(§35-2o-4).", ""]
+        if t == "flange":
+            L += ["⚠️ **flange 는 쓰이는 자리가 둘이고 요구 수준이 다르다** — 같이 고르면 안 된다:", "",
+                  "| 경로 | flange 마스크의 역할 | 필요한 것 |", "|---|---|---|",
+                  "| **TF** (`--primary flange`) | `guess_translation` 을 직접 결정 | "
+                  "🔴 **최고 IoU**. 어긋나면 90°/180° 뒤집힘(§32-1) |",
+                  "| **RH2s** (`--primary full` + `--flange-mask-from seg`) | 2단계 depth 를 자르기만 | "
+                  "🟢 **검출률·오선택 없음**이면 충분 (IoU 0.93 차이가 pose 를 안 바꿨다, §38-12) |",
+                  "",
+                  "→ TF 후보는 «눈으로 가장 정확한 것», RH2s 후보는 «가장 안 놓치는 것» 으로 고른다.", ""]
 
         # ── 2요인 교차표 ────────────────────────────────────────────────────
         # `category` 가 `D:<서술어>/A:<소속구>` 꼴이면 요인별로 합쳐서 낸다.

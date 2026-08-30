@@ -1,0 +1,186 @@
+{
+ "_status": "🟢 **현행** — **`flange` «pose 팔» 후보 3개 (웹 근거).** 같은 3벌 합산에서 계보를 벌려 고른 것(`plate`·`bracket`·`coupling`). ⚠️ **실물 분할 스윕(`flange_real20`)을 돌렸다면 그 결과로 대체한다** — 이건 «웹까지의 최종 답» 이자 스윕을 못 돌릴 때의 기본값이다. 🔴 20개 중 13개가 1위와 통계적으로 구분되지 않는다(§39-39).",
+ "_note": "🟢🟢 **flange 실물 후보 3개 (최종, 2026-08-29)** — 웹 «어려운» 40장 **세 벌**을 사람이 판정해 **합산**한 결과.",
+ "_criterion": "**세 벌 합산 정답률(n≈83) + 계보 다양성.** 🔴 «표본 간 격차» 로 고르던 것을 폐기했다 — 그 격차는 **우연 범위와 겹친다**(n=40·25·18 이면 참 85% 라도 폭 중앙 11.4%p, §39-39a · 교훈 #105).",
+ "_limit": "🔴 **20개 중 13개가 1위와 통계적으로 구분되지 않는다**(1위 95% 하한 83.6%). **웹사진으로 가릴 수 있는 것은 여기까지**이고 — 237장 중 150장을 썼으며 남은 87장은 대부분 flange 가 안 보인다 — 상위권을 더 가르려면 **실물 사진**이 필요하다.",
+ "_history": "52개(§39-32) → 43(30장) → 20(40장 A) → 3 (40장 B·C 로 합산 확인, §39-37~39)",
+ "_caution": "🔴 `--primary flange` 는 마스크가 조금만 어긋나도 **90°/180° 뒤집힌다**(IoU ≥0.98, §32-1) — **A1/COMBO 와 회전이 90° 배수로 어긋나는지 반드시 대조**한다(§37-9c). ★ 셋 중 **둘이 실물 검증분**이라 도메인 이전 위험이 그만큼 낮다.",
+ "_ref": "🔴 스윕에 `--ref-full-slug f002,f005,f007` 필수.",
+ "_count": "flange 3개 · full 4개",
+ "full": [
+  [
+   "f002",
+   "MS:shape",
+   "cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.977,
+    "rounds": [
+     "§37-14",
+     "§37-15",
+     "§37-16"
+    ],
+    "slug_orig": "ms1_cubeshaped",
+    "human_79": 77,
+    "rank_old": 2,
+    "ok158": 158,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 1,
+    "real_pos": {
+     "r1": 1,
+     "r2": 1,
+     "r3": 2
+    },
+    "web_rank_237": 2.5,
+    "web_ok237": 235,
+    "role": "A — 웹 2.5위·실물 1위. **양쪽 1위**이자 기준선"
+   }
+  ],
+  [
+   "f005",
+   "PL:plastic",
+   "plastic cube shaped sealed wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.973,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "pl2",
+    "human_79": 78,
+    "rank_old": 5,
+    "ok158": 158,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 14,
+    "real_pos": {
+     "r1": 12,
+     "r2": 19,
+     "r3": 13
+    },
+    "web_rank_237": 1.0,
+    "web_ok237": 236,
+    "role": "W — **웹 1위**(사람 판정 78/79, 최고). A 와 «어순» 만 다르다"
+   }
+  ],
+  [
+   "f007",
+   "M:adjfuse",
+   "boxy sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.957,
+    "rounds": [
+     "§37-13",
+     "§37-14",
+     "§37-15-1"
+    ],
+    "slug_orig": "m6_boxy_pod",
+    "human_79": 73,
+    "rank_old": 7,
+    "ok158": 157,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 3,
+    "real_pos": {
+     "r1": 6,
+     "r2": 5,
+     "r3": 4
+    },
+    "web_rank_237": 28.0,
+    "web_ok237": 230,
+    "role": "B — **실물 3위**. 형상어가 `boxy` 로 다르다"
+   }
+  ],
+  [
+   "f019",
+   "R:article",
+   "a boxy plastic object",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.895,
+    "rounds": [
+     "§37-13"
+    ],
+    "slug_orig": "r1_a_boxy",
+    "human_79": 71,
+    "rank_old": 19,
+    "ok158": 153,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 11,
+    "real_pos": {
+     "r1": 18,
+     "r2": 14,
+     "r3": 8
+    },
+    "web_rank_237": 70.0,
+    "web_ok237": 224,
+    "role": "C — 🔴 **대조군**. 도메인 낱말이 없다 (성능 서열에 섞지 말 것)"
+   }
+  ]
+ ],
+ "flange": [
+  [
+   "g002",
+   "control",
+   "top mounting plate with a hole",
+   {
+    "origin": "real-validated",
+    "web": "9/9",
+    "score_min": 0.695,
+    "slug_orig": "c1_mounting",
+    "round": "§37-17 (3차)",
+    "web237_ok": 168,
+    "web237_det": 206,
+    "web30_ok": 30,
+    "web30_det": 30,
+    "pooled": "76/83 = 91.6%",
+    "ci95": "[83.6, 95.9]",
+    "per_round": "A 37/40 · B 24/25 · C 15/18",
+    "role": "합산 1위 · `mounting` 계보 · 🟢 real-validated"
+   }
+  ],
+  [
+   "g009",
+   "control",
+   "black square bracket on top",
+   {
+    "origin": "real-validated",
+    "web": "9/9",
+    "score_min": 0.531,
+    "slug_orig": "c2_bracket",
+    "round": "§37-17 (3차)",
+    "web237_ok": 152,
+    "web237_det": 196,
+    "web30_ok": 29,
+    "web30_det": 30,
+    "pooled": "74/83 = 89.2%",
+    "ci95": "[80.7, 94.2]",
+    "per_round": "A 35/40 · B 22/25 · C 17/18",
+    "role": "합산 4위(3위와 동점) · `bracket` 계보 · 🟢 real-validated"
+   }
+  ],
+  [
+   "g019",
+   "HF:head",
+   "black square plastic top coupling",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.111,
+    "slug_orig": "hf7_coupling",
+    "round": "§37-17 (3차)",
+    "web237_ok": 145,
+    "web237_det": 164,
+    "web30_ok": 30,
+    "web30_det": 30,
+    "pooled": "73/82 = 89.0%",
+    "ci95": "[80.4, 94.1]",
+    "per_round": "A 34/39 · B 23/25 · C 16/18",
+    "role": "합산 5위 · `coupling` — 다른 핵명사"
+   }
+  ]
+ ]
+}

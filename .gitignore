@@ -108,3 +108,7 @@ dist/
 
 
 CONSUMER_6DPOSE.md
+# ── flange 라운드용 심링크 디렉토리 ─────────────────────────────────────────────
+# `assets/real_imgs/web/` 을 가리키는 심링크뿐이고 그 원본이 이미 gitignore 다.
+# 🔴 **어느 이미지를 썼는지는 `assets/prompts/flange_human_labels.json` 의 `_image_sets`** 에 있다.
+assets/real_imgs/web_flange*/

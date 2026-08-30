@@ -164,15 +164,15 @@ MODES = {
     #     참조 기반 SAM3(A그룹)가 실물에서 **전부 실패**했고, 텍스트 마스크 + `--primary full` +
     #     **stage2 on** + 하이브리드(R=coarse·t=refined)가 «눈으로 오차가 분간 안 되는» 수준을 냈다.
     #     🔴 정합(`refine_contour`)이 **하나도 없다** — 이 축은 실물에서 아직 이득이 확인되지 않았다.
-    "combo":   {"arms": "+4", "cost": "+2~3분",
+    "combo":   {"arms": "+5", "cost": "+2~3분",
                 "what": "**실물 검증 체인**: 텍스트 full 마스크 → `pose_fp --primary full` "
                         "(**stage2 on**) × `--input-scale 0.75/0.5` × `--flange-mask-proj hull` "
-                        "+ 하이브리드. 🔴 `--sam3-text` 필요 · 0.75 는 `expandable_segments` 필요(§38-4)"},
-    "all":     {"arms": "34 (+TF 2)", "cost": "+4~6분",
-                "what": "quick 을 뺀 전부 (refs 스윕 + combo 포함) → **총 34팔**. "
+                        "+ 하이브리드 **2종**(RH1=0.75기반 · RH2=0.5기반). 🔴 `--sam3-text` 필요 · 0.75 는 `expandable_segments` 필요(§38-4). ★ RH2 는 §38-9c — `0.5` 는 1단계가 **결정론**이라 A/B 를 가릴 수 있다(0.75 는 재실행 잡음이 설정 효과와 같은 자릿수)"},
+    "all":     {"arms": "35 (+TF 2)", "cost": "+4~6분",
+                "what": "quick 을 뺀 전부 (refs 스윕 + combo 포함) → **총 35팔**. "
                         "★ **`--ism`·`--sam3-text` 도 자동으로 켠다** — «all» 은 경로도 전부라는 뜻이다. "
                         "🔴 **`--text-prompt-flange` 는 값이 필요해 자동으로 못 켠다** — 주면 TF 경로가 "
-                        "붙어 **36팔**(안 주면 러너가 경고한다)"},
+                        "붙어 **37팔**(안 주면 러너가 경고한다)"},
 }
 
 # 거리대 → SAM3 참조. 🔴 참조는 **거리 종속**이라 틀리면 IoU 가 조용히 무너진다(§34-6).
@@ -455,7 +455,8 @@ def build_steps(a) -> list[Step]:
     #    1920×1200 에서 **frame_0002 부터 OOM** 이다(§38-4). `env.sh` 가 그것을 건다.
     if "combo" in set(a.mode) and a.sam3_text:
         seg_t = o / "seg_txt"
-        c075, c050, chull, chyb = (o / "fp_c075", o / "fp_c050", o / "fp_chull", o / "hyb_combo")
+        c075, c050, chull = o / "fp_c075", o / "fp_c050", o / "fp_chull"
+        chyb, chyb2 = o / "hyb_combo", o / "hyb_combo2"
         cf = ["--obj", obj, "--masks", seg_t, "--depth", "stereo", "--depth-dir", st,
               "--primary", "full", "--flange-mask-from", "pose"]     # 🔴 --no-stage2 를 **안 준다**
         steps += [
@@ -479,6 +480,16 @@ def build_steps(a) -> list[Step]:
                   "--r-dir", c075, "--r-name", "pose_coarse.json",
                   "--t-dir", c075, "--t-name", "pose_refined.json", "--out", chyb],
                  chyb, "meta_hybrid.json"),
+            # ★ RH2 — **RP2(0.5) 기반 하이브리드** (§38-9, 2026-08-30 사용자 요청).
+            #   왜 필요한가: RH1 만 있으면 «RP1 은 하이브리드, RP2 는 단일 단계» 라 축 비교가 어긋난다.
+            #   🔴 그리고 §38-9c 에서 **`--input-scale 0.5` 은 1단계가 결정론**(재실행 17/17 바이트 동일)
+            #   인데 `0.75` 는 아니라는 것이 나왔다 — 재현성이 필요한 A/B 는 이쪽으로 해야 한다.
+            #   비용 0(파일 병합).
+            Step("hyb_combo2", "COMBO H2 — 하이브리드 (RP2 0.5 기반) · §38-9c 결정론 팔",
+                 [PY["pose"], "-m", "spatial_vision.eval.hybrid_pose",
+                  "--r-dir", c050, "--r-name", "pose_coarse.json",
+                  "--t-dir", c050, "--t-name", "pose_refined.json", "--out", chyb2],
+                 chyb2, "meta_hybrid.json"),
         ]
 
     # ══════════════════════════════════════════════════════════════════════════════════
@@ -716,7 +727,8 @@ def build_steps(a) -> list[Step]:
         lr += [("RP1", o / "fp_c075", "pose_refined.json"),
                ("RP2", o / "fp_c050", "pose_refined.json"),
                ("RP3", o / "fp_chull", "pose_refined.json"),
-               ("RH1", o / "hyb_combo", "pose_coarse.json")]
+               ("RH1", o / "hyb_combo", "pose_coarse.json"),
+               ("RH2", o / "hyb_combo2", "pose_coarse.json")]
     lr += [(sid, Path(a.out) / sid, "pose_refined.json") for sid, *_ in arms]
     for sid, pdir, pname in lr:
         steps.append(Step(f"lr_{sid}", f"좌우 투영 일관성 · {sid}",
@@ -739,7 +751,8 @@ def build_steps(a) -> list[Step]:
         + ([f"{o / 'fp_txt'}:pose_coarse.json"] if a.sam3_text else []) \
         + ([f"{o / 'fp_txtf'}:pose_coarse.json"] if a.text_prompt_flange else []) \
         + ([f"{o / 'fp_c075'}:pose_refined.json", f"{o / 'fp_c050'}:pose_refined.json",
-            f"{o / 'fp_chull'}:pose_refined.json", f"{o / 'hyb_combo'}:pose_coarse.json"]
+            f"{o / 'fp_chull'}:pose_refined.json", f"{o / 'hyb_combo'}:pose_coarse.json",
+            f"{o / 'hyb_combo2'}:pose_coarse.json"]
            if "combo" in set(a.mode) and a.sam3_text else []) \
         + [str(Path(a.out) / sid) for sid, *_ in arms]
     steps.append(Step("ov", "오버레이 시트 (육안 검사)",
@@ -858,13 +871,14 @@ def build_steps(a) -> list[Step]:
     stat_ids = [sid for sid, *_ in arms] + ([] if a.no_exemplar else ["A3"]) \
         + (["I3"] if a.ism else []) + (["T3"] if a.sam3_text else []) \
         + (["TF3"] if a.text_prompt_flange else []) \
-        + (["RP1", "RP2", "RP3", "RH1"] if combo_on else [])
+        + (["RP1", "RP2", "RP3", "RH1", "RH2"] if combo_on else [])
     stat_alias = ([] if a.no_exemplar else ["A3=fp_ns2:pose_coarse.json"]) \
         + (["I3=fp_ism:pose_coarse.json"] if a.ism else []) \
         + (["T3=fp_txt:pose_coarse.json"] if a.sam3_text else []) \
         + (["TF3=fp_txtf:pose_coarse.json"] if a.text_prompt_flange else []) \
         + (["RP1=fp_c075:pose_refined.json", "RP2=fp_c050:pose_refined.json",
-            "RP3=fp_chull:pose_refined.json", "RH1=hyb_combo:pose_coarse.json"]
+            "RP3=fp_chull:pose_refined.json", "RH1=hyb_combo:pose_coarse.json",
+            "RH2=hyb_combo2:pose_coarse.json"]
            if combo_on else [])
     steps.append(Step("stats", "통계 표·그래프·CSV",
                       [PY["pose"], "-m", "spatial_vision.eval.group_stats",
@@ -1960,7 +1974,7 @@ def report(a) -> int:
         if (root / src).exists() or (root / "lr" / f"lr_consistency_{sid}.json").exists():
             v[sid] = read_variant(root, sid)
     # COMBO — 실물 검증 체인. 정합이 없어 자기 디렉토리가 없다(lr 만 있다).
-    for k in ("RP1", "RP2", "RP3", "RH1"):
+    for k in ("RP1", "RP2", "RP3", "RH1", "RH2"):
         if (root / "lr" / f"lr_consistency_{k}.json").exists():
             v[k] = read_variant(root, k)
     labels = {"A1": "A1 홀 제외 (배포본)", "A2a": "A2a 홀 윤곽 (규격부)",
@@ -1970,6 +1984,7 @@ def report(a) -> int:
               "RP2": "RP2 COMBO P2 (같은 체인 scale .50)",
               "RP3": "RP3 COMBO P3 (hull 투영)",
               "RH1": "RH1 COMBO 하이브리드 R=coarse·t=refined  ← 실물 최선",
+              "RH2": "RH2 COMBO 하이브리드 (RP2 .50 기반)  ← 재현성 최선(§38-9c)",
               "TF1": "TF1 텍스트 flange + 정합 (--primary flange)",
               "TF3": "TF3 텍스트 flange 정합 off",
               "T1": "T1 텍스트 초기값 + 정합 (참조 비의존)", "T3": "T3 텍스트 정합 off",
@@ -2049,7 +2064,7 @@ def report(a) -> int:
     all_gated: list[str] = []
     order = ["A3", "A1", "A2a", "A2b", "A4"] + (["I3", "I1"] if a.ism else []) \
         + (["T3", "T1"] if a.sam3_text else []) \
-        + [k for k in ("TF3", "TF1", "RP1", "RP2", "RP3", "RH1") if k in v] \
+        + [k for k in ("TF3", "TF1", "RP1", "RP2", "RP3", "RH1", "RH2") if k in v] \
         + [k for k in ("Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "H1", "Ccas", "IX1",
                        "Ed", "Eb", "Ea", "Eg3", "Eg05") if k in v] \
         + sorted(k for k in v if k.startswith("R_") or (k.startswith("Rn") and k[2:].isdigit()))
@@ -2414,7 +2429,11 @@ def main(argv: list[str] | None = None) -> int:
                          "**바꿔 읽지 말라는 표시**다(교훈 #88)")
     ap.add_argument("--text-prompt-flange", default=None,
                     help="TF그룹 프롬프트 (flange 를 낱말로). 주면 `seg_txtf`·`fp_txtf`·TF1·TF3 이 생긴다. "
-                         "실사진 스윕 1순위: \"black top flange on top of the plastic box\" (RESULTS §37-4b). "
+                         "현행 후보는 `assets/prompts/flange_real20.json`, 웹 3벌 합산 1위는 "
+                         "\"top mounting plate with a hole\" (RESULTS §39-39 · docs/PROMPT_RANKING_FLANGE.md). "
+                         "🔴 배포할 사진으로 스윕을 다시 돌려 고른다 — flange 서열은 도메인을 안 넘는다(교훈 #92). "
+                         "⚠️ 옛 권고 \"black top flange on top of the plastic box\"(§37-4b, 실사진 9장 1위)는 "
+                         "sim 검정에서 몸체 전체를 집어 R 최대 176.7° 를 냈다(§37-9b) — 쓰지 말 것. "
                          "🔴 `--sam3-text` 와 함께 써야 한다")
     ap.add_argument("--text-conf-flange", type=float, default=0.15,
                     help="TF그룹 검출 임계값. flange 는 작아서 점수가 낮게 나오는 경향이 있다 — "

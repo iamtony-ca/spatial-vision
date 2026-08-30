@@ -45,7 +45,8 @@ ALIAS = {"A3": ("fp_ns2", "pose_coarse.json"), "I3": ("fp_ism", "pose_coarse.jso
          "T3": ("fp_txt", "pose_coarse.json"), "TF3": ("fp_txtf", "pose_coarse.json"),
          # COMBO — 실물 검증 체인(§38). 정합을 안 하므로 자기 디렉토리가 없다.
          "RP1": ("fp_c075", "pose_refined.json"), "RP2": ("fp_c050", "pose_refined.json"),
-         "RP3": ("fp_chull", "pose_refined.json"), "RH1": ("hyb_combo", "pose_coarse.json")}
+         "RP3": ("fp_chull", "pose_refined.json"), "RH1": ("hyb_combo", "pose_coarse.json"),
+         "RH2": ("hyb_combo2", "pose_coarse.json")}
 # 🔴 여기에 안 적힌 별칭은 ④ lr 파일 수 · ⑤ 오버레이 열 수 검사에서 **초과분으로 잡혀 감사 실패**가 된다.
 #    새 «정합 안 하는 팔» 을 만들 때마다 이 표를 같이 고친다 — 실제로 TF3 을 빠뜨려 잡혔다.
 

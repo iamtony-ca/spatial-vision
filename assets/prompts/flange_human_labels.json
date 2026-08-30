@@ -1,0 +1,2991 @@
+{
+ "_status": "📘 **참조** — **사람 라벨 원본**(150장 이미지 목록 + 76장 판정). 판정 시트·마스크는 `runs/`(gitignore)에 있어 **다시 만들 수 없다**. 실험군이 아니다.",
+ "_note": "🟢🟢 **`flange` 프롬프트 선정의 사람 라벨 원본** (2026-08-29). 🔴 판정 시트·마스크는 `runs/` 에 있고 `runs/` 는 `.gitignore` 다 — **이 파일만이 다른 PC 로 넘어가는 유일한 기록**이다. 경위는 `RESULTS.md §39-31~§39-39`.",
+ "_how": "각 라운드에서 **프롬프트들이 «갈린» 이미지**만 시트로 내고 사용자가 «정답 칸» 을 골랐다. `picked_cells` 는 시트의 칸 번호(**칸1 = 원본**이므로 2부터가 마스크), `groups` 는 그 이미지에서 같은 마스크를 낸 프롬프트 묶음(칸2 = groups[0]).",
+ "_no_self_gold": "🔴 **정답을 어느 프롬프트의 출력으로도 삼지 않았다**(R3·R4). R2 에서 그렇게 했다가 **8%p 자기편향**이 드러났다(§39-37b).",
+ "_image_sets": {
+  "_note": "라운드별 이미지 목록. `assets/real_imgs/web/` 의 stem 이다(그 폴더는 `fetch_foup_images.py --restore` 로 재현한다).",
+  "R1_30": [
+   "w515_gudeng-foup",
+   "w507_gudeng-foup",
+   "w513_gudeng-foup",
+   "w437_entegris-a300-foup",
+   "w420_entegris-foup",
+   "w115_front-opening-unified-pod",
+   "w430_entegris-a300-foup",
+   "w266_semi-e47-1-foup",
+   "w404_entegris-foup",
+   "w418_entegris-foup",
+   "w270_semi-e47-1-foup",
+   "w297_foup",
+   "w438_entegris-a300-foup",
+   "w446_shin-etsu-polymer-foup",
+   "w012_foup",
+   "w020_foup",
+   "w268_semi-e47-1-foup",
+   "w408_entegris-foup",
+   "w013_foup",
+   "w385_foup",
+   "w077_foup-wafer-carrier",
+   "w338_foup",
+   "w447_shin-etsu-polymer-foup",
+   "w432_entegris-a300-foup",
+   "w333_foup",
+   "w502_miraial-foup",
+   "w296_foup",
+   "w023_foup",
+   "w053_foup-wafer-carrier",
+   "w433_entegris-a300-foup"
+  ],
+  "R2_40a": [
+   "w028_foup",
+   "w066_foup-wafer-carrier",
+   "w399_entegris-foup",
+   "w376_foup",
+   "w152_300mm-foup",
+   "w121_front-opening-unified-pod",
+   "w334_foup",
+   "w124_front-opening-unified-pod",
+   "w479_miraial-foup",
+   "w017_foup",
+   "w512_gudeng-foup",
+   "w043_foup",
+   "w019_foup",
+   "w299_foup",
+   "w065_foup-wafer-carrier",
+   "w171_300mm-wafer-carrier-pod",
+   "w057_foup-wafer-carrier",
+   "w003_foup",
+   "w106_front-opening-unified-pod",
+   "w140_300mm-foup",
+   "w417_entegris-foup",
+   "w116_front-opening-unified-pod",
+   "w141_300mm-foup",
+   "w460_shin-etsu-polymer-foup",
+   "w119_front-opening-unified-pod",
+   "w139_300mm-foup",
+   "w001_foup",
+   "w529_gudeng-foup",
+   "w055_foup-wafer-carrier",
+   "w406_entegris-foup",
+   "w054_foup-wafer-carrier",
+   "w033_foup",
+   "w095_front-opening-unified-pod",
+   "w495_miraial-foup",
+   "w403_entegris-foup",
+   "w006_foup",
+   "w401_entegris-foup",
+   "w509_gudeng-foup",
+   "w309_foup",
+   "w253_semi-e47-1-foup"
+  ],
+  "R3_40b": [
+   "w090_front-opening-unified-pod",
+   "w275_semi-e47-1-foup",
+   "w298_foup",
+   "w434_entegris-a300-foup",
+   "w126_front-opening-unified-pod-se",
+   "w487_miraial-foup",
+   "w442_shin-etsu-polymer-foup",
+   "w400_entegris-foup",
+   "w026_foup",
+   "w347_foup",
+   "w413_entegris-foup",
+   "w431_entegris-a300-foup",
+   "w503_miraial-foup",
+   "w380_foup",
+   "w410_entegris-foup",
+   "w514_gudeng-foup",
+   "w425_entegris-foup",
+   "w089_front-opening-unified-pod",
+   "w390_foup",
+   "w064_foup-wafer-carrier",
+   "w068_foup-wafer-carrier",
+   "w450_shin-etsu-polymer-foup",
+   "w031_foup",
+   "w348_foup",
+   "w004_foup",
+   "w036_foup",
+   "w405_entegris-foup",
+   "w374_foup",
+   "w159_300mm-foup",
+   "w002_foup",
+   "w038_foup",
+   "w093_front-opening-unified-pod",
+   "w155_300mm-foup",
+   "w256_semi-e47-1-foup",
+   "w368_foup",
+   "w030_foup",
+   "w061_foup-wafer-carrier",
+   "w154_300mm-foup",
+   "w293_semi-e47-1-foup",
+   "w336_foup"
+  ],
+  "R4_40c": [
+   "w395_foup",
+   "w421_entegris-foup",
+   "w021_foup",
+   "w044_foup",
+   "w032_foup",
+   "w073_foup-wafer-carrier",
+   "w252_semi-e47-1-foup",
+   "w018_foup",
+   "w082_foup-wafer-carrier",
+   "w025_foup",
+   "w016_foup",
+   "w027_foup",
+   "w041_foup",
+   "w337_foup",
+   "w429_entegris-a300-foup",
+   "w010_foup",
+   "w067_foup-wafer-carrier",
+   "w008_foup",
+   "w022_foup",
+   "w407_entegris-foup",
+   "w091_front-opening-unified-pod",
+   "w161_300mm-foup",
+   "w009_foup",
+   "w059_foup-wafer-carrier",
+   "w014_foup",
+   "w518_gudeng-foup",
+   "w046_foup",
+   "w508_gudeng-foup",
+   "w531_gudeng-foup",
+   "w007_foup",
+   "w409_entegris-foup",
+   "w094_front-opening-unified-pod",
+   "w137_front-opening-unified-pod-se",
+   "w156_300mm-foup",
+   "w063_foup-wafer-carrier",
+   "w084_foup-wafer-carrier",
+   "w165_300mm-wafer-carrier-pod",
+   "w457_shin-etsu-polymer-foup",
+   "w103_front-opening-unified-pod",
+   "w138_300mm-foup"
+  ]
+ },
+ "_judgments": {
+  "R2_40a": {
+   "_note": "29개 이상 맞춘 13개가 갈린 25장. 시트 `JUDGE13_p1~3`. #26 은 기준 마스크가 오답이라 별도 제외했다.",
+   "rows": [
+    {
+     "image": "w028_foup",
+     "idx": 1,
+     "picked_cells": [
+      2,
+      7
+     ],
+     "excluded": false,
+     "miss_is_correct": true,
+     "n_groups": 5,
+     "n_miss": 5,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "black square bracket on top"
+      ],
+      [
+       "a top mounting plate with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black plastic square top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "top mounting plate"
+      ],
+      [
+       "black square plastic top panel with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w512_gudeng-foup",
+     "idx": 11,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 4,
+     "n_miss": 3,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "square black plastic top flange",
+       "black square plastic top coupling"
+      ],
+      [
+       "black square bracket on top",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square plastic top panel with a hole"
+      ],
+      [
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w065_foup-wafer-carrier",
+     "idx": 15,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 4,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "the black square top flange",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square bracket on top"
+      ],
+      [
+       "black square plastic top panel with a hole"
+      ],
+      [
+       "black square plastic top bracket"
+      ]
+     ]
+    },
+    {
+     "image": "w406_entegris-foup",
+     "idx": 30,
+     "picked_cells": [
+      3,
+      5
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 4,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "black square plastic top coupling",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square top flange",
+       "square black plastic top flange",
+       "a black square plastic top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square bracket on top"
+      ],
+      [
+       "black plastic square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w116_front-opening-unified-pod",
+     "idx": 22,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 6,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square plastic top panel with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square bracket on top"
+      ],
+      [
+       "black square plastic top bracket"
+      ]
+     ]
+    },
+    {
+     "image": "w141_300mm-foup",
+     "idx": 23,
+     "picked_cells": [
+      3,
+      4
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 5,
+     "groups": [
+      [
+       "top mounting plate",
+       "black square top flange",
+       "black square plastic top panel with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole"
+      ],
+      [
+       "black square bracket on top",
+       "black square plastic top coupling"
+      ]
+     ]
+    },
+    {
+     "image": "w460_shin-etsu-polymer-foup",
+     "idx": 24,
+     "picked_cells": [
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 3,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square bracket on top",
+       "the black square top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange"
+      ],
+      [
+       "black square plastic top bracket"
+      ]
+     ]
+    },
+    {
+     "image": "w139_300mm-foup",
+     "idx": 26,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square plastic top panel with a hole"
+      ],
+      [
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w066_foup-wafer-carrier",
+     "idx": 2,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w399_entegris-foup",
+     "idx": 3,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square plastic top panel with a hole",
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w376_foup",
+     "idx": 4,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w121_front-opening-unified-pod",
+     "idx": 6,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black plastic square top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black square plastic top bracket"
+      ]
+     ]
+    },
+    {
+     "image": "w124_front-opening-unified-pod",
+     "idx": 8,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w479_miraial-foup",
+     "idx": 9,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w019_foup",
+     "idx": 13,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 1,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "black square bracket on top",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square top lid with a center hole",
+       "black square plastic top bracket"
+      ],
+      [
+       "top mounting plate",
+       "black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w003_foup",
+     "idx": 18,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square top lid with a center hole",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square plastic top panel with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w417_entegris-foup",
+     "idx": 21,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square plastic top panel with a hole",
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w119_front-opening-unified-pod",
+     "idx": 25,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w055_foup-wafer-carrier",
+     "idx": 29,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square top lid with a center hole",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square bracket on top"
+      ]
+     ]
+    },
+    {
+     "image": "w495_miraial-foup",
+     "idx": 34,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square top lid with a center hole",
+       "black square plastic top bracket"
+      ],
+      [
+       "top mounting plate"
+      ]
+     ]
+    },
+    {
+     "image": "w403_entegris-foup",
+     "idx": 35,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 1,
+     "groups": [
+      [
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square top lid with a center hole",
+       "black square plastic top bracket"
+      ],
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w006_foup",
+     "idx": 36,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square top lid with a center hole",
+       "black square plastic top bracket"
+      ],
+      [
+       "top mounting plate",
+       "square black plastic top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w401_entegris-foup",
+     "idx": 37,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 6,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square plastic top panel with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square bracket on top"
+      ]
+     ]
+    },
+    {
+     "image": "w509_gudeng-foup",
+     "idx": 38,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square top lid with a center hole",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square plastic top coupling"
+      ]
+     ]
+    },
+    {
+     "image": "w253_semi-e47-1-foup",
+     "idx": 40,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square top flange",
+       "black square bracket on top",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square black plastic top flange",
+       "black plastic square top flange",
+       "a black square plastic top flange",
+       "black square top lid with a center hole",
+       "black square plastic top bracket"
+      ],
+      [
+       "black square plastic top coupling"
+      ]
+     ]
+    }
+   ]
+  },
+  "R3_40b": {
+   "_note": "상위 20이 갈린 26장. 시트 `JUDGE20_p1~3`. #10 제외.",
+   "rows": [
+    {
+     "image": "w090_front-opening-unified-pod",
+     "idx": 1,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 4,
+     "n_miss": 7,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black square plastic top bracket",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange"
+      ],
+      [
+       "black square plastic top panel with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square plastic top panel"
+      ],
+      [
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w275_semi-e47-1-foup",
+     "idx": 2,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 4,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole"
+      ],
+      [
+       "the black square top flange"
+      ],
+      [
+       "black square plastic top panel with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w126_front-opening-unified-pod-se",
+     "idx": 5,
+     "picked_cells": [
+      2,
+      3,
+      4
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 4,
+     "n_miss": 5,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "top mounting plate",
+       "black square plastic top coupling",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "a top mounting plate with a hole",
+       "a black square plastic top flange",
+       "black square plastic top bracket",
+       "black square plastic top panel with a hole"
+      ],
+      [
+       "black square bracket on top"
+      ],
+      [
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w487_miraial-foup",
+     "idx": 6,
+     "picked_cells": [
+      6
+     ],
+     "excluded": false,
+     "miss_is_correct": true,
+     "n_groups": 4,
+     "n_miss": 9,
+     "groups": [
+      [
+       "black square top flange",
+       "black square bracket on top",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "plastic black square top flange"
+      ],
+      [
+       "top mounting plate",
+       "black square plastic top panel"
+      ],
+      [
+       "a top mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w002_foup",
+     "idx": 30,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 4,
+     "n_miss": 2,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "black square plastic top panel",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange"
+      ],
+      [
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "the black square top flange"
+      ],
+      [
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w298_foup",
+     "idx": 3,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 8,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "black square plastic top bracket",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange"
+      ],
+      [
+       "top mounting plate",
+       "black square plastic top panel",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w410_entegris-foup",
+     "idx": 15,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange"
+      ],
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "square black plastic top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w004_foup",
+     "idx": 25,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square plastic top panel with a hole"
+      ],
+      [
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w159_300mm-foup",
+     "idx": 29,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 10,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "black square plastic top coupling",
+       "black square plastic top bracket",
+       "black square plastic top cap with a hole"
+      ],
+      [
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "top mounting plate",
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w434_entegris-a300-foup",
+     "idx": 4,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 12,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square plastic top cap with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w442_shin-etsu-polymer-foup",
+     "idx": 7,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 7,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square plastic top coupling",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square bracket on top",
+       "black square plastic top bracket",
+       "rectangular black plastic top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w431_entegris-a300-foup",
+     "idx": 12,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "square black plastic top flange",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black plastic square top flange",
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w514_gudeng-foup",
+     "idx": 16,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square bracket on top",
+       "black square plastic top panel with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w390_foup",
+     "idx": 19,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square plastic top panel",
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w064_foup-wafer-carrier",
+     "idx": 20,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "black square bracket on top",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square top flange",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square plastic top coupling",
+       "black square plastic top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top cap with a hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w031_foup",
+     "idx": 23,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square plastic top panel with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w405_entegris-foup",
+     "idx": 27,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "plastic black square top flange"
+      ],
+      [
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w374_foup",
+     "idx": 28,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 4,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black plastic square top flange",
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w155_300mm-foup",
+     "idx": 33,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square bracket on top"
+      ]
+     ]
+    },
+    {
+     "image": "w368_foup",
+     "idx": 35,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square bracket on top"
+      ]
+     ]
+    },
+    {
+     "image": "w154_300mm-foup",
+     "idx": 38,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "top mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w293_semi-e47-1-foup",
+     "idx": 39,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "rectangular black plastic top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w347_foup",
+     "idx": 10,
+     "picked_cells": null,
+     "excluded": true,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w425_entegris-foup",
+     "idx": 17,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w450_shin-etsu-polymer-foup",
+     "idx": 22,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w348_foup",
+     "idx": 24,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 7,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "a black square plastic top flange",
+       "black square plastic top bracket",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole"
+      ]
+     ]
+    }
+   ]
+  },
+  "R4_40c": {
+   "_note": "상위 20이 갈린 25장. 시트 `JUDGE20c_p1~3`. 7장 제외.",
+   "rows": [
+    {
+     "image": "w103_front-opening-unified-pod",
+     "idx": 39,
+     "picked_cells": [
+      11
+     ],
+     "excluded": false,
+     "miss_is_correct": true,
+     "n_groups": 9,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square mounting plate with a hole"
+      ],
+      [
+       "black square top flange",
+       "black plastic square top flange"
+      ],
+      [
+       "square black plastic top flange"
+      ],
+      [
+       "a black square plastic top flange"
+      ],
+      [
+       "black square plastic top bracket"
+      ],
+      [
+       "black square plastic top flange"
+      ],
+      [
+       "black square plastic top panel"
+      ],
+      [
+       "rectangular black plastic top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w165_300mm-wafer-carrier-pod",
+     "idx": 37,
+     "picked_cells": [
+      2,
+      6,
+      9
+     ],
+     "excluded": false,
+     "miss_is_correct": true,
+     "n_groups": 7,
+     "n_miss": 10,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "black square bracket on top"
+      ],
+      [
+       "black square plastic top panel with a hole",
+       "black square plastic top cap with a hole"
+      ],
+      [
+       "black square plastic top bracket"
+      ],
+      [
+       "black square plastic top panel"
+      ],
+      [
+       "square mounting plate with a hole"
+      ],
+      [
+       "black square top lid with a center hole"
+      ],
+      [
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w457_shin-etsu-polymer-foup",
+     "idx": 38,
+     "picked_cells": [
+      2,
+      4
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 7,
+     "n_miss": 8,
+     "groups": [
+      [
+       "black square bracket on top",
+       "black square plastic top bracket",
+       "black square plastic top panel"
+      ],
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole"
+      ],
+      [
+       "black square plastic top coupling",
+       "rectangular black plastic top flange"
+      ],
+      [
+       "black square plastic top cap with a hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square plastic top panel with a hole"
+      ],
+      [
+       "square mounting plate with a hole"
+      ],
+      [
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w044_foup",
+     "idx": 4,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "black square bracket on top",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square top flange",
+       "top mounting plate",
+       "black square plastic top coupling",
+       "black square top mount",
+       "black square plastic top panel",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square plastic top panel with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w032_foup",
+     "idx": 5,
+     "picked_cells": [
+      2,
+      3,
+      4
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square plastic top coupling",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square bracket on top",
+       "black plastic square top flange",
+       "black square plastic top bracket"
+      ],
+      [
+       "a black square plastic top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w016_foup",
+     "idx": 11,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 2,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square plastic top cap with a hole"
+      ],
+      [
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w022_foup",
+     "idx": 19,
+     "picked_cells": [
+      2,
+      3,
+      4
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 0,
+     "groups": [
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square top flange",
+       "top mounting plate",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top cap with a hole",
+       "plastic black square top flange"
+      ],
+      [
+       "the black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w138_300mm-foup",
+     "idx": 40,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 3,
+     "n_miss": 3,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "black square top mount",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "plastic black square top flange"
+      ],
+      [
+       "a top mounting plate with a hole",
+       "black square plastic top panel with a hole",
+       "black square top lid with a center hole"
+      ],
+      [
+       "black square plastic top panel"
+      ]
+     ]
+    },
+    {
+     "image": "w021_foup",
+     "idx": 3,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ],
+      [
+       "top mounting plate",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top cap with a hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w073_foup-wafer-carrier",
+     "idx": 6,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "top mounting plate",
+       "black square top mount",
+       "black square plastic top panel",
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w027_foup",
+     "idx": 12,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "top mounting plate",
+       "black square plastic top coupling",
+       "black square top mount",
+       "black square plastic top panel",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "plastic black square top flange"
+      ],
+      [
+       "square black plastic top flange",
+       "black square bracket on top",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square plastic top panel with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w010_foup",
+     "idx": 16,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w059_foup-wafer-carrier",
+     "idx": 24,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w046_foup",
+     "idx": 27,
+     "picked_cells": null,
+     "excluded": true,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 2,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w094_front-opening-unified-pod",
+     "idx": 32,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w137_front-opening-unified-pod-se",
+     "idx": 33,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square plastic top panel",
+       "square mounting plate with a hole"
+      ]
+     ]
+    },
+    {
+     "image": "w156_300mm-foup",
+     "idx": 34,
+     "picked_cells": [
+      2,
+      3
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 2,
+     "n_miss": 0,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square plastic top coupling",
+       "black plastic square top flange",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ],
+      [
+       "black square bracket on top",
+       "a black square plastic top flange",
+       "black square plastic top bracket",
+       "rectangular black plastic top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w395_foup",
+     "idx": 1,
+     "picked_cells": null,
+     "excluded": true,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w018_foup",
+     "idx": 8,
+     "picked_cells": null,
+     "excluded": true,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 2,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w082_foup-wafer-carrier",
+     "idx": 9,
+     "picked_cells": null,
+     "excluded": true,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w025_foup",
+     "idx": 10,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 7,
+     "groups": [
+      [
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "rectangular black plastic top flange",
+       "black square top lid with a center hole"
+      ]
+     ]
+    },
+    {
+     "image": "w161_300mm-foup",
+     "idx": 22,
+     "picked_cells": [
+      2
+     ],
+     "excluded": false,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w518_gudeng-foup",
+     "idx": 26,
+     "picked_cells": null,
+     "excluded": true,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w508_gudeng-foup",
+     "idx": 28,
+     "picked_cells": null,
+     "excluded": true,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 3,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "a black square plastic top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ]
+     ]
+    },
+    {
+     "image": "w063_foup-wafer-carrier",
+     "idx": 35,
+     "picked_cells": null,
+     "excluded": true,
+     "miss_is_correct": false,
+     "n_groups": 1,
+     "n_miss": 1,
+     "groups": [
+      [
+       "black square top flange",
+       "top mounting plate with a hole",
+       "a top mounting plate with a hole",
+       "square black plastic top flange",
+       "top mounting plate",
+       "black square bracket on top",
+       "black square plastic top coupling",
+       "a black square plastic top flange",
+       "black plastic square top flange",
+       "black square plastic top bracket",
+       "black square plastic top flange",
+       "the black square top flange",
+       "black square top mount",
+       "black square plastic top panel",
+       "black square plastic top panel with a hole",
+       "square mounting plate with a hole",
+       "black square plastic top cap with a hole",
+       "black square top lid with a center hole",
+       "plastic black square top flange"
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ "_scores": {
+  "_note": "세 벌 합산 (Wilson 95%). A=R2 · B=R3 · C=R4.",
+  "rows": [
+   {
+    "prompt": "top mounting plate with a hole",
+    "k": 76,
+    "n": 83,
+    "pct": 91.6,
+    "lo": 83.6,
+    "hi": 95.9,
+    "A": "37/40",
+    "B": "24/25",
+    "C": "15/18"
+   },
+   {
+    "prompt": "a top mounting plate with a hole",
+    "k": 76,
+    "n": 83,
+    "pct": 91.6,
+    "lo": 83.6,
+    "hi": 95.9,
+    "A": "37/40",
+    "B": "23/25",
+    "C": "16/18"
+   },
+   {
+    "prompt": "black square plastic top bracket",
+    "k": 74,
+    "n": 83,
+    "pct": 89.2,
+    "lo": 80.7,
+    "hi": 94.2,
+    "A": "34/40",
+    "B": "24/25",
+    "C": "16/18"
+   },
+   {
+    "prompt": "black square bracket on top",
+    "k": 74,
+    "n": 83,
+    "pct": 89.2,
+    "lo": 80.7,
+    "hi": 94.2,
+    "A": "35/40",
+    "B": "22/25",
+    "C": "17/18"
+   },
+   {
+    "prompt": "black square plastic top coupling",
+    "k": 73,
+    "n": 82,
+    "pct": 89.0,
+    "lo": 80.4,
+    "hi": 94.1,
+    "A": "34/39",
+    "B": "23/25",
+    "C": "16/18"
+   },
+   {
+    "prompt": "top mounting plate",
+    "k": 73,
+    "n": 83,
+    "pct": 88.0,
+    "lo": 79.2,
+    "hi": 93.3,
+    "A": "35/40",
+    "B": "21/25",
+    "C": "17/18"
+   },
+   {
+    "prompt": "black square top flange",
+    "k": 72,
+    "n": 82,
+    "pct": 87.8,
+    "lo": 79.0,
+    "hi": 93.2,
+    "A": "37/39",
+    "B": "20/25",
+    "C": "15/18"
+   },
+   {
+    "prompt": "a black square plastic top flange",
+    "k": 69,
+    "n": 82,
+    "pct": 84.1,
+    "lo": 74.7,
+    "hi": 90.5,
+    "A": "34/39",
+    "B": "21/25",
+    "C": "14/18"
+   },
+   {
+    "prompt": "square black plastic top flange",
+    "k": 69,
+    "n": 82,
+    "pct": 84.1,
+    "lo": 74.7,
+    "hi": 90.5,
+    "A": "36/39",
+    "B": "17/25",
+    "C": "16/18"
+   },
+   {
+    "prompt": "black square plastic top flange",
+    "k": 66,
+    "n": 82,
+    "pct": 80.5,
+    "lo": 70.6,
+    "hi": 87.6,
+    "A": "33/39",
+    "B": "18/25",
+    "C": "15/18"
+   },
+   {
+    "prompt": "black square plastic top cap with a hole",
+    "k": 66,
+    "n": 83,
+    "pct": 79.5,
+    "lo": 69.6,
+    "hi": 86.8,
+    "A": "29/40",
+    "B": "23/25",
+    "C": "14/18"
+   },
+   {
+    "prompt": "black plastic square top flange",
+    "k": 65,
+    "n": 83,
+    "pct": 78.3,
+    "lo": 68.3,
+    "hi": 85.8,
+    "A": "34/40",
+    "B": "15/25",
+    "C": "16/18"
+   },
+   {
+    "prompt": "black square plastic top panel",
+    "k": 64,
+    "n": 83,
+    "pct": 77.1,
+    "lo": 67.0,
+    "hi": 84.8,
+    "A": "32/40",
+    "B": "18/25",
+    "C": "14/18"
+   },
+   {
+    "prompt": "black square top mount",
+    "k": 63,
+    "n": 82,
+    "pct": 76.8,
+    "lo": 66.6,
+    "hi": 84.6,
+    "A": "32/39",
+    "B": "16/25",
+    "C": "15/18"
+   },
+   {
+    "prompt": "the black square top flange",
+    "k": 61,
+    "n": 82,
+    "pct": 74.4,
+    "lo": 64.0,
+    "hi": 82.6,
+    "A": "32/39",
+    "B": "15/25",
+    "C": "14/18"
+   },
+   {
+    "prompt": "black square plastic top panel with a hole",
+    "k": 61,
+    "n": 83,
+    "pct": 73.5,
+    "lo": 63.1,
+    "hi": 81.8,
+    "A": "31/40",
+    "B": "16/25",
+    "C": "14/18"
+   },
+   {
+    "prompt": "rectangular black plastic top flange",
+    "k": 60,
+    "n": 82,
+    "pct": 73.2,
+    "lo": 62.7,
+    "hi": 81.6,
+    "A": "28/39",
+    "B": "19/25",
+    "C": "13/18"
+   },
+   {
+    "prompt": "black square top lid with a center hole",
+    "k": 60,
+    "n": 83,
+    "pct": 72.3,
+    "lo": 61.8,
+    "hi": 80.8,
+    "A": "28/40",
+    "B": "18/25",
+    "C": "14/18"
+   },
+   {
+    "prompt": "square mounting plate with a hole",
+    "k": 58,
+    "n": 83,
+    "pct": 69.9,
+    "lo": 59.3,
+    "hi": 78.7,
+    "A": "29/40",
+    "B": "16/25",
+    "C": "13/18"
+   },
+   {
+    "prompt": "plastic black square top flange",
+    "k": 53,
+    "n": 83,
+    "pct": 63.9,
+    "lo": 53.1,
+    "hi": 73.4,
+    "A": "27/40",
+    "B": "12/25",
+    "C": "14/18"
+   }
+  ]
+ },
+ "_reproduce": "① 이미지: `_image_sets` 의 stem 으로 심링크 디렉토리를 만든다 ② 스윕: `sam3_prompt_sweep.py --target full,flange --prompts-json <라운드 json> --confidence 0.05 --full-area-min 0.005 --ref-full-slug f002,f005,f007` ③ 채점: `runs/psweep_web68/diff/scripts/flange_grade*.py`"
+}

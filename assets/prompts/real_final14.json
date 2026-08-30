@@ -1,4 +1,5 @@
 {
+ "_status": "⚪ **이력** — `full` 좁히기 스냅샷. 계보: `real_testset`(136) → `real_pass81` → `real_pass70_50cm` → `real_pass58` → `real_pass37` → `real_top15` → `real_final14` → `real_final12` → `real_final11` → **`real_top4` = 현행 `real_current`**",
  "_note": "🟢 **실물 다음 라운드 실험군 14개** (2026-08-28, 사용자 지시).",
  "_composition": "**① `real_top15.json` 의 상위 10** (웹·실물 «둘 중 나쁜 쪽» 순위 기준) **② 계열·핵명사 다양성 보강 3개** (`boxy … case` · `… silicon …` · `… semiconductor …`) **③ 대조군 1개** `a boxy plastic object`.",
  "_control": "🔴 **`a boxy plastic object` 는 대조군이다** — 웹 70위라 «양쪽 상위권» 기준에는 못 들지만 **도메인 어휘에 기대지 않는 유일한 후보**이고 실물 11위다. 성능 후보가 아니라 **«도메인어가 실제로 필요한가» 를 매 라운드 확인하는 기준선**으로 계속 넣는다(사용자 방침).",

@@ -213,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--flange-mask-proj", default="faces", choices=["faces", "hull"],
                     help="[--flange-mask-from pose] 투영 마스크 만드는 법. "
                          "faces=삼각형 합집합(**올바름**, 노치를 살린다) / hull=볼록껍질(옛 동작, 대조군). "
-                         "볼록껍질은 GT 대비 평균 1.55% 부푼다 — 그만큼 배경 depth 가 refine 에 들어간다")
+                         "볼록껍질은 GT 대비 평균 1.55%% 부푼다 — 그만큼 배경 depth 가 refine 에 들어간다")
     ap.add_argument("--mask-band-mm", type=float, default=0.0,
                     help="flange 마스크를 **바깥 테두리 밴드**로 줄인다(rim 밴드 정합, CATALOG §2.2 S⑤). "
                          "⚠️ 반드시 `cad.build_rim_obj --band-mm` 로 같은 폭의 밴드 메쉬를 만든 obj 와 "
@@ -232,6 +232,17 @@ def main(argv: list[str] | None = None) -> int:
                          "(env.sh 가 상설로 건다). 없으면 0.5. 1.0 은 불가 (RESULTS §38-4)")
     ap.add_argument("--mask-hub-r-mm", type=float, default=0.0,
                     help="밴드에 중심 홀 주변 원판을 더한다(build_rim_obj --hub-r-mm 과 같은 값)")
+    # ★ FoundationPose 의 depth 전처리 반경을 **원본 해상도 기준**으로 고정한다 (RESULTS §38-10).
+    #   FP 는 `erode_depth(radius=2)`·`bilateral_filter_depth(radius=2, sigmaD=2)` 를 **픽셀 단위**로
+    #   쓰는데(estimater.py:173-174), 그러면 `--input-scale` 이 «해상도 노브» 인 동시에
+    #   «전처리 반경 노브» 가 된다 — 0.75 에서 원본 2.67px, 0.5 에서 4.00px 를 덮어
+    #   **물체 depth 를 지우는 비율이 1.32% → 3.56% 로 2.7배** 달라진다.
+    #   이 옵션을 주면 `radius = max(1, round(v · input_scale))` 로 물리 크기를 맞춘다.
+    #   🔴 기본 0 = **끄기(FP 원래 동작)** — 켜는 것이 기본값이 되면 옛 수치와 비교가 깨진다.
+    ap.add_argument("--preproc-radius-px", type=float, default=0.0,
+                    help="FP depth 전처리(erode·bilateral) 반경을 **원본 해상도 픽셀**로 고정한다. "
+                         "0=끄기(FP 기본 radius 2, 축소하면 물리적으로 넓어진다). "
+                         "권장 4 — 0.75→3 · 0.5→2 로 둘 다 정수 (RESULTS §38-11)")
     args = ap.parse_args(argv)
 
     in_dir, out_dir = Path(args.in_dir), Path(args.out_dir)
@@ -243,6 +254,20 @@ def main(argv: list[str] | None = None) -> int:
 
     import torch
     FoundationPose, ScorePredictor, PoseRefinePredictor, dr = _import_fp()
+
+    # ── depth 전처리 반경 물리 고정 (--preproc-radius-px) ─────────────────────────────
+    # 🔴 `third_party` 는 불변이므로 **여기서 감싼다.** `estimater` 가 `from Utils import *`
+    #    라 두 함수가 그 모듈의 전역이고, 그것만 바꿔 끼우면 register/track_one 이 새 반경을 쓴다.
+    if args.preproc_radius_px > 0:
+        import estimater as _est
+        r = max(1, int(round(args.preproc_radius_px * args.input_scale)))
+        _sig = 2.0 * r / 2.0            # FP 기본은 radius 2 · sigmaD 2 (같은 비율을 유지한다)
+        _ero, _bil = _est.erode_depth, _est.bilateral_filter_depth
+        _est.erode_depth = lambda d, radius=2, **kw: _ero(d, radius=r, **kw)
+        _est.bilateral_filter_depth = (
+            lambda d, radius=2, sigmaD=2, **kw: _bil(d, radius=r, sigmaD=_sig, **kw))
+        print(f"   ⚙️ depth 전처리 반경 고정: 원본 {args.preproc_radius_px:g}px "
+              f"× scale {args.input_scale:g} → **radius {r}** (sigmaD {_sig:g}) — FP 기본은 2")
 
     frames = sorted([p for p in in_dir.glob("frame_*") if p.is_dir()]) or [in_dir]
     print(f"== FoundationPose 2-stage | {len(frames)} 프레임 | depth={args.depth} "
@@ -367,6 +392,14 @@ def main(argv: list[str] | None = None) -> int:
                 cv2.imwrite(str(od / "mask_flange_proj.png"), mf_out)
             else:
                 mf = cv2.imread(str(md / "mask_flange.png"), cv2.IMREAD_GRAYSCALE)
+                # 🔴 **`--input-scale` 과 함께 쓰면 여기서 깨졌다** (2026-08-30 수정).
+                #    stage-1 의 `mask_full` 은 위에서 축소하는데 이 마스크는 원본 크기 그대로
+                #    읽혀서 `np.where(mf > 127, depth_m, 0)` 이 broadcast 오류로 죽었다.
+                #    배포는 `--input-scale` 이 필수(1920×1200 OOM)라 이 경로가 사실상 봉인돼 있었다.
+                #    ⚠️ depth 와 짝지을 마스크이므로 보간은 **NEAREST** 여야 한다.
+                if mf is not None and mf.shape[:2] != depth_m.shape[:2]:
+                    mf = cv2.resize(mf, (depth_m.shape[1], depth_m.shape[0]),
+                                    interpolation=cv2.INTER_NEAREST)
                 if mf is None or not (mf > 127).any():
                     print(f"  {f.name}: flange 마스크 없음 — coarse 만 사용", file=sys.stderr)
                     mf = None
@@ -404,6 +437,7 @@ def main(argv: list[str] | None = None) -> int:
         "mask_band_mm": args.mask_band_mm, "mask_hub_r_mm": args.mask_hub_r_mm,
         "flange_mask_proj": args.flange_mask_proj,
         "input_scale": args.input_scale,
+        "preproc_radius_px": args.preproc_radius_px,
         "est_iter": args.est_iter, "refine_iter": args.refine_iter,
         "two_stage": est2 is not None,
         "mean_ms": float(np.mean(t_frames)) if t_frames else None, "frames": rows,

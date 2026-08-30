@@ -1,69 +1,251 @@
 {
-  "_note": "3차 스윕 후보 — **도메인 용어**를 넣어 «주변 사물 중에서 FOUP 을 고르는» 쪽으로 좁히려는 목적 (사용자, 2026-08-27). 대상은 `assets/real_imgs` 9장.",
-  "_design": "full 은 2요인 = 서술어(D, 도메인 성분) × 닻(A, 이미 검증된 형상/구조어). §37-4 의 flange 설계를 full 에 그대로 적용한다 — 실패했을 때 «서술어 탓인가 닻 탓인가» 를 가르기 위해서다.",
-  "_evidence": "장부(assets/prompts/tested_prompts.json)에서 온 규칙 셋 — ① 약어는 죽는다(`FOUP` 0/9) ② 순수 도메인 명사도 죽는다(`reticle pod` 0/9 · `semiconductor shipping box` 0/9 · `wafer cassette` 2/9) ③ 풀어 쓰면 산다(`front opening unified pod` 9/9). 그래서 이번 후보는 **도메인어를 흔한 낱말로 풀어 쓰거나 검증된 닻에 붙인 것**뿐이다.",
-  "_limit": "🔴 이 스윕은 «검출되는가» 만 잰다. **오선택(주변 사물 중 고르기)은 원리적으로 못 잰다** — 9장이 전부 단일 물체 제품 사진이다. 그 축은 distractor 씬(`capture_sim --distractors`)이나 실물 배치 사진에서만 나온다.",
-  "full": [
-    ["c_boxy",            "control",              "boxy plastic object"],
-    ["c_fooup",           "control",              "front opening unified pod"],
-
-    ["d1_fop__a0",        "D:frontopenpod/A:a0",  "front opening pod"],
-    ["d1_fop__a1",        "D:frontopenpod/A:a1",  "front opening pod, a boxy plastic object"],
-    ["d1_fop__a2",        "D:frontopenpod/A:a2",  "front opening pod with a door on the front"],
-
-    ["d2_siwafer__a0",    "D:siliconwafer/A:a0",  "silicon wafer carrier"],
-    ["d2_siwafer__a1",    "D:siliconwafer/A:a1",  "silicon wafer carrier, a boxy plastic object"],
-    ["d2_siwafer__a2",    "D:siliconwafer/A:a2",  "silicon wafer carrier with a door on the front"],
-
-    ["d3_300mm__a0",      "D:300mm/A:a0",         "300 mm wafer carrier"],
-    ["d3_300mm__a1",      "D:300mm/A:a1",         "300 mm wafer carrier, a boxy plastic object"],
-    ["d3_300mm__a2",      "D:300mm/A:a2",         "300 mm wafer carrier with a door on the front"],
-
-    ["d4_ship__a0",       "D:shipping/A:a0",      "wafer shipping container"],
-    ["d4_ship__a1",       "D:shipping/A:a1",      "wafer shipping container, a boxy plastic object"],
-    ["d4_ship__a2",       "D:shipping/A:a2",      "wafer shipping container with a door on the front"],
-
-    ["d5_transport__a0",  "D:transport/A:a0",     "wafer transport container"],
-    ["d5_transport__a1",  "D:transport/A:a1",     "wafer transport container, a boxy plastic object"],
-    ["d5_transport__a2",  "D:transport/A:a2",     "wafer transport container with a door on the front"],
-
-    ["d6_storage__a0",    "D:storagepod/A:a0",    "wafer storage pod"],
-    ["d6_storage__a1",    "D:storagepod/A:a1",    "wafer storage pod, a boxy plastic object"],
-    ["d6_storage__a2",    "D:storagepod/A:a2",    "wafer storage pod with a door on the front"],
-
-    ["d7_substrate__a0",  "D:substrate/A:a0",     "substrate carrier"],
-    ["d7_substrate__a1",  "D:substrate/A:a1",     "substrate carrier, a boxy plastic object"],
-    ["d7_substrate__a2",  "D:substrate/A:a2",     "substrate carrier with a door on the front"],
-
-    ["d8_cleanroom__a0",  "D:cleanroom/A:a0",     "cleanroom wafer container"],
-    ["d8_cleanroom__a1",  "D:cleanroom/A:a1",     "cleanroom wafer container, a boxy plastic object"],
-    ["d8_cleanroom__a2",  "D:cleanroom/A:a2",     "cleanroom wafer container with a door on the front"],
-
-    ["d9_fab__a0",        "D:fabcarrier/A:a0",    "semiconductor fab carrier"],
-    ["d9_fab__a1",        "D:fabcarrier/A:a1",    "semiconductor fab carrier, a boxy plastic object"],
-    ["d9_fab__a2",        "D:fabcarrier/A:a2",    "semiconductor fab carrier with a door on the front"],
-
-    ["d10_sealed__a0",    "D:sealed/A:a0",        "sealed wafer container"],
-    ["d10_sealed__a1",    "D:sealed/A:a1",        "sealed wafer container, a boxy plastic object"],
-    ["d10_sealed__a2",    "D:sealed/A:a2",        "sealed wafer container with a door on the front"],
-
-    ["e1_frontdoor",      "E:structure",          "plastic box with a removable front door"],
-    ["e2_shelves",        "E:structure",          "plastic container with slotted shelves inside"],
-    ["e3_topflange",      "E:structure",          "plastic box with a square flange on top"],
-    ["e4_handles_door",   "E:structure",          "box with a handle on each side and a door on the front"],
-    ["e5_latching",       "E:structure",          "sealed plastic box with a latching door"],
-    ["e6_loadport",       "E:context",            "plastic box on a load port"],
-    ["e7_wafers_inside",  "E:context",            "plastic box with wafers inside"],
-    ["e8_blackplate",     "E:structure",          "boxy plastic object with a black plate on top"]
+ "_status": "⚪ **이력** — `full` 웹 스윕 라운드 후보(§37-11~§37-16). 문장을 넓히던 단계다. 현행은 `real_current.json`.",
+ "_note": "3차 스윕 후보 — **도메인 용어**를 넣어 «주변 사물 중에서 FOUP 을 고르는» 쪽으로 좁히려는 목적 (사용자, 2026-08-27). 대상은 `assets/real_imgs` 9장.",
+ "_design": "full 은 2요인 = 서술어(D, 도메인 성분) × 닻(A, 이미 검증된 형상/구조어). §37-4 의 flange 설계를 full 에 그대로 적용한다 — 실패했을 때 «서술어 탓인가 닻 탓인가» 를 가르기 위해서다.",
+ "_evidence": "장부(assets/prompts/tested_prompts.json)에서 온 규칙 셋 — ① 약어는 죽는다(`FOUP` 0/9) ② 순수 도메인 명사도 죽는다(`reticle pod` 0/9 · `semiconductor shipping box` 0/9 · `wafer cassette` 2/9) ③ 풀어 쓰면 산다(`front opening unified pod` 9/9). 그래서 이번 후보는 **도메인어를 흔한 낱말로 풀어 쓰거나 검증된 닻에 붙인 것**뿐이다.",
+ "_limit": "🔴 이 스윕은 «검출되는가» 만 잰다. **오선택(주변 사물 중 고르기)은 원리적으로 못 잰다** — 9장이 전부 단일 물체 제품 사진이다. 그 축은 distractor 씬(`capture_sim --distractors`)이나 실물 배치 사진에서만 나온다.",
+ "full": [
+  [
+   "c_boxy",
+   "control",
+   "boxy plastic object"
   ],
-  "flange": [
-    ["f1_oht",            "F:oht",                "overhead hoist transfer flange"],
-    ["f2_oht_top",        "F:oht",                "overhead transport flange on top"],
-    ["f3_robot_wc",       "F:robot",              "robotic transfer plate on top of the wafer carrier"],
-    ["f4_crane",          "F:crane",              "crane pickup plate on top"],
-    ["f5_hoist",          "F:crane",              "hoist coupling plate on top of the box"],
-    ["f6_fop",            "F:domain",             "top flange of the front opening pod"],
-    ["f7_wc_plate",       "F:domain",             "black plate on top of the wafer container"],
-    ["f8_abbrev",         "F:control-abbrev",     "OHT flange"]
+  [
+   "c_fooup",
+   "control",
+   "front opening unified pod"
+  ],
+  [
+   "d1_fop__a0",
+   "D:frontopenpod/A:a0",
+   "front opening pod"
+  ],
+  [
+   "d1_fop__a1",
+   "D:frontopenpod/A:a1",
+   "front opening pod, a boxy plastic object"
+  ],
+  [
+   "d1_fop__a2",
+   "D:frontopenpod/A:a2",
+   "front opening pod with a door on the front"
+  ],
+  [
+   "d2_siwafer__a0",
+   "D:siliconwafer/A:a0",
+   "silicon wafer carrier"
+  ],
+  [
+   "d2_siwafer__a1",
+   "D:siliconwafer/A:a1",
+   "silicon wafer carrier, a boxy plastic object"
+  ],
+  [
+   "d2_siwafer__a2",
+   "D:siliconwafer/A:a2",
+   "silicon wafer carrier with a door on the front"
+  ],
+  [
+   "d3_300mm__a0",
+   "D:300mm/A:a0",
+   "300 mm wafer carrier"
+  ],
+  [
+   "d3_300mm__a1",
+   "D:300mm/A:a1",
+   "300 mm wafer carrier, a boxy plastic object"
+  ],
+  [
+   "d3_300mm__a2",
+   "D:300mm/A:a2",
+   "300 mm wafer carrier with a door on the front"
+  ],
+  [
+   "d4_ship__a0",
+   "D:shipping/A:a0",
+   "wafer shipping container"
+  ],
+  [
+   "d4_ship__a1",
+   "D:shipping/A:a1",
+   "wafer shipping container, a boxy plastic object"
+  ],
+  [
+   "d4_ship__a2",
+   "D:shipping/A:a2",
+   "wafer shipping container with a door on the front"
+  ],
+  [
+   "d5_transport__a0",
+   "D:transport/A:a0",
+   "wafer transport container"
+  ],
+  [
+   "d5_transport__a1",
+   "D:transport/A:a1",
+   "wafer transport container, a boxy plastic object"
+  ],
+  [
+   "d5_transport__a2",
+   "D:transport/A:a2",
+   "wafer transport container with a door on the front"
+  ],
+  [
+   "d6_storage__a0",
+   "D:storagepod/A:a0",
+   "wafer storage pod"
+  ],
+  [
+   "d6_storage__a1",
+   "D:storagepod/A:a1",
+   "wafer storage pod, a boxy plastic object"
+  ],
+  [
+   "d6_storage__a2",
+   "D:storagepod/A:a2",
+   "wafer storage pod with a door on the front"
+  ],
+  [
+   "d7_substrate__a0",
+   "D:substrate/A:a0",
+   "substrate carrier"
+  ],
+  [
+   "d7_substrate__a1",
+   "D:substrate/A:a1",
+   "substrate carrier, a boxy plastic object"
+  ],
+  [
+   "d7_substrate__a2",
+   "D:substrate/A:a2",
+   "substrate carrier with a door on the front"
+  ],
+  [
+   "d8_cleanroom__a0",
+   "D:cleanroom/A:a0",
+   "cleanroom wafer container"
+  ],
+  [
+   "d8_cleanroom__a1",
+   "D:cleanroom/A:a1",
+   "cleanroom wafer container, a boxy plastic object"
+  ],
+  [
+   "d8_cleanroom__a2",
+   "D:cleanroom/A:a2",
+   "cleanroom wafer container with a door on the front"
+  ],
+  [
+   "d9_fab__a0",
+   "D:fabcarrier/A:a0",
+   "semiconductor fab carrier"
+  ],
+  [
+   "d9_fab__a1",
+   "D:fabcarrier/A:a1",
+   "semiconductor fab carrier, a boxy plastic object"
+  ],
+  [
+   "d9_fab__a2",
+   "D:fabcarrier/A:a2",
+   "semiconductor fab carrier with a door on the front"
+  ],
+  [
+   "d10_sealed__a0",
+   "D:sealed/A:a0",
+   "sealed wafer container"
+  ],
+  [
+   "d10_sealed__a1",
+   "D:sealed/A:a1",
+   "sealed wafer container, a boxy plastic object"
+  ],
+  [
+   "d10_sealed__a2",
+   "D:sealed/A:a2",
+   "sealed wafer container with a door on the front"
+  ],
+  [
+   "e1_frontdoor",
+   "E:structure",
+   "plastic box with a removable front door"
+  ],
+  [
+   "e2_shelves",
+   "E:structure",
+   "plastic container with slotted shelves inside"
+  ],
+  [
+   "e3_topflange",
+   "E:structure",
+   "plastic box with a square flange on top"
+  ],
+  [
+   "e4_handles_door",
+   "E:structure",
+   "box with a handle on each side and a door on the front"
+  ],
+  [
+   "e5_latching",
+   "E:structure",
+   "sealed plastic box with a latching door"
+  ],
+  [
+   "e6_loadport",
+   "E:context",
+   "plastic box on a load port"
+  ],
+  [
+   "e7_wafers_inside",
+   "E:context",
+   "plastic box with wafers inside"
+  ],
+  [
+   "e8_blackplate",
+   "E:structure",
+   "boxy plastic object with a black plate on top"
   ]
+ ],
+ "flange": [
+  [
+   "f1_oht",
+   "F:oht",
+   "overhead hoist transfer flange"
+  ],
+  [
+   "f2_oht_top",
+   "F:oht",
+   "overhead transport flange on top"
+  ],
+  [
+   "f3_robot_wc",
+   "F:robot",
+   "robotic transfer plate on top of the wafer carrier"
+  ],
+  [
+   "f4_crane",
+   "F:crane",
+   "crane pickup plate on top"
+  ],
+  [
+   "f5_hoist",
+   "F:crane",
+   "hoist coupling plate on top of the box"
+  ],
+  [
+   "f6_fop",
+   "F:domain",
+   "top flange of the front opening pod"
+  ],
+  [
+   "f7_wc_plate",
+   "F:domain",
+   "black plate on top of the wafer container"
+  ],
+  [
+   "f8_abbrev",
+   "F:control-abbrev",
+   "OHT flange"
+  ]
+ ]
 }

@@ -1,0 +1,695 @@
+{
+ "_status": "⚪ **이력** — `flange` 라운드별 실험군. 계보: `flange_round3`(35) → `round4`(52) → `round5`(73) → `round6`(43) → `flange_top20`(20) → **`flange_real20`(20, 재정렬) · `flange_top3`(3)**",
+ "_note": "🟢 **flange 프롬프트 4차 실험군** (2026-08-28) — 기존 21개(§37-17) + **신규 31개**. `full` 은 현행 4개를 **flange 판정의 기준 프레임**으로 싣는다(스윕에 필수).",
+ "_why": "기존 21개는 **20개가 `black` 을 쓰고 구조가 `black square plastic top X` 하나**다. `full` 에서 얻은 교훈으로 **빠진 축을 채운다** — 색 대조 · 구조 특징어(중심 홀) · 닻 변형 · 핵명사 확장 · 도메인 접지 · 관사 · 도메인어 0 대조군.",
+ "_axes": {
+  "A 색 대조": "기존 상위 문장에서 `black` 만 뺀 짝 5개. 🔴 §39-27a 에서 «맞는 색어도 `score` 를 절반으로 깎는다» 가 `full` 에서 나왔다 — flange 는 **실제로 검정 고정색**이라 이득이 날 수도 있다. **그걸 가르는 게 이 축이다**",
+  "B 구조 특징어": "«중심 홀» 을 문장에 넣는다(6개). 규칙 ③(형상 접지가 문장 안에 있으면 산다)의 flange 판이고, flange 의 가장 뚜렷한 시각 특징이다. 기존 21개 중 이걸 쓴 것은 `top mounting plate with a hole` 하나뿐이다",
+  "C 닻 변형": "`on top` / `on top of the box` 계열 4개. §37-17 에서 **도메인 닻(`on top of the wafer carrier`)은 7건 전멸**했고 살아남은 닻은 이 둘이다",
+  "D 핵명사 확장": "`lid`·`panel`·`interface`·`fitting`·`handle plate`·`piece` 6개. 규칙 ⑬(핵명사가 서열을 가른다)의 flange 판",
+  "E 도메인 접지": "⚠️ **실패가 예상되는 축**(§37-17 의 도메인 닻 전멸). 표현을 바꿔 4개만 재시험한다 — «그때 죽은 게 «도메인» 인가 «그 표현» 인가» 를 가른다",
+  "F 관사": "기존 21개에 관사가 **하나도 없다**. 규칙 ⑤(관사는 주효과가 아니라 상호작용)이라 문장마다 재야 한다 — 3개",
+  "G 도메인어 0 대조군": "`full` 의 `a boxy plastic object` 에 대응하는 자리. 3개"
+ },
+ "_ref": "🔴 스윕 시 **`--ref-full-slug` 를 반드시 준다** — flange 판정은 같은 이미지의 `full` 마스크를 **물체 기준 프레임**으로 쓴다. 이 파일의 full slug 3개를 준다. 로그에 «참조 3개 잡힘» 이 떠야 하고 **3개 미만이면 flange 결과가 무효**다(§37-2).",
+ "_caution": "🔴🔴 **flange 는 도메인을 안 넘는다**(§37-13·교훈 #92) — `full` 은 웹·sim·실물 세 데이터에서 같은 답이었지만 flange 는 **웹 1위가 탈락하고 하위권 둘이 살아남았다.** 그래서 이 목록의 쓸모는 «서열» 이 아니라 **«배포할 사진에서 눈으로 추리는 것»** 이다. 🔴 그리고 `--primary flange` 는 마스크가 조금만 어긋나도 **90°/180° 로 뒤집힌다**(IoU ≥0.98 조건, §32-1) — **A1/COMBO 와 회전이 90° 배수로 어긋나는지 반드시 대조한다**.",
+ "_count": "flange 52개 (기존 21 + 신규 31) · full 4개 (기준 프레임)",
+ "full": [
+  [
+   "f002",
+   "MS:shape",
+   "cube shaped sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-14)",
+    "web": "9/9",
+    "score_min": 0.977,
+    "rounds": [
+     "§37-14",
+     "§37-15",
+     "§37-16"
+    ],
+    "slug_orig": "ms1_cubeshaped",
+    "human_79": 77,
+    "rank_old": 2,
+    "ok158": 158,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 1,
+    "real_pos": {
+     "r1": 1,
+     "r2": 1,
+     "r3": 2
+    },
+    "web_rank_237": 2.5,
+    "web_ok237": 235,
+    "role": "A — 웹 2.5위·실물 1위. **양쪽 1위**이자 기준선"
+   }
+  ],
+  [
+   "f005",
+   "PL:plastic",
+   "plastic cube shaped sealed wafer pod",
+   {
+    "origin": "web-9/9(§37-15)",
+    "web": "9/9",
+    "score_min": 0.973,
+    "rounds": [
+     "§37-15"
+    ],
+    "slug_orig": "pl2",
+    "human_79": 78,
+    "rank_old": 5,
+    "ok158": 158,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 14,
+    "real_pos": {
+     "r1": 12,
+     "r2": 19,
+     "r3": 13
+    },
+    "web_rank_237": 1.0,
+    "web_ok237": 236,
+    "role": "W — **웹 1위**(사람 판정 78/79, 최고). A 와 «어순» 만 다르다"
+   }
+  ],
+  [
+   "f007",
+   "M:adjfuse",
+   "boxy sealed plastic wafer pod",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.957,
+    "rounds": [
+     "§37-13",
+     "§37-14",
+     "§37-15-1"
+    ],
+    "slug_orig": "m6_boxy_pod",
+    "human_79": 73,
+    "rank_old": 7,
+    "ok158": 157,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 3,
+    "real_pos": {
+     "r1": 6,
+     "r2": 5,
+     "r3": 4
+    },
+    "web_rank_237": 28.0,
+    "web_ok237": 230,
+    "role": "B — **실물 3위**. 형상어가 `boxy` 로 다르다"
+   }
+  ],
+  [
+   "f019",
+   "R:article",
+   "a boxy plastic object",
+   {
+    "origin": "web-9/9(§37-13)",
+    "web": "9/9",
+    "score_min": 0.895,
+    "rounds": [
+     "§37-13"
+    ],
+    "slug_orig": "r1_a_boxy",
+    "human_79": 71,
+    "rank_old": 19,
+    "ok158": 153,
+    "real_pass": "all@r1+50cm+28cm",
+    "real_rank": 11,
+    "real_pos": {
+     "r1": 18,
+     "r2": 14,
+     "r3": 8
+    },
+    "web_rank_237": 70.0,
+    "web_ok237": 224,
+    "role": "C — 🔴 **대조군**. 도메인 낱말이 없다 (성능 서열에 섞지 말 것)"
+   }
+  ]
+ ],
+ "flange": [
+  [
+   "g001",
+   "AF:fuse",
+   "black square plastic handling flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.742,
+    "slug_orig": "af05",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g002",
+   "control",
+   "top mounting plate with a hole",
+   {
+    "origin": "real-validated",
+    "web": "9/9",
+    "score_min": 0.695,
+    "slug_orig": "c1_mounting",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g003",
+   "PF:material",
+   "plastic black square top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.648,
+    "slug_orig": "pf2_pre",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g004",
+   "HF:head",
+   "black square plastic top cover",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.621,
+    "slug_orig": "hf4_cover",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g005",
+   "control",
+   "black top flange on top of the plastic box",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.59,
+    "slug_orig": "c3_topflange",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g006",
+   "HF:head",
+   "black square plastic top cap",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.582,
+    "slug_orig": "hf5_cap",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g007",
+   "SF:shape",
+   "flat black plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.57,
+    "slug_orig": "sf2_flat",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g008",
+   "SF:shape",
+   "square black plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.535,
+    "slug_orig": "sf1_square",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g009",
+   "control",
+   "black square bracket on top",
+   {
+    "origin": "real-validated",
+    "web": "9/9",
+    "score_min": 0.531,
+    "slug_orig": "c2_bracket",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g010",
+   "PF:material",
+   "black square top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.531,
+    "slug_orig": "pf1_noplastic",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g011",
+   "NF:fuse+anchor",
+   "black square plastic top flange on top",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.498,
+    "slug_orig": "nf4",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g012",
+   "AF:fuse",
+   "black flat plastic top plate",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.455,
+    "slug_orig": "af09",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g013",
+   "HF:head",
+   "black square plastic top plate",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.342,
+    "slug_orig": "hf1_plate",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g014",
+   "AF:fuse",
+   "black square plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.264,
+    "slug_orig": "af03",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g015",
+   "NF:fuse+anchor",
+   "black square plastic top flange on top of the box",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.238,
+    "slug_orig": "nf3",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g016",
+   "PF:material",
+   "black plastic square top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.215,
+    "slug_orig": "pf3_mid",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g017",
+   "HF:head",
+   "black square plastic top bracket",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.183,
+    "slug_orig": "hf2_bracket",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g018",
+   "AF:fuse",
+   "flat black square plastic cover",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.175,
+    "slug_orig": "af08",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g019",
+   "HF:head",
+   "black square plastic top coupling",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.111,
+    "slug_orig": "hf7_coupling",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g020",
+   "HF:head",
+   "black square plastic top disc",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.067,
+    "slug_orig": "hf8_disc",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "g021",
+   "SF:shape",
+   "rectangular black plastic top flange",
+   {
+    "origin": "web-9/9(§37-17)",
+    "web": "9/9",
+    "score_min": 0.051,
+    "slug_orig": "sf5_rect",
+    "round": "§37-17 (3차)"
+   }
+  ],
+  [
+   "h001",
+   "A:색",
+   "square plastic handling flange",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "A"
+   }
+  ],
+  [
+   "h002",
+   "A:색",
+   "plastic square top flange",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "A"
+   }
+  ],
+  [
+   "h003",
+   "A:색",
+   "square plastic top cover",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "A"
+   }
+  ],
+  [
+   "h004",
+   "A:색",
+   "flat plastic top flange",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "A"
+   }
+  ],
+  [
+   "h005",
+   "A:색",
+   "square plastic top plate",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "A"
+   }
+  ],
+  [
+   "h006",
+   "B:구조",
+   "square top plate with a round hole in the middle",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "B"
+   }
+  ],
+  [
+   "h007",
+   "B:구조",
+   "black square top plate with a hole in the center",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "B"
+   }
+  ],
+  [
+   "h008",
+   "B:구조",
+   "flat square plate with a center hole",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "B"
+   }
+  ],
+  [
+   "h009",
+   "B:구조",
+   "square flange with a circular opening",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "B"
+   }
+  ],
+  [
+   "h010",
+   "B:구조",
+   "top plate with a round opening",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "B"
+   }
+  ],
+  [
+   "h011",
+   "B:구조",
+   "black flat plate with a hole on top of the box",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "B"
+   }
+  ],
+  [
+   "h012",
+   "C:닻(anchor)",
+   "square plastic plate on top of the box",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "C"
+   }
+  ],
+  [
+   "h013",
+   "C:닻(anchor)",
+   "flat black plate on top",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "C"
+   }
+  ],
+  [
+   "h014",
+   "C:닻(anchor)",
+   "the square flange on top of the plastic box",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "C"
+   }
+  ],
+  [
+   "h015",
+   "C:닻(anchor)",
+   "black square plate mounted on top",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "C"
+   }
+  ],
+  [
+   "h016",
+   "D:핵명사",
+   "black square plastic top lid",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "D"
+   }
+  ],
+  [
+   "h017",
+   "D:핵명사",
+   "black square plastic top panel",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "D"
+   }
+  ],
+  [
+   "h018",
+   "D:핵명사",
+   "black square robotic handling interface",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "D"
+   }
+  ],
+  [
+   "h019",
+   "D:핵명사",
+   "square plastic lifting fitting on top",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "D"
+   }
+  ],
+  [
+   "h020",
+   "D:핵명사",
+   "black square top handle plate",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "D"
+   }
+  ],
+  [
+   "h021",
+   "D:핵명사",
+   "flat square plastic top piece",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "D"
+   }
+  ],
+  [
+   "h022",
+   "E:도메인",
+   "black square top flange of a wafer pod",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "E"
+   }
+  ],
+  [
+   "h023",
+   "E:도메인",
+   "top flange of the cube shaped sealed plastic wafer pod",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "E"
+   }
+  ],
+  [
+   "h024",
+   "E:도메인",
+   "square handling flange on a wafer carrier",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "E"
+   }
+  ],
+  [
+   "h025",
+   "E:도메인",
+   "black flange on top of the wafer pod",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "E"
+   }
+  ],
+  [
+   "h026",
+   "F:관사",
+   "a black square plastic top flange",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "F"
+   }
+  ],
+  [
+   "h027",
+   "F:관사",
+   "the black square top flange",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "F"
+   }
+  ],
+  [
+   "h028",
+   "F:관사",
+   "a flat square plate with a hole",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "F"
+   }
+  ],
+  [
+   "h029",
+   "G:도메인어",
+   "a flat square black part on top",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "G"
+   }
+  ],
+  [
+   "h030",
+   "G:도메인어",
+   "square black object on top of the box",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "G"
+   }
+  ],
+  [
+   "h031",
+   "G:도메인어",
+   "flat black square panel",
+   {
+    "origin": "new-§39-31(4차)",
+    "round": "§39-31 (4차)",
+    "axis": "G"
+   }
+  ]
+ ]
+}

@@ -1,323 +1,324 @@
 {
-  "_note": "🟢 **`full` 실험 후보군** — 웹사진 9장(assets/real_imgs)에서 **전 이미지 통과(9/9)** 한 텍스트 프롬프트 전부. `tools/prompt_ledger.py` 장부에서 뽑아 기록한다(사용자 지시, 2026-08-27).",
-  "_order": "score 최소값 내림차순 = «미검출까지의 여유» 순. ⚠️ score 는 마스크 품질이 아니다(r=+0.06, 교훈 #90) — 문턱 여유 지표라 중앙값이 아니라 최소값을 본다.",
-  "_limit": "🔴 «검출되는가» 만 통과한 목록이다. **오선택(주변 사물 중 고르기)은 이 9장으로 원리적으로 못 쟀다** — 전부 흰 배경 단일 물체다. 그 축은 distractor 씬(`capture_sim --distractors`)이나 실물 배치 사진에서만 나온다.",
-  "_flange": "🔴 flange 는 이 파일에 없다. 3차 도메인 스윕(§37-11)에서 반송 도메인 용어 8개가 전부 실패했다(최고 6/9). flange 최종본은 `real_validated.json` 의 2개를 유지한다.",
-  "full": [
-    [
-      "s_boxy",
-      "descript",
-      "boxy plastic object",
-      {
-        "web": "9/9",
-        "score_min": 0.645,
-        "sim": "10/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "promptsweep_flange",
-          "promptsweep_flange2",
-          "psweep_domain3",
-          "psweep_finalists",
-          "psweep_short",
-          "psweep_sim50black",
-          "psweep_validated"
-        ]
-      }
-    ],
-    [
-      "d10_sealed__a1",
-      "D:sealed/A:a1",
-      "sealed wafer container, a boxy plastic object",
-      {
-        "web": "9/9",
-        "score_min": 0.605,
-        "sim": null,
-        "source": "round3(§37-11) 신규",
-        "runs": [
-          "psweep_domain3"
-        ]
-      }
-    ],
-    [
-      "s_cube",
-      "descript",
-      "cube shaped plastic case",
-      {
-        "web": "9/9",
-        "score_min": 0.367,
-        "sim": "10/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "promptsweep_flange",
-          "promptsweep_flange2",
-          "psweep_finalists",
-          "psweep_sim50black"
-        ]
-      }
-    ],
-    [
-      "d2_siwafer__a2",
-      "D:siliconwafer/A:a2",
-      "silicon wafer carrier with a door on the front",
-      {
-        "web": "9/9",
-        "score_min": 0.305,
-        "sim": null,
-        "source": "round3(§37-11) 신규",
-        "runs": [
-          "psweep_domain3"
-        ]
-      }
-    ],
-    [
-      "e1_frontdoor",
-      "E:structure",
-      "plastic box with a removable front door",
-      {
-        "web": "9/9",
-        "score_min": 0.285,
-        "sim": null,
-        "source": "round3(§37-11) 신규",
-        "runs": [
-          "psweep_domain3"
-        ]
-      }
-    ],
-    [
-      "d1_fop__a1",
-      "D:frontopenpod/A:a1",
-      "front opening pod, a boxy plastic object",
-      {
-        "web": "9/9",
-        "score_min": 0.254,
-        "sim": null,
-        "source": "round3(§37-11) 신규",
-        "runs": [
-          "psweep_domain3"
-        ]
-      }
-    ],
-    [
-      "d_fooup_long",
-      "domain",
-      "front opening unified pod",
-      {
-        "web": "9/9",
-        "score_min": 0.25,
-        "sim": "10/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "promptsweep_flange",
-          "promptsweep_flange2",
-          "psweep_domain3",
-          "psweep_finalists",
-          "psweep_short",
-          "psweep_sim50black",
-          "psweep_validated"
-        ]
-      }
-    ],
-    [
-      "e5_latching",
-      "E:structure",
-      "sealed plastic box with a latching door",
-      {
-        "web": "9/9",
-        "score_min": 0.232,
-        "sim": null,
-        "source": "round3(§37-11) 신규",
-        "runs": [
-          "psweep_domain3"
-        ]
-      }
-    ],
-    [
-      "d10_sealed__a2",
-      "D:sealed/A:a2",
-      "sealed wafer container with a door on the front",
-      {
-        "web": "9/9",
-        "score_min": 0.217,
-        "sim": null,
-        "source": "round3(§37-11) 신규",
-        "runs": [
-          "psweep_domain3"
-        ]
-      }
-    ],
-    [
-      "d2_siwafer__a1",
-      "D:siliconwafer/A:a1",
-      "silicon wafer carrier, a boxy plastic object",
-      {
-        "web": "9/9",
-        "score_min": 0.151,
-        "sim": null,
-        "source": "round3(§37-11) 신규",
-        "runs": [
-          "psweep_domain3"
-        ]
-      }
-    ],
-    [
-      "g_case",
-      "generic",
-      "case",
-      {
-        "web": "9/9",
-        "score_min": 0.145,
-        "sim": "10/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "psweep_finalists",
-          "psweep_sim50black"
-        ]
-      }
-    ],
-    [
-      "g_box",
-      "generic",
-      "box",
-      {
-        "web": "9/9",
-        "score_min": 0.09,
-        "sim": "10/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "psweep_finalists",
-          "psweep_sim50black"
-        ]
-      }
-    ],
-    [
-      "s_sidehandle",
-      "descript",
-      "square plastic box with a handle on the side",
-      {
-        "web": "9/9",
-        "score_min": 0.081,
-        "sim": "10/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "psweep_finalists",
-          "psweep_sim50black"
-        ]
-      }
-    ],
-    [
-      "s_rectangular",
-      "descript",
-      "rectangular plastic enclosure",
-      {
-        "web": "9/9",
-        "score_min": 0.069,
-        "sim": "1/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "psweep_finalists",
-          "psweep_sim50black"
-        ]
-      }
-    ],
-    [
-      "g_plasticbox",
-      "generic",
-      "plastic box",
-      {
-        "web": "9/9",
-        "score_min": 0.065,
-        "sim": "5/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "psweep_finalists",
-          "psweep_sim50black"
-        ]
-      }
-    ],
-    [
-      "g_plasticcont",
-      "generic",
-      "plastic container",
-      {
-        "web": "9/9",
-        "score_min": 0.062,
-        "sim": "4/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "psweep_finalists",
-          "psweep_sim50black"
-        ]
-      }
-    ],
-    [
-      "g_thebox",
-      "generic",
-      "the box",
-      {
-        "web": "9/9",
-        "score_min": 0.059,
-        "sim": "8/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "psweep_finalists",
-          "psweep_sim50black"
-        ]
-      }
-    ],
-    [
-      "g_storagebox",
-      "generic",
-      "storage box",
-      {
-        "web": "9/9",
-        "score_min": 0.055,
-        "sim": "9/10",
-        "source": "round1-2(§37-3·§37-8)",
-        "runs": [
-          "promptsweep",
-          "psweep_finalists",
-          "psweep_sim50black"
-        ]
-      }
-    ],
-    [
-      "d9_fab__a1",
-      "D:fabcarrier/A:a1",
-      "semiconductor fab carrier, a boxy plastic object",
-      {
-        "web": "9/9",
-        "score_min": 0.055,
-        "sim": null,
-        "source": "round3(§37-11) 신규",
-        "runs": [
-          "psweep_domain3"
-        ]
-      }
-    ],
-    [
-      "e7_wafers_inside",
-      "E:context",
-      "plastic box with wafers inside",
-      {
-        "web": "9/9",
-        "score_min": 0.052,
-        "sim": null,
-        "source": "round3(§37-11) 신규",
-        "runs": [
-          "psweep_domain3"
-        ]
-      }
+ "_status": "⚪ **이력** — 웹 9장 시절의 `full` 후보(§37-3·§37-8·§37-10). 계보: `real_testset`(136) → `real_pass81` → `real_pass70_50cm` → `real_pass58` → `real_pass37` → `real_top15` → `real_final14` → `real_final12` → `real_final11` → **`real_top4` = 현행 `real_current`**",
+ "_note": "🟢 **`full` 실험 후보군** — 웹사진 9장(assets/real_imgs)에서 **전 이미지 통과(9/9)** 한 텍스트 프롬프트 전부. `tools/prompt_ledger.py` 장부에서 뽑아 기록한다(사용자 지시, 2026-08-27).",
+ "_order": "score 최소값 내림차순 = «미검출까지의 여유» 순. ⚠️ score 는 마스크 품질이 아니다(r=+0.06, 교훈 #90) — 문턱 여유 지표라 중앙값이 아니라 최소값을 본다.",
+ "_limit": "🔴 «검출되는가» 만 통과한 목록이다. **오선택(주변 사물 중 고르기)은 이 9장으로 원리적으로 못 쟀다** — 전부 흰 배경 단일 물체다. 그 축은 distractor 씬(`capture_sim --distractors`)이나 실물 배치 사진에서만 나온다.",
+ "_flange": "🔴 flange 는 이 파일에 없다. 3차 도메인 스윕(§37-11)에서 반송 도메인 용어 8개가 전부 실패했다(최고 6/9). flange 최종본은 `real_validated.json` 의 2개를 유지한다.",
+ "full": [
+  [
+   "s_boxy",
+   "descript",
+   "boxy plastic object",
+   {
+    "web": "9/9",
+    "score_min": 0.645,
+    "sim": "10/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "promptsweep_flange",
+     "promptsweep_flange2",
+     "psweep_domain3",
+     "psweep_finalists",
+     "psweep_short",
+     "psweep_sim50black",
+     "psweep_validated"
     ]
+   }
   ],
-  "_count": "총 20개 — 3차 신규 9 · 기존 11"
+  [
+   "d10_sealed__a1",
+   "D:sealed/A:a1",
+   "sealed wafer container, a boxy plastic object",
+   {
+    "web": "9/9",
+    "score_min": 0.605,
+    "sim": null,
+    "source": "round3(§37-11) 신규",
+    "runs": [
+     "psweep_domain3"
+    ]
+   }
+  ],
+  [
+   "s_cube",
+   "descript",
+   "cube shaped plastic case",
+   {
+    "web": "9/9",
+    "score_min": 0.367,
+    "sim": "10/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "promptsweep_flange",
+     "promptsweep_flange2",
+     "psweep_finalists",
+     "psweep_sim50black"
+    ]
+   }
+  ],
+  [
+   "d2_siwafer__a2",
+   "D:siliconwafer/A:a2",
+   "silicon wafer carrier with a door on the front",
+   {
+    "web": "9/9",
+    "score_min": 0.305,
+    "sim": null,
+    "source": "round3(§37-11) 신규",
+    "runs": [
+     "psweep_domain3"
+    ]
+   }
+  ],
+  [
+   "e1_frontdoor",
+   "E:structure",
+   "plastic box with a removable front door",
+   {
+    "web": "9/9",
+    "score_min": 0.285,
+    "sim": null,
+    "source": "round3(§37-11) 신규",
+    "runs": [
+     "psweep_domain3"
+    ]
+   }
+  ],
+  [
+   "d1_fop__a1",
+   "D:frontopenpod/A:a1",
+   "front opening pod, a boxy plastic object",
+   {
+    "web": "9/9",
+    "score_min": 0.254,
+    "sim": null,
+    "source": "round3(§37-11) 신규",
+    "runs": [
+     "psweep_domain3"
+    ]
+   }
+  ],
+  [
+   "d_fooup_long",
+   "domain",
+   "front opening unified pod",
+   {
+    "web": "9/9",
+    "score_min": 0.25,
+    "sim": "10/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "promptsweep_flange",
+     "promptsweep_flange2",
+     "psweep_domain3",
+     "psweep_finalists",
+     "psweep_short",
+     "psweep_sim50black",
+     "psweep_validated"
+    ]
+   }
+  ],
+  [
+   "e5_latching",
+   "E:structure",
+   "sealed plastic box with a latching door",
+   {
+    "web": "9/9",
+    "score_min": 0.232,
+    "sim": null,
+    "source": "round3(§37-11) 신규",
+    "runs": [
+     "psweep_domain3"
+    ]
+   }
+  ],
+  [
+   "d10_sealed__a2",
+   "D:sealed/A:a2",
+   "sealed wafer container with a door on the front",
+   {
+    "web": "9/9",
+    "score_min": 0.217,
+    "sim": null,
+    "source": "round3(§37-11) 신규",
+    "runs": [
+     "psweep_domain3"
+    ]
+   }
+  ],
+  [
+   "d2_siwafer__a1",
+   "D:siliconwafer/A:a1",
+   "silicon wafer carrier, a boxy plastic object",
+   {
+    "web": "9/9",
+    "score_min": 0.151,
+    "sim": null,
+    "source": "round3(§37-11) 신규",
+    "runs": [
+     "psweep_domain3"
+    ]
+   }
+  ],
+  [
+   "g_case",
+   "generic",
+   "case",
+   {
+    "web": "9/9",
+    "score_min": 0.145,
+    "sim": "10/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "psweep_finalists",
+     "psweep_sim50black"
+    ]
+   }
+  ],
+  [
+   "g_box",
+   "generic",
+   "box",
+   {
+    "web": "9/9",
+    "score_min": 0.09,
+    "sim": "10/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "psweep_finalists",
+     "psweep_sim50black"
+    ]
+   }
+  ],
+  [
+   "s_sidehandle",
+   "descript",
+   "square plastic box with a handle on the side",
+   {
+    "web": "9/9",
+    "score_min": 0.081,
+    "sim": "10/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "psweep_finalists",
+     "psweep_sim50black"
+    ]
+   }
+  ],
+  [
+   "s_rectangular",
+   "descript",
+   "rectangular plastic enclosure",
+   {
+    "web": "9/9",
+    "score_min": 0.069,
+    "sim": "1/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "psweep_finalists",
+     "psweep_sim50black"
+    ]
+   }
+  ],
+  [
+   "g_plasticbox",
+   "generic",
+   "plastic box",
+   {
+    "web": "9/9",
+    "score_min": 0.065,
+    "sim": "5/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "psweep_finalists",
+     "psweep_sim50black"
+    ]
+   }
+  ],
+  [
+   "g_plasticcont",
+   "generic",
+   "plastic container",
+   {
+    "web": "9/9",
+    "score_min": 0.062,
+    "sim": "4/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "psweep_finalists",
+     "psweep_sim50black"
+    ]
+   }
+  ],
+  [
+   "g_thebox",
+   "generic",
+   "the box",
+   {
+    "web": "9/9",
+    "score_min": 0.059,
+    "sim": "8/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "psweep_finalists",
+     "psweep_sim50black"
+    ]
+   }
+  ],
+  [
+   "g_storagebox",
+   "generic",
+   "storage box",
+   {
+    "web": "9/9",
+    "score_min": 0.055,
+    "sim": "9/10",
+    "source": "round1-2(§37-3·§37-8)",
+    "runs": [
+     "promptsweep",
+     "psweep_finalists",
+     "psweep_sim50black"
+    ]
+   }
+  ],
+  [
+   "d9_fab__a1",
+   "D:fabcarrier/A:a1",
+   "semiconductor fab carrier, a boxy plastic object",
+   {
+    "web": "9/9",
+    "score_min": 0.055,
+    "sim": null,
+    "source": "round3(§37-11) 신규",
+    "runs": [
+     "psweep_domain3"
+    ]
+   }
+  ],
+  [
+   "e7_wafers_inside",
+   "E:context",
+   "plastic box with wafers inside",
+   {
+    "web": "9/9",
+    "score_min": 0.052,
+    "sim": null,
+    "source": "round3(§37-11) 신규",
+    "runs": [
+     "psweep_domain3"
+    ]
+   }
+  ]
+ ],
+ "_count": "총 20개 — 3차 신규 9 · 기존 11"
 }

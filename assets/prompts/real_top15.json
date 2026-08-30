@@ -1,4 +1,5 @@
 {
+ "_status": "⚪ **이력** — `full` 좁히기 스냅샷. 계보: `real_testset`(136) → `real_pass81` → `real_pass70_50cm` → `real_pass58` → `real_pass37` → `real_top15` → `real_final14` → `real_final12` → `real_final11` → **`real_top4` = 현행 `real_current`**",
  "_note": "🟢 **웹·실물 양쪽에서 상위권인 15개** (2026-08-28, 사용자 지시). 다음 실물 라운드의 실험군.",
  "_lineage": "`real_testset`(136) → `real_pass81` → `real_pass70_50cm` → `real_pass58` → `real_pass37` → **이 파일(15)**",
  "_criterion": "37개 안에서 **웹 순위·실물 순위를 각각 매기고 «둘 중 나쁜 쪽»** 으로 정렬해 앞 15개. 합이 아니라 최댓값을 쓰는 이유는 «한쪽만 좋은 것» 을 배제하려는 것이다. 결과: **웹 최저 28위 · 실물 최저 23위 · `score` 최저 0.420**.",

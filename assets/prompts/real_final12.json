@@ -1,4 +1,5 @@
 {
+ "_status": "⚪ **이력** — `full` 좁히기 스냅샷. 계보: `real_testset`(136) → `real_pass81` → `real_pass70_50cm` → `real_pass58` → `real_pass37` → `real_top15` → `real_final14` → `real_final12` → `real_final11` → **`real_top4` = 현행 `real_current`**",
  "_note": "🟢 **실물 실험군 12개 스냅샷** (2026-08-28). 현행 정본은 `real_current.json`.",
  "_snapshot": "현재 내용 = `real_final12.json` (2026-08-28). 직전은 `real_final11.json`.",
  "_composition": "웹·실물 양쪽 상위권 6 + 보강 5(`boxy … case` · `… silicon …` · `… semiconductor …` · `boxy sealed plastic wafer pod` · **`box shaped sealed plastic wafer pod`**) + 대조군 1.",

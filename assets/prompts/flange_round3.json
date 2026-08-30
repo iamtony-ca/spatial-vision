@@ -1,59 +1,207 @@
 {
-  "_note": "flange 3차 스윕 — `full` 에서 얻은 규칙을 flange 에 적용한다 (사용자, 2026-08-27). 기존 flange 후보 92개는 **전부 «명사구 + 전치사 닻»** 형태였고, `full` 의 최대 승리인 **형용사 융합(한 명사구에 형상+재질+도메인을 스택)** 은 flange 에 **한 번도 안 해봤다.**",
-  "_from_full": {
-    "형용사 융합": "`full` 1위 `cube shaped sealed plastic wafer pod`(0.977)는 앵커 없는 한 명사구다. flange 대응 = `black square plastic mounting flange` 꼴. **미시험 축이고 이번의 주축이다.**",
-    "plastic 필수": "`full` 에서 `plastic` 을 빼면 0.977→0.812. flange 프롬프트에는 `plastic` 이 **닻 안에서만**(`on top of the plastic box`) 나왔지 **수식어로 쓴 적이 없다.**",
-    "핵명사가 크다": "`full` 에서 핵명사만 바꿔 7.8배 갈렸다(`pod` vs `container`). flange 는 `flange`·`plate`·`bracket` 셋만 봤다.",
-    "형상어는 수식어 자리": "`cube shaped case` 9/9 ↔ `plastic cube` 0/9. flange 형상어(`square`·`flat`·`plate shaped`)를 수식어로만 쓴다.",
-    "색은 black 이 안전": "§37-16-2 — `orange` 만 배타적이고 `black` 은 틀려도 안 죽는다. **flange 는 요구사항상 검정 고정**이라 넣는 편이 낫다."
-  },
-  "_flange_specific": "🔴 **flange 는 `full` 과 정반대인 축이 하나 있다** — 도메인 닻이 **죽인다**. `on top of the wafer carrier`·`of the front opening unified pod` 를 붙인 후보가 **7건 전멸(0/9)** 했다. 반면 `on top of the plastic box`·`on top` 은 살아남았다. → 이번 닻은 **살아남은 것만** 쓴다.",
-  "_limit": "🔴 9장이 전부 흰 배경 단일 물체라 **오선택은 못 잰다**. 그리고 flange 판정에는 `full` 기준 프레임이 필요하므로 `full` 참조 3개를 함께 돌린다(§37-2).",
-  "full": [
-    ["ref_boxy",  "ref", "boxy plastic object"],
-    ["ref_cube",  "ref", "cube shaped sealed plastic wafer pod"],
-    ["ref_fooup", "ref", "front opening unified pod"]
+ "_status": "⚪ **이력** — `flange` 초기 스윕 후보(§37-17 이전). 계보: `flange_round3`(35) → `round4`(52) → `round5`(73) → `round6`(43) → `flange_top20`(20) → **`flange_real20`(20, 재정렬) · `flange_top3`(3)**",
+ "_note": "flange 3차 스윕 — `full` 에서 얻은 규칙을 flange 에 적용한다 (사용자, 2026-08-27). 기존 flange 후보 92개는 **전부 «명사구 + 전치사 닻»** 형태였고, `full` 의 최대 승리인 **형용사 융합(한 명사구에 형상+재질+도메인을 스택)** 은 flange 에 **한 번도 안 해봤다.**",
+ "_from_full": {
+  "형용사 융합": "`full` 1위 `cube shaped sealed plastic wafer pod`(0.977)는 앵커 없는 한 명사구다. flange 대응 = `black square plastic mounting flange` 꼴. **미시험 축이고 이번의 주축이다.**",
+  "plastic 필수": "`full` 에서 `plastic` 을 빼면 0.977→0.812. flange 프롬프트에는 `plastic` 이 **닻 안에서만**(`on top of the plastic box`) 나왔지 **수식어로 쓴 적이 없다.**",
+  "핵명사가 크다": "`full` 에서 핵명사만 바꿔 7.8배 갈렸다(`pod` vs `container`). flange 는 `flange`·`plate`·`bracket` 셋만 봤다.",
+  "형상어는 수식어 자리": "`cube shaped case` 9/9 ↔ `plastic cube` 0/9. flange 형상어(`square`·`flat`·`plate shaped`)를 수식어로만 쓴다.",
+  "색은 black 이 안전": "§37-16-2 — `orange` 만 배타적이고 `black` 은 틀려도 안 죽는다. **flange 는 요구사항상 검정 고정**이라 넣는 편이 낫다."
+ },
+ "_flange_specific": "🔴 **flange 는 `full` 과 정반대인 축이 하나 있다** — 도메인 닻이 **죽인다**. `on top of the wafer carrier`·`of the front opening unified pod` 를 붙인 후보가 **7건 전멸(0/9)** 했다. 반면 `on top of the plastic box`·`on top` 은 살아남았다. → 이번 닻은 **살아남은 것만** 쓴다.",
+ "_limit": "🔴 9장이 전부 흰 배경 단일 물체라 **오선택은 못 잰다**. 그리고 flange 판정에는 `full` 기준 프레임이 필요하므로 `full` 참조 3개를 함께 돌린다(§37-2).",
+ "full": [
+  [
+   "ref_boxy",
+   "ref",
+   "boxy plastic object"
   ],
-  "flange": [
-    ["c1_mounting", "control", "top mounting plate with a hole"],
-    ["c2_bracket",  "control", "black square bracket on top"],
-    ["c3_topflange","control", "black top flange on top of the plastic box"],
-
-    ["af01", "AF:fuse", "black square plastic mounting flange"],
-    ["af02", "AF:fuse", "flat black square plastic plate"],
-    ["af03", "AF:fuse", "black square plastic top flange"],
-    ["af04", "AF:fuse", "flat black plastic mounting plate"],
-    ["af05", "AF:fuse", "black square plastic handling flange"],
-    ["af06", "AF:fuse", "flat square black plastic bracket"],
-    ["af07", "AF:fuse", "black square plastic wafer pod flange"],
-    ["af08", "AF:fuse", "flat black square plastic cover"],
-    ["af09", "AF:fuse", "black flat plastic top plate"],
-    ["af10", "AF:fuse", "square black plastic lifting flange"],
-    ["af11", "AF:fuse", "black square plastic robot flange"],
-    ["af12", "AF:fuse", "flat black square plastic fixture"],
-
-    ["hf1_plate",    "HF:head", "black square plastic top plate"],
-    ["hf2_bracket",  "HF:head", "black square plastic top bracket"],
-    ["hf3_fixture",  "HF:head", "black square plastic top fixture"],
-    ["hf4_cover",    "HF:head", "black square plastic top cover"],
-    ["hf5_cap",      "HF:head", "black square plastic top cap"],
-    ["hf6_adapter",  "HF:head", "black square plastic top adapter"],
-    ["hf7_coupling", "HF:head", "black square plastic top coupling"],
-    ["hf8_disc",     "HF:head", "black square plastic top disc"],
-
-    ["sf1_square",   "SF:shape", "square black plastic top flange"],
-    ["sf2_flat",     "SF:shape", "flat black plastic top flange"],
-    ["sf3_plateshp", "SF:shape", "plate shaped black plastic top flange"],
-    ["sf4_discshp",  "SF:shape", "disc shaped black plastic top flange"],
-    ["sf5_rect",     "SF:shape", "rectangular black plastic top flange"],
-
-    ["pf1_noplastic","PF:material", "black square top flange"],
-    ["pf2_pre",      "PF:material", "plastic black square top flange"],
-    ["pf3_mid",      "PF:material", "black plastic square top flange"],
-
-    ["nf1", "NF:fuse+anchor", "black square plastic mounting flange on top of the plastic box"],
-    ["nf2", "NF:fuse+anchor", "flat black square plastic plate on top of the plastic box"],
-    ["nf3", "NF:fuse+anchor", "black square plastic top flange on top of the box"],
-    ["nf4", "NF:fuse+anchor", "black square plastic top flange on top"]
+  [
+   "ref_cube",
+   "ref",
+   "cube shaped sealed plastic wafer pod"
+  ],
+  [
+   "ref_fooup",
+   "ref",
+   "front opening unified pod"
   ]
+ ],
+ "flange": [
+  [
+   "c1_mounting",
+   "control",
+   "top mounting plate with a hole"
+  ],
+  [
+   "c2_bracket",
+   "control",
+   "black square bracket on top"
+  ],
+  [
+   "c3_topflange",
+   "control",
+   "black top flange on top of the plastic box"
+  ],
+  [
+   "af01",
+   "AF:fuse",
+   "black square plastic mounting flange"
+  ],
+  [
+   "af02",
+   "AF:fuse",
+   "flat black square plastic plate"
+  ],
+  [
+   "af03",
+   "AF:fuse",
+   "black square plastic top flange"
+  ],
+  [
+   "af04",
+   "AF:fuse",
+   "flat black plastic mounting plate"
+  ],
+  [
+   "af05",
+   "AF:fuse",
+   "black square plastic handling flange"
+  ],
+  [
+   "af06",
+   "AF:fuse",
+   "flat square black plastic bracket"
+  ],
+  [
+   "af07",
+   "AF:fuse",
+   "black square plastic wafer pod flange"
+  ],
+  [
+   "af08",
+   "AF:fuse",
+   "flat black square plastic cover"
+  ],
+  [
+   "af09",
+   "AF:fuse",
+   "black flat plastic top plate"
+  ],
+  [
+   "af10",
+   "AF:fuse",
+   "square black plastic lifting flange"
+  ],
+  [
+   "af11",
+   "AF:fuse",
+   "black square plastic robot flange"
+  ],
+  [
+   "af12",
+   "AF:fuse",
+   "flat black square plastic fixture"
+  ],
+  [
+   "hf1_plate",
+   "HF:head",
+   "black square plastic top plate"
+  ],
+  [
+   "hf2_bracket",
+   "HF:head",
+   "black square plastic top bracket"
+  ],
+  [
+   "hf3_fixture",
+   "HF:head",
+   "black square plastic top fixture"
+  ],
+  [
+   "hf4_cover",
+   "HF:head",
+   "black square plastic top cover"
+  ],
+  [
+   "hf5_cap",
+   "HF:head",
+   "black square plastic top cap"
+  ],
+  [
+   "hf6_adapter",
+   "HF:head",
+   "black square plastic top adapter"
+  ],
+  [
+   "hf7_coupling",
+   "HF:head",
+   "black square plastic top coupling"
+  ],
+  [
+   "hf8_disc",
+   "HF:head",
+   "black square plastic top disc"
+  ],
+  [
+   "sf1_square",
+   "SF:shape",
+   "square black plastic top flange"
+  ],
+  [
+   "sf2_flat",
+   "SF:shape",
+   "flat black plastic top flange"
+  ],
+  [
+   "sf3_plateshp",
+   "SF:shape",
+   "plate shaped black plastic top flange"
+  ],
+  [
+   "sf4_discshp",
+   "SF:shape",
+   "disc shaped black plastic top flange"
+  ],
+  [
+   "sf5_rect",
+   "SF:shape",
+   "rectangular black plastic top flange"
+  ],
+  [
+   "pf1_noplastic",
+   "PF:material",
+   "black square top flange"
+  ],
+  [
+   "pf2_pre",
+   "PF:material",
+   "plastic black square top flange"
+  ],
+  [
+   "pf3_mid",
+   "PF:material",
+   "black plastic square top flange"
+  ],
+  [
+   "nf1",
+   "NF:fuse+anchor",
+   "black square plastic mounting flange on top of the plastic box"
+  ],
+  [
+   "nf2",
+   "NF:fuse+anchor",
+   "flat black square plastic plate on top of the plastic box"
+  ],
+  [
+   "nf3",
+   "NF:fuse+anchor",
+   "black square plastic top flange on top of the box"
+  ],
+  [
+   "nf4",
+   "NF:fuse+anchor",
+   "black square plastic top flange on top"
+  ]
+ ]
 }
