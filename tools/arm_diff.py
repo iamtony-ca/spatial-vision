@@ -93,7 +93,9 @@ def load(run: Path) -> dict[str, dict[str, tuple]]:
     return out
 
 
-def q(v: list[float]) -> tuple[float, float, float]:
+def quantiles(v: list[float]) -> tuple[float, float, float]:
+    """(중앙, p90, 최대). 🔴 이름을 `q` 로 두었다가 `main` 안의 지역변수와 충돌해 죽었다 —
+    파이썬은 **함수 안 어디서든 대입하면 그 이름이 함수 전체에서 지역**이 된다."""
     a = np.asarray(v, float)
     return float(np.median(a)), float(np.percentile(a, 90)), float(a.max())
 
@@ -159,20 +161,23 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             dr = [rotation_angle_deg(d[u][f][0], d[v][f][0]) for f in common]
             dt = [float(np.linalg.norm(d[u][f][1] - d[v][f][1])) for f in common]
-            rm, r9, rx = q(dr)
-            tm, t9, tx = q(dt)
+            rm, r9, rx = quantiles(dr)
+            tm, t9, tx = quantiles(dt)
             # ★ **구조상 같은 값을 공유하는 짝**을 먼저 가른다 — 하이브리드(R=coarse·t=refined)는
             #   자기 기반 FP 와 t 를 **정확히** 공유한다. 0.000 이 나오는 게 정상이고, 안 나오면
             #   하이브리드가 깨진 것이다. 이걸 «다르다» 로 세면 표가 통째로 오독된다.
-            share = ("t 공유" if tx == 0 else "R 공유" if rx == 0 else "")
-            # 🔴 판정은 **중앙값**으로 한다. 꼬리는 따로 표시한다 — n 이 작으면 max 가 곧 잡음이다.
-            med_ok = rm <= NOISE_R_MED and tm <= NOISE_T_MED
+            # 🔴 판정은 **어느 축이 문턱을 넘었나** 로 한다. 초판은 `t 공유` 꼬리표가 판정을
+            #    가로채 «ΔR 이 넘었다» 를 못 말했다 — 심은 값 검증에서 드러났다.
+            over = [n for n, v, lim in (("ΔR", rm, NOISE_R_MED), ("Δt", tm, NOISE_T_MED))
+                    if v > lim]
+            # ★ 한 축이 **정확히 0** 이면 «같은 값을 쓰는» 짝이다(하이브리드 ↔ 그 기반 FP).
+            #   판정이 아니라 **꼬리표**로 붙인다 — 그것 자체는 좋고 나쁨이 아니다.
+            tag = ("  · t 동일" if tx == 0 else "  · R 동일" if rx == 0 else "")
+            med_ok = not over
             n_same += med_ok
-            mark = ("★ " + share + " (구조상 정상)" if share and med_ok else
-                    "🔴 " + share + " 인데 중앙 초과" if share else
-                    "구분 안 됨" if med_ok and rx <= NOISE_R_MAX else
+            mark = ("구분 안 됨" if med_ok and rx <= NOISE_R_MAX and tx <= NOISE_T_MAX else
                     "⚠️ 중앙은 바닥 안 · **꼬리 초과**" if med_ok else
-                    "🔴 **다르다**")
+                    "🔴 **다르다** (" + "·".join(over) + ")") + tag
             say(f"| `{u}` ↔ `{v}` | {len(common)} | {rm:.3f}° | {r9:.3f}° | **{rx:.3f}°** "
                 f"| {tm:.3f} | {t9:.3f} | **{tx:.3f}** | {mark} |")
         say("")
@@ -183,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
             say(f"- 🔴🔴 **n={n_com} 이라 `p90`·`최대` 열은 읽지 말 것** — 표본이 10 미만이면 "
                 f"꼬리 통계가 곧 잡음이다(교훈 #58: n=40 무결점도 실패율 상한이 7.5% 였다). "
                 f"**중앙값 열만** 본다.")
-        say(f"- ★ **`t 공유`·`R 공유` 는 «같은 값을 쓰도록 만든» 짝**이다 — 하이브리드는 자기 기반 "
+        say(f"- ★ **`t 동일`·`R 동일` 은 그 축이 «정확히 0» 인 짝**이다 — 하이브리드는 자기 기반 "
             f"FP 와 **t 를 정확히 공유**한다(R=coarse·t=refined, §27-7). `0.000` 이 정상이고 "
             f"**0 이 아니면 하이브리드가 깨진 것**이다. 성능 비교로 읽지 말 것.")
         say(f"- 🔴 **«하이브리드 ↔ refined» 의 ΔR ~2° 는 잡음이 아니라 구조**다 — 하이브리드는 R 을 "
@@ -204,10 +209,11 @@ def main(argv: list[str] | None = None) -> int:
     say("   🔴 로봇이 필요 없다(카메라를 안 움직인다).")
 
     if a.md_out:
-        q = Path(a.md_out)
-        q.parent.mkdir(parents=True, exist_ok=True)
-        q.write_text("\n".join(L) + "\n", encoding="utf-8")
-        print(f"\n→ {q.resolve()}")          # 🔴 «어디에 떨어졌나» 를 절대경로로 말한다
+        mp = Path(a.md_out)
+        if mp.parent != Path(""):
+            mp.parent.mkdir(parents=True, exist_ok=True)
+        mp.write_text("\n".join(L) + "\n", encoding="utf-8")
+        print(f"\n→ {mp.resolve()}")          # 🔴 «어디에 떨어졌나» 를 절대경로로 말한다
     return 0
 
 
