@@ -1099,6 +1099,7 @@ A2~A4 대조군은 추가 촬영 0 이다 → §9.1★c.
 ★★★ **육안·진단 산출물 (`RESULTS.md §35-2n`)** — 전부 추가 촬영 0:
 `overlay_sheet.png`(프레임 × 변형) · **`overlay_combo.png`**(한 이미지에 겹침) ·
 **`segcmp/seg_compare.png`**(분할 + 그 pose, 크롭 없음 — 「분할이 틀렸나 pose 가 틀렸나」) ·
+🟢 **`tools/inspect_frames.py`**(**프레임마다 한 장** — 마스크 + 최종 pose 를 색 달리해 겹친다. `arms`/`prompts`/`all` 세 시점. 러너 시트는 몇 장만 뽑지만 이건 **전 프레임**이다. 🔴 런 단위 요약이 못 하는 «몇 번 프레임이 어떻게 틀렸나» 를 보는 수단이고, GT 없는 실환경에서 «다 같이 틀린» 경우를 잡는 건 눈뿐이다) ·
 `diag/diag_sheet.png`·`diag_trends.png` · **`stats/traffic.png`**(신호등) · `stats/variants.png` ·
 `scale_check.json`(실루엣 거리). 오버레이에는 **mm 눈금자**가 찍힌다.
 🔴 **신호등은 «순위표» 가 아니라 «고장 표시» 다** — GT 없이 프레임별 우열은 원리적으로 못 정한다(§7.5).
@@ -1119,14 +1120,18 @@ A2~A4 대조군은 추가 촬영 0 이다 → §9.1★c.
 python3 tools/make_frame_from_zed.py --left L.png --right R.png \
     --cam assets/cam/zedx_s48560070_hd1200.json --out runs/real01/frame_0000
 envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
-    --preset n30black --ism --sam3-text --text-prompt "black plastic box" \
-    --mode wide \
+    --no-exemplar --mode combo,prompts \
+    --text-prompt "cube shaped sealed plastic wafer pod" \
+    --text-prompt-flange "top mounting plate with a hole" --text-conf-flange 0.15 \
     --note "형광등 2등, FOUP 정면, 1차 시도" --true-distance-mm 280      # 뒤 둘은 선택
+#   🟢 프롬프트는 확정됐다 — `full` 4개(§39-30e) · `flange` 2개(§41). 색어를 안 쓴다(§41-4).
 #   --mode : 후보를 얼마나 넓게 펼치나 (`--list-modes`). 기본 `default` = 9팔.
-#           `wide` = **23팔**(정합·게이트·초기값·캐스케이드·select·edge) — **실물 초반 권장**
-#                    ⚠️ `combo`(§38 실물 검증 체인)는 `wide` 에 안 들어간다 — `--mode wide,combo`
-#           `all`  = **34팔** (참조 스윕 + 실물 검증 COMBO. `--ism`·`--sam3-text` 자동)
-#                    `--text-prompt-flange` 를 주면 **36팔**(TF 경로, §37-9)
+#           `combo,prompts` = **15팔** ← **지금 권장**. §38 실물 검증 체인 + TF + `full` 4개.
+#                    🔴 `--no-exemplar` 를 함께 준다 — 안 주면 실물에서 죽는 A 팔 4개가 딸려 온다(§38-1)
+#           `wide` = **23팔**(정합·게이트·초기값·캐스케이드·select·edge) — 축을 넓게 볼 때
+#                    ⚠️ `combo`·`prompts` 는 `wide` 에 안 들어간다 — `--mode wide,combo,prompts`
+#           `all`  = **35팔** (참조 스윕 + COMBO. `--ism`·`--sam3-text` 자동)
+#                    `--text-prompt-flange` 를 주면 **37팔**(TF 경로, §37-9)
 #   --limit-frames N : 앞 N 장만 (새 설정을 처음 시험할 때)
 # 여러 번 돌린 뒤 — 설정 diff 를 먼저 내고 지표를 나란히 놓는다
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
@@ -1162,8 +1167,8 @@ envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index
 | **A5** | **근접 거리 3점** | 0.22~0.30 / 0.28~0.35 / 0.35~0.45m | 419 / 343 / 264px · R 0.220/0.291/0.384 | **각 1** | sim 최적점 재현 + **손이 닿는 거리** 확인. 🔴 **후퇴율로 판정하면 안 된다**(위 9.1★b) — 좌우 일관성 + 오버레이 육안으로 본다 |
 | **I1·I3** | **ISM 경로 대조군** (CAD 템플릿 단독) | `run_group_a.py --ism` | `black` n25 12/20 → **n30 17/20** (§35-2h) | **0** | `A1` 과 z 가 크게 어긋나면 한쪽이 틀린 것이다. **거리대에 민감**하니 A5 와 같이 읽는다 |
 | **T1·T3** | **텍스트 경로 대조군** (참조 자산 비의존) | `--sam3-text --text-prompt "…"` | 50cm `black` T3 ≈ I3 (R 0.470↔0.452) (§35-2m-5) | **0** | **참조의 도메인 갭을 우회한다.** A 가 무너지고 T 가 살면 원인은 «참조» 지 «SAM3» 가 아니다 |
-| **RP1·RP2·RP3·RH1** | 🔴🔴 **실물에서 실제로 통과한 체인** (§38) | `--mode combo` (`all` 에 포함) | 실물에서 «눈으로 오차 분간 불가». **GT 없음** | **0** | ★ 텍스트 full 마스크 + `--primary full` + **stage2 on** + 하이브리드(R=coarse·t=refined). 🔴 **정합이 없다** — sim 권고와 네 군데가 다르다. 🔴 넷이 전부 «분간 안 됨» 이라 육안으로 못 가른다 → **좌우 \|Δdx\|** 로 서열화. ⚠️ `--input-scale 0.75` 는 `expandable_segments` 필요(§38-4) |
-| **TF1·TF3** | **텍스트 flange 경로** (`--primary flange`) | `--text-prompt-flange "…"` | sim GT: **t 1.095mm (T 대비 1.8배)** · R 중앙 1.0° (2배 나쁨) · 10/10 (§37-9b) | **0** | ★ `--primary full` 의 **t 천장(§22, 3배)** 을 넘는 유일한 무참조 경로. 🔴 마스크가 어긋나면 **90° 뒤집힘**(IoU ≥0.98 조건, §32-1) — **A1 과 회전이 90° 배수로 어긋나는지** 반드시 본다. 🔴 SAM3 의 결손이 **flange 에 몰린다**는 § M4 측정이 근접+텍스트에도 성립하는지가 이 팔의 질문이다. ★★ **프롬프트는 `assets/prompts/flange_real20.json`(상위 20)** — 웹 «어려운» 40장 **세 벌**을 사람이 판정해 합산한 서열(`docs/PROMPT_RANKING_FLANGE.md` · §39-31~§39-39). 🔴 **13/20 이 1위와 구분되지 않아** 실물 분할 스윕으로 먼저 3~4개로 좁힌 뒤 이 팔에 넣는다 |
+| **RP1·RP2·RP3·RH1·RH2** | 🔴🔴 **실물에서 실제로 통과한 체인** (§38) | `--mode combo` (`all` 에 포함) | 실물에서 «눈으로 오차 분간 불가». **GT 없음** | **0** | ★ 텍스트 full 마스크 + `--primary full` + **stage2 on** + 하이브리드(R=coarse·t=refined). 🔴 **정합이 없다** — sim 권고와 네 군데가 다르다. 🔴 넷이 전부 «분간 안 됨» 이라 육안으로 못 가른다 → **좌우 \|Δdx\|** 로 서열화. ★ **RH2** = RP2(0.5) 기반 하이브리드. 🔴 **RP1/RP2/RP3 는 통계적으로 구분되지 않는다**(4회 재실행 짝지은 검정 p=1.000, §38-9) — 선택은 **비용·OOM 위험**으로. **의미 있는 노브는 «하이브리드를 켜는 것» 하나**다. ⚠️ `--input-scale 0.75` 는 `expandable_segments` 필요(§38-4) |
+| **TF1·TF3** | **텍스트 flange 경로** (`--primary flange`) | `--text-prompt-flange "…"` | sim GT: **t 1.095mm (T 대비 1.8배)** · R 중앙 1.0° (2배 나쁨) · 10/10 (§37-9b) | **0** | ★ `--primary full` 의 **t 천장(§22, 3배)** 을 넘는 유일한 무참조 경로. 🔴 마스크가 어긋나면 **90° 뒤집힘**(IoU ≥0.98 조건, §32-1) — **A1 과 회전이 90° 배수로 어긋나는지** 반드시 본다. 🔴 SAM3 의 결손이 **flange 에 몰린다**는 § M4 측정이 근접+텍스트에도 성립하는지가 이 팔의 질문이다. ★★ **프롬프트는 확정됐다 — `assets/prompts/flange_real_top2.json` 2개**(§41). 실물 3거리(28·40·50cm, 각 40장)에 웹 상위 20을 다 돌려 **셋 다 통과한 2개**이고, 그 둘은 **관사만 다른 같은 문장**이다(`top mounting plate with a hole`). 🔴 **`black` 16개가 전멸했다 — 실물 flange 가 실제로 검정인데도**(§41-4). 🔴🔴 **여유가 얇다**(`full` 은 136 → 58 인데 flange 는 20 → 2) — 개체·조명이 바뀌면 **0개가 될 수 있다.** 재스윕은 `flange_real20.json`(20개). 🔴🔴 **이 경로는 «켜야 하는 것» 이 아니라 «더 짜내야 할 때 켜는 것» 이다**(§41-9b) — `--primary full` 이 이미 KPI 안쪽이고(t 중앙 2.20~2.87mm · 하이브리드 ADD 1.395mm ↔ KPI ≤5mm) **실물에서 전 체인이 통과한 유일한 기록(§38)은 flange 마스크를 아예 안 쓴다.** ★ **채택 조건 3개** — 좌우 `\|Δdx\|` 가 `full` 계열보다 뚜렷이 낫고 · 회전이 90°/180° 배수로 어긋나는 프레임 **0** · 검출 0 프레임 **0**. 하나라도 어긋나면 끈다 |
 
 🔴🔴 **A그룹(exemplar)은 실물에서 전부 실패했다** (§38-1). sim 에서 만든 참조로는 하나도 안 됐고,
 **텍스트가 유일하게 살아남은 SAM3 경로**다. A 는 이제 «배포 후보» 가 아니라 **대조군**으로 읽는다.
@@ -1174,6 +1179,9 @@ T 의 성능은 전적으로 프롬프트가 정하는데, 지금 쓰는 낱말�
 
 > 🟢🟢 **2026-08-28 — 이 절차를 다 돌렸고 프롬프트 축은 닫혔다** (`RESULTS.md §39`).
 > 웹 237장 + 실물 3런(1차·50cm·28cm)으로 **136 → 81 → 70 → 58 → 12 → 4** 로 좁혔다.
+> ★★ **`--mode prompts` 로 4개를 한 런에서 돌린다** (§41-10) — 프롬프트마다 `RP1@<tag>`·`RH1@<tag>` 두 팔이 붙고 `report.md` 가 **「검출 → pose → 이탈 → 좌우 `|Δdx|`」 순서의 전용 표**를 낸다. 🔴 프롬프트당 COMBO 5팔을 복제하지 않는다(RP1/RP2/RP3 는 §38-9 에서 «구분되지 않는다»).
+> 🔴 **초기값이 달라지는 비교**라 게이트 후퇴율로 판정하면 안 된다(교훈 #82). 갈리는 축은 **«검출되느냐» 하나**다(§37-5·§39-17).
+>
 > **현행 4개는 `assets/prompts/real_current.json`** — `cube shaped sealed plastic wafer pod`(A, 양쪽 1위) ·
 > `plastic cube shaped sealed wafer pod`(W, 웹 1위) · `boxy sealed plastic wafer pod`(B, 실물 3위) ·
 > `a boxy plastic object`(C, 🔴 **대조군** — 도메인어 없음). 넷이 **어순·형상어·도메인어** 세 축을 본다.

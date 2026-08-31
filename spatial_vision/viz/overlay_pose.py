@@ -95,7 +95,8 @@ def draw_axes(img, T, K, mm: float) -> None:
     cv2.circle(img, o, 4, (255, 255, 255), -1)
 
 
-def draw_scalebar(img, px_per_mm_disp: float, mm_per_px_src: float) -> None:
+def draw_scalebar(img, px_per_mm_disp: float, mm_per_px_src: float,
+                  max_span_mm: float | None = None) -> None:
     """★ **mm 눈금자** — *"10mm 쯤 어긋난 것 같다"* 를 눈대중이 아니라 **읽어서** 판정한다.
 
     실환경에는 GT 가 없어 오차를 숫자로 못 낸다. 남는 건 오버레이인데, 거기서 «윤곽이 얼마나
@@ -109,7 +110,12 @@ def draw_scalebar(img, px_per_mm_disp: float, mm_per_px_src: float) -> None:
     if not (np.isfinite(px_per_mm_disp) and px_per_mm_disp > 0):
         return
     H, W = img.shape[:2]
-    fits = [s for s in (5, 10, 20, 50, 100, 200, 500) if s * px_per_mm_disp <= 0.45 * W]
+    # 🔴 **«가장 긴 것» 이 아니라 «읽을 수 있는 것» 을 고른다.** 크롭이 없는 시트(seg_compare)에서는
+    #    500mm 가 들어가 버리는데 그러면 **눈금 한 칸이 50mm** 라 우리가 실제로 판정하려는
+    #    «1~5mm 어긋났나»(KPI t ≤5mm)·«10mm 넘었나»(§35-2m-6)를 못 읽는다.
+    #    → 부르는 쪽이 `max_span_mm` 으로 상한을 건다.
+    fits = [s for s in (5, 10, 20, 50, 100, 200, 500)
+            if s * px_per_mm_disp <= 0.45 * W and (max_span_mm is None or s <= max_span_mm)]
     span = fits[-1] if fits else 5
     L = int(round(span * px_per_mm_disp))
     if L < 12:

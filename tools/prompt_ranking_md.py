@@ -65,6 +65,22 @@ def main() -> int:
         L += ["## 🟢 현행 실험군 — `assets/prompts/real_current.json`", "",
               f"**{len(cur)}개.** pose 까지 돌리는 팔은 이것뿐이다. 넓히는 조건은 "
               "«오선택 축을 열 때»·«개체·조명이 바뀔 때» 뿐(§39-30).", "",
+              "★★ **`--mode prompts` 로 넷을 한 런에서 돌린다** (§41-10) — 프롬프트마다 "
+              "`RP1@<tag>`·`RH1@<tag>` 두 팔이 붙고, `report.md` 가 "
+              "**「검출 → pose → 이탈 → 좌우 `|Δdx|`」 순서의 전용 표**를 낸다.", "",
+              "```bash",
+              "envs/pose/bin/python tools/run_group_a.py --in <촬영> --out <출력> \\",
+              "    --no-exemplar --mode combo,prompts \\",
+              f"    --text-prompt \"{cur[0][0]}\" \\",
+              "    --text-prompt-flange \"top mounting plate with a hole\" --text-conf-flange 0.15",
+              "```", "",
+              "- 🔴 **초기값이 달라지는 비교**라 게이트 후퇴율로 판정하면 안 된다(교훈 #82). "
+              "갈리는 축은 **«검출되느냐» 하나**다(§37-5·§39-17) — 전 프레임 통과한 것이 "
+              "여럿이면 그때 **좌우 `|Δdx|`** 로 고른다.",
+              "- 🔴 **이 넷에는 색어가 하나도 없다** — `black` 하나를 붙이면 `score` 가 "
+              "0.977 → 0.420 으로 절반 넘게 깎인다(§39-27a). 몸체 3종 어디에도 그대로 쓴다.",
+              "- **`flange` 는 이 파일이 아니다** → `assets/prompts/flange_real_top2.json` **2개** "
+              "(실물 3거리에서 20 → 2, §41). 서열 표는 `docs/PROMPT_RANKING_FLANGE.md`.", "",
               "| 프롬프트 | 역할 |", "|---|---|"]
         L += [f"| `{s}` | {r} |" for s, r in cur]
         L += [""]

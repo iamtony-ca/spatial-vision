@@ -53,13 +53,24 @@ except Exception:                                                # pragma: no co
 
 _K_CACHE: dict = {}
 
+# ★ mm 눈금자는 `overlay_pose` 것을 **그대로 재사용**한다 — 같은 그림을 두 벌 구현하면
+#   한쪽만 고쳐져서 두 시트의 «10mm» 가 달라진다(교훈 #20 의 구조).
+try:
+    from spatial_vision.viz.overlay_pose import draw_scalebar
+except Exception:                                          # noqa: BLE001
+    draw_scalebar = None
+
 # 🔴 `overlay_pose.COMBO_COLORS` 와 **같은 순서**로 둔다 — 두 시트를 나란히 볼 때 팔마다
 #    색이 달라지면 눈이 헷갈린다. 빨강은 거기서 GT 전용이라 여기서도 안 쓴다.
 COLORS = [(0, 255, 0), (255, 255, 0), (0, 255, 255), (255, 0, 255),
           (0, 165, 255), (255, 128, 0), (128, 255, 128), (200, 200, 255)]
 # ★ pose 는 **마스크와 겹치지 않는 팔레트**를 쓴다. `COLORS` 를 이어서 쓰면 5번째가
 #   연두(128,255,128)라 1번째 초록과 헷갈린다 — 실제로 시트에서 구분이 안 됐다.
-POSE_COLORS = [(0, 165, 255), (255, 128, 0), (180, 180, 255), (0, 255, 128)]
+# 🔴 **4색이면 pose 5개부터 색이 순환해 «다른 팔이 같은 색» 이 된다** — 겹쳐 보는 시트에서
+#    그건 «구분이 안 되는» 정도가 아니라 **오독**이다. 7색으로 넓혔다(2026-08-31).
+#    빨강 계열(0,0,255)은 overlay_pose 에서 GT 전용이라 여기서도 안 쓴다.
+POSE_COLORS = [(0, 165, 255), (255, 128, 0), (180, 180, 255), (0, 255, 128),
+               (255, 0, 0), (240, 32, 160), (0, 215, 255)]
 EDGE_THR = 0.25          # 중심 이탈 임계 — §34-10 의 «사전 위치 가드» 를 화면 좌표로 옮긴 것
 
 
@@ -150,6 +161,8 @@ def make_tile(frame: Path, segs: list, width: int, alpha: float,
     #   채우면 아래가 안 보이고, 실선이면 마스크 윤곽과 구분이 안 된다.
     for j, (d, name, lab) in enumerate(poses or []):
         col = POSE_COLORS[j % len(POSE_COLORS)]
+        if j >= len(POSE_COLORS):
+            lab += " ⚠️색순환"      # 🔴 같은 색이 두 번 나오면 시트를 오독한다
         T = load_pose(d / frame.name / name)
         if T is None:
             rows.append((f"[P] {lab}", col, None, None))
@@ -170,6 +183,15 @@ def make_tile(frame: Path, segs: list, width: int, alpha: float,
 
     s = width / W
     img = cv2.resize(img, (width, int(H * s)))
+    # ★ **mm 눈금자** — «점선이 얼마나 벌어졌나» 를 눈대중이 아니라 **읽어서** 판정한다.
+    #   🔴 `seg_compare` 는 크롭이 없어 배율이 `width/W` 하나뿐이라 계산이 단순하다.
+    #   ⚠️ **물체 평면(= pose 의 z)에서만 맞다.** z 는 첫 pose 에서 가져온다 — pose 가 없으면 안 그린다.
+    z = next((r[3] for r in rows if r[3]), None)
+    if draw_scalebar is not None and z:
+        fx = float(K_of(frame)[0, 0])
+        # 🔴 **100mm 상한** → 눈금 10mm. 이 시트는 크롭이 없어 그냥 두면 500mm(눈금 50mm)가
+        #   잡히는데, 우리가 재려는 것은 «KPI 5mm»·«정합 이동 10mm»(§35-2m-6) 급이다.
+        draw_scalebar(img, fx / z * s, z / fx, max_span_mm=100)
     h = 18 * max(len(rows), 1) + 8
     cv2.rectangle(img, (0, 0), (width - 1, h), (0, 0, 0), -1)
     y = 15

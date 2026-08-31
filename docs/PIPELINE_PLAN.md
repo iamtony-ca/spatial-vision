@@ -187,15 +187,22 @@ spatial_manipulation_ws/src/
     │   │                           #   + GT-free 리포트·진단시트·오버레이(겹치기 포함)·분할+pose 대조
     │   │                           #   · 신호등(stats/traffic.png)·통계·실루엣 거리·run_meta 까지 낸다
     │   │                           #   `--limit-frames N` 으로 앞 N 장만 (새 설정 시험용)
-    │   │                           #   ★ `--mode` 로 후보 폭을 정한다: default **9** / wide **23** /
-    │   │                             all **34**(참조 스윕 + **combo** = §38 실물 검증 체인,
-    │   │                             --ism·--sam3-text 자동). `--list-modes`
+    │   │                           #   ★ `--mode` 로 후보 폭을 정한다: default **9** /
+    │   │                             **combo,prompts 15 ← 현행 권장** / wide **23** /
+    │   │                             all **35**(참조 스윕 + combo, --ism·--sam3-text 자동). `--list-modes`
+    │   │                           #   ★ `--mode prompts` = `full` 프롬프트 여러 개를 **한 런에서**
+    │   │                             (기본 현행 4개). 프롬프트마다 `RP1@<tag>`·`RH1@<tag>` (§41-10)
     │   │                           #   ★ `--text-prompt-flange` 로 **TF 경로**(텍스트 flange →
-    │   │                             `--primary flange`, §37-9) 추가 → **36팔**
+    │   │                             `--primary flange`, §37-9) 추가 → all 이면 **37팔**
+    │   │                           #   ★ `--no-exemplar` 로 sim 참조 경로를 빼고 정합 축을 옮긴다(§38-8)
     │   ├── sam3_prompt_sweep.py   # ✅ **SAM3 텍스트 프롬프트 스윕** — 모델 1회 로드로 이미지 ×
     │   │                           #   프롬프트 전수. GT-free 지표 + **육안 시트**(perfect/matrix)
     │   │                           #   `--prompts-json` 목록 교체 · `--rebuild-sheets` 추론 없이
     │   │                           #   재생성 · `--instances` 후보를 하나씩 (§37-2)
+    │   ├── inspect_frames.py      # ✅ **프레임마다 한 장** — 마스크 + 최종 pose 를 색 달리해
+    │   │                           #   겹친다. `arms`(pose 팔만) / `prompts`(분할까지) / `all`
+    │   │                           #   🔴 팔마다 pose 파일 이름이 달라(`hyb_*/pose_coarse` ↔
+    │   │                           #   `fp_chull/pose_refined`) 손으로 조립하면 조용히 «없음»
     │   ├── compare_runs.py         # ✅ 런 N개 비교 (설정 diff 먼저 → 지표) + 누적 실험 노트
     │   ├── audit_run.py            # ✅ **배선 감사** — «어느 팔의 숫자가 다른 팔 것은 아닌가» 7항목
     │   │                           #   러너가 자동으로 돌려 `report.md` 「배선 감사」 절에 넣는다
@@ -439,6 +446,10 @@ USD 자체를 옮기지 않는 이유:
   🔴 단 **홀 주변 융기는 개체마다 다르다**(대부분 있고 가끔 없다) → **CAD 로 맞출 수 있는 축이 아니고**,
   그래서 **`--outer-only`(P9)가 «가장 정확해서» 가 아니라 «유일하게 개체 불변이라서» 배포본**이다.
 - ✅ **근접 0.28m 40장 촬영 완료**(2026-08-12). 실행 도구도 준비됨(`tools/run_group_a.py`, `RESULTS.md §35`).
+- ✅ **프롬프트 축이 닫혔다** — `full` 4개(§39-30e) · **`flange` 2개**(§41, 실물 3거리에서 20 → 2).
+  🔴 재발굴 방아쇠는 **① 검출 0 프레임 ② 개체·조명 변경 ③ 다중 인스턴스 ④ 배포 거리 변경**뿐이다(§41-9a).
+  🔴🔴 **flange 경로(TF) 자체가 «선택지» 다**(§41-9b) — `--primary full` 이 이미 KPI 안쪽이고
+  (하이브리드 ADD 1.395mm ↔ KPI ≤5mm) 실물에서 통과한 유일한 체인(§38)은 flange 마스크를 안 쓴다.
 - 🔴🔴 **환경 제약(2026-08-12 사용자 확정): 아직 로봇이 없다** — 카메라 + FOUP 뿐이고 **손으로 움직인다.**
   → **hand-eye 가 «측정 대기» 가 아니라 «존재하지 않는다»** → **1 사이클 촬영 2회 이상은 전부 후순위**이고
   **G0·G9·G10·farfuse 는 원천적으로 불가**다. 지금 돌릴 목록은 **`PIPELINE_CATALOG §9.1★c`**

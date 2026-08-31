@@ -377,8 +377,10 @@ cd /isaac-sim/volume/spatial_manipulation_ws/src/vision && source envs/env.sh
 #        GT-free 리포트(report.md)·그림·배선 감사까지 낸다. 멱등이라 다시 돌려도 없는 것만 채운다.
 envs/pose/bin/python tools/run_group_a.py --list-presets     # ① 참조 세트가 있는지 먼저 (인자 불필요)
 envs/pose/bin/python tools/run_group_a.py \
-    --in runs/real01_near --out runs/real01_A --preset n25orange \
-    --text-prompt "orange plastic box" --mode all \
+    --in runs/real01_near --out runs/real01_A \
+    --no-exemplar --mode combo,prompts \
+    --text-prompt "cube shaped sealed plastic wafer pod" \
+    --text-prompt-flange "top mounting plate with a hole" --text-conf-flange 0.15 \
     --note "형광등 2등, 정면, 1차 시도" --true-distance-mm 250    # ② 뒤 둘은 선택 인자
 # 여러 번 돌린 뒤 — 설정 diff 를 먼저 내고 지표를 나란히 놓는다 (누적 실험 노트)
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
@@ -392,7 +394,7 @@ envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index
 **외관 축 이전의 구 세트**라 새 실험에 쓰지 않는다.
 ★ `--ism`(CAD 템플릿) · `--sam3-text`(낱말) 은 **추가 촬영 0 인 대조군**이고 둘 다 **`--primary full`**
 이라 `mask_flange` 가 비어도 pose 가 나온다 — 검정 몸체에서 실제로 그 상황이 났다(`RESULTS.md §35-2m`).
-`--text-prompt` 는 **몸체 색에 맞춘다**(`"black/orange/clear plastic box"`).
+`--text-prompt` 는 **확정된 4개 중 하나**다(`assets/prompts/real_current.json`). 🔴 **색어를 쓰지 않는다** — `black` 하나가 `score` 를 절반 넘게 깎는다(§39-27a). ★ `--mode combo,prompts` 면 **넷이 한 런에서** 돈다(§41-10).
 ★ `--note` 는 `run_meta.json` 에 남아 `compare_runs.py` 가 함께 보여준다. `--true-distance-mm`
 (줄자값)을 주면 **FP 추정 z 와 stereo depth 중 어느 쪽이 틀렸는지**까지 갈린다 —
 안 줘도 둘끼리는 비교된다(`RESULTS.md §35-2l`).
@@ -428,36 +430,37 @@ envs/pose/bin/python tools/run_group_a.py --list-presets      # ③ 참조 세�
 #    처음이면 --limit-frames 3 으로 먼저 돌려 설정을 확인하고, 그다음 전체를 돌린다
 envs/pose/bin/python tools/run_group_a.py \
     --in runs/real01 --out runs/real01_A --preset n25orange \
-    --ism --sam3-text --text-prompt "orange plastic box" \
+    --ism --sam3-text --text-prompt "cube shaped sealed plastic wafer pod" \
     --mode wide \
     --note "형광등 2등, 0.28m, 1차" --true-distance-mm 280
 
-# ④′ 🔴🔴 **이게 실물에서 실제로 칠 한 줄이다 — 「후보를 전부 펼친다」 34팔 (+TF 면 36).**
+# ④′ 🔴🔴 **이게 실물에서 실제로 칠 한 줄이다 — 「후보를 전부 펼친다」 35팔 (+TF 면 37).**
 #    ★ `--ism`·`--sam3-text` 는 **`--mode all` 이 자동으로 켠다**(그 둘은 모드가 아니라 별도
 #      플래그라, 안 켜지면 경로 둘이 통째로 빠진다)
 #    🔴 **`--text-prompt-flange` 만은 자동으로 못 켠다**(값이 필요하다) — 안 주면 **TF 경로가
-#      빠지고** 러너가 경고한다. 34팔 → 주면 36팔 (§37-9)
-#    🔴 **낱말은 ⓪ 스윕에서 살아남은 것을 쓴다** — 아래는 «시작 후보» 일 뿐이다(§37-3·§37-4b).
-#      실사진 1위가 sim 검정에서 최악이었다(교훈 #92) → 반드시 배포할 사진에서 다시 고른다.
+#      빠지고** 러너가 경고한다. 35팔 → 주면 37팔 (§37-9)
+#    🟢 **낱말은 확정됐다** — `full` 4개(§39-30e) · `flange` 2개(§41). 아래는 각 1위다.
+#      🔴 다시 고르는 조건은 **새 개체·조명·다중 인스턴스**뿐이다(§41-9a) — 그때는 `RUNBOOK_PROMPT_SWEEP.md`.
+#    ★ `--mode combo,prompts` 를 쓰면 `full` **4개가 한 런에서** 돈다(§41-10).
 envs/pose/bin/python tools/run_group_a.py \
     --in runs/real01 --out runs/real01_Aall --preset n30black \
-    --text-prompt "boxy plastic object" --text-conf 0.10 \
-    --text-prompt-flange "black square bracket on top of the box" \
+    --text-prompt "cube shaped sealed plastic wafer pod" --text-conf 0.05 \
+    --text-prompt-flange "top mounting plate with a hole" --text-conf-flange 0.15 \
     --mode all \
     --note "형광등 2등, 0.28m, 전팔" --true-distance-mm 280
 #    → 실물 검증 COMBO(RP1·RP2·RP3·**RH1**, §38) + TF(TF1·TF3) + A/I/T + 정합·참조 축이
 #      **한 런에서 나란히** 나온다. 실측 소요: 10프레임 약 11분 (콜드 스타트 포함)
 
 # ④″ 🔴🔴 **sim 참조(exemplar)를 빼고 나머지 전부 — 실물 권장 (§38-8).**
-#    exemplar 는 실물에서 **전부 실패**했다(§38-1). 그런데 36팔 중 **26팔이 그 경로를 초기값으로**
+#    exemplar 는 실물에서 **전부 실패**했다(§38-1). 그런데 37팔 중 **26팔이 그 경로를 초기값으로**
 #    쓰므로 그냥 빼면 정합·게이트·엣지 축이 통째로 사라진다 → `--no-exemplar` 가 **옮긴다.**
 #    ★ 옮겨진 팔에는 **접미사**가 붙는다(`Cs16@T` …) — 다른 런의 같은 이름과 **바꿔 읽지 말 것**
 #    ★ `--preset` 이 필요 없다 (참조를 안 쓴다)
 envs/pose/bin/python tools/run_group_a.py \
     --in runs/real01 --out runs/real01_Anoex \
     --no-exemplar --mode all \
-    --text-prompt "boxy plastic object" --text-conf 0.10 \
-    --text-prompt-flange "black square bracket on top of the box" \
+    --text-prompt "cube shaped sealed plastic wafer pod" --text-conf 0.05 \
+    --text-prompt-flange "top mounting plate with a hole" --text-conf-flange 0.15 \
     --note "참조 제외 · 전팔" --true-distance-mm 280
 #    → **23팔** (I·T·TF·COMBO + 정합 12종@T + IX1). 실측: 5프레임 4.1분
 #    ⚠️ exemplar 를 «대조군» 으로 한 번은 보고 싶으면 ④′ 를 따로 돌린다
@@ -466,22 +469,27 @@ envs/pose/bin/python tools/run_group_a.py \
 envs/pose/bin/python tools/compare_runs.py runs/real0*_A --index runs/runs_index.md
 ```
 
-★ **몸체 색 → `--preset` · `--text-prompt` 짝** (거리대는 실제 촬영 거리로 바꾼다):
+🟢 **프롬프트는 확정됐다 — 몸체 색과 무관하다** (§39-30e · §41)
 
-| 몸체 | `--preset` | `--text-prompt` |
-|---|---|---|
-| 검정 불투명 | `n25black` / `n30black` / `n40black` / `n50black` … | `"black plastic box"` |
-| 반투명 주황 | `n30orange` 식 | `"orange plastic box"` |
-| 투명 | `n30clear` 식 | `"clear plastic box"` |
-| 모르겠다 | `n30mixed` 식 | `"plastic box"` |
+| 대상 | 파일 | 개수 | 문장 |
+|---|---|---|---|
+| **`full`** | `assets/prompts/real_current.json` | **4** | `cube shaped sealed plastic wafer pod`(A, 양쪽 1위) · `plastic cube shaped sealed wafer pod`(W, 웹 1위) · `boxy sealed plastic wafer pod`(B, 실물 3위) · `a boxy plastic object`(C, 🔴 **대조군**) |
+| **`flange`** | `assets/prompts/flange_real_top2.json` | **2** | `top mounting plate with a hole` · `a top mounting plate with a hole` |
 
-🔴 **위 표는 «몸체 색을 알 때» 의 짝이다.** 색 지정 프롬프트는 **조건부**라 색이 틀리면
-**조용히 검출 0** 이 된다. **모르거나 투톤(검정 프레임 + 흰 문)이면 색을 빼고** 무조건부 프롬프트를
-쓴다 — 실사진에서 고른 1순위는 `full` **`"boxy plastic object"`** ·
-`flange` **`"black top flange on top of the plastic box"`** 다.
+★ **`--mode combo,prompts` 를 주면 `full` 4개가 한 런에서 돈다** — 프롬프트마다 `RP1@<tag>`·`RH1@<tag>`
+두 팔이 붙고 `report.md` 가 **「검출 → pose → 이탈 → 좌우 `|Δdx|`」 순서의 전용 표**를 낸다(§41-10).
+
+🔴🔴 **색어(`black`·`orange`·`clear`)를 넣지 않는다** — 옛 판(«몸체 색에 맞춘다»)은 **기각됐다**:
+- `full` — `black` 하나를 붙이면 `score` 가 **0.977 → 0.420** 으로 절반 넘게 깎인다(§39-27a).
+- `flange` — 웹에서는 `black` 이 이득으로 보였는데(§39-32b) **실물에서 `black` 16개가 전멸**했다.
+  🔴 **실물 flange 가 실제로 검정인데도** 그렇다(§41-4).
+- → **색어는 «명사구가 부품을 특정하지 못할 때» 구제책으로만** 이득이다(규칙 ⑩ 정밀화).
+  위 6개에는 색어가 **하나도 없어** 몸체 3종(검정·주황·투명) 어디에도 그대로 쓴다.
+
 ⚠️ **약어는 안 통하고 풀어 쓰면 통한다** (`"FOUP"` ❌ / `"front opening unified pod"` ✅).
 ⚠️ **`score` 로 프롬프트를 고르면 안 된다** — 마스크 품질이 아니라 **`--text-conf` 문턱 여유**를
-재는 값이다. 고를 때는 **미검출 0** 이 1순위다.
+재는 값이다(마스크 품질과 r = +0.06, 교훈 #90). 고를 때는 **미검출 0** 이 1순위다.
+⚠️ `--preset` 은 **exemplar 참조**용이라 `--no-exemplar` 면 필요 없다. 색·거리대 짝은 §35-2f 참조.
 🔴🔴 **sim 에서 만든 SAM3 참조(exemplar)는 실물에서 전부 실패했다** — 실물에서 쓸 수 있는
 SAM3 경로는 **텍스트뿐**이다(`RESULTS.md §38-1`). A그룹은 대조군으로만 돌린다.
 🔴 `pose_fp --input-scale 0.75` 는 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 가
@@ -493,7 +501,7 @@ SAM3 경로는 **텍스트뿐**이다(`RESULTS.md §38-1`). A그룹은 대조군
 
 **소요 (실측, RTX 5090 · 콜드 스타트 포함)** — 🔴 프레임 수보다 **모드**가 지배한다:
 
-| | 기본 `default` (9팔) | `--mode all` (34팔·+TF 36) |
+| | 기본 `default` (9팔) | `--mode all` (35팔·+TF 37) |
 |---|---|---|
 | **8프레임** (실물 운용 규모) | ~1.5분 | **~7분** |
 | 20프레임 | 5~6분 | **13.4분** (실측 799·804·816초, 3회) |
@@ -523,7 +531,7 @@ SAM3 경로는 **텍스트뿐**이다(`RESULTS.md §38-1`). A그룹은 대조군
 어긋나고 그건 «편향» 이 아니라 «다른 것을 쟀다» 다.
 ★ **`--mode`** — **후보 파이프라인을 얼마나 넓게 펼치나**(`--list-modes`). 기본 `default` = 9팔로
 지금까지와 같다. **`wide` = 23팔**(정합·게이트·초기값·캐스케이드·select·edge) 이 **실물 초반 권장**이고,
-**`all` = 34팔**(참조 거리대 스윕 + **실물 검증 COMBO** 포함 · `--ism`·`--sam3-text` 자동 — ④′), **`--text-prompt-flange` 를 주면 36팔**(TF 경로). `wide` = 23팔. 실측: 10프레임 `all`+TF **약 11분**(콜드 스타트 포함).
+**`all` = 35팔**(참조 거리대 스윕 + **실물 검증 COMBO** 포함 · `--ism`·`--sam3-text` 자동 — ④′), **`--text-prompt-flange` 를 주면 37팔**(TF 경로). `wide` = 23팔. 실측: 10프레임 `all`+TF **약 11분**(콜드 스타트 포함).
 ⚠️ **`all` 은 «구현된 모드 전부» 이지 «가능한 파이프라인 전부» 가 아니다** — 미구현 축(prompt·band·
 stereo·jitter)과 **hand-eye 가 필요한 넷**(P1 2단계 · P2 G9 · P3 5시점 융합 · P4 G9+G10)은 빠진다.
 뒤의 넷은 `cam1_T_cam2` 가 있어야 성립하는데 로봇이 없으면 그 값이 **부정확한 게 아니라 존재하지 않는다.**
