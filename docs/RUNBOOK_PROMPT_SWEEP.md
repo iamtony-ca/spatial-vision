@@ -6,11 +6,13 @@
 > | | 실험군 파일 | 개수 | 갈리는가 |
 > |---|---|---|---|
 > | **`full`** (§2) | `assets/prompts/real_testset.json` | 136 | 실물 3라운드에서 **갈린 이미지 0장** → §3c 로 |
-> | **`flange`** (§2b) | `assets/prompts/flange_real20.json` | 20 (+ 기준용 `full` 4) | **거의 다 갈린다** → 육안 판정을 실제로 한다 |
+> | **`flange`** (§2b) | `assets/prompts/flange_real20.json` | 20 (+ 기준용 `full` 4) | **거의 다 갈린다** → 육안 판정을 실제로 한다. ✅ **1차 완료 → 2개 생존**(§41) |
 >
 > - 경위·수치의 정본: **`docs/RESULTS.md §39`**
 > - 현재 서열: **`docs/PROMPT_RANKING.md`**(`full`) · **`docs/PROMPT_RANKING_FLANGE.md`**(`flange`)
 > - 🔴 **웹사진 서열은 실물로 전이되지 않을 수 있다**(교훈 #92·#100). 실물에서 다시 내는 게 이 문서다.
+> - 🟢 **프롬프트 축은 `full`·`flange` 둘 다 닫혔다**(§39-30e · §41). 새 개체·조명·다중 인스턴스가
+>   아니면 §2~§3 을 다시 돌릴 이유가 없다 — **바로 `§4b`(COMBO + TF 9팔)로 간다.**
 > - 🔴 **자르지 않는다.** 136개 전부 돌린다 — 실물에서 확인된 두 프롬프트가 웹 서열로는 **78위·87위**라
 >   «상위 N 컷» 이면 잘린다(§39-15). 비용은 40장 기준 **약 17분**이다.
 
@@ -31,9 +33,10 @@ EOF
 
 | 파일 | 상태 | 무엇에 쓰나 |
 |---|---|---|
-| **`real_current.json`** | 🟢 **현행** | **`full` 정본** — `--prompts-json` · `--text-prompt` 는 여기서 고른다(§39-28). 현재 `full` **4개** |
-| **`flange_real20.json`** | 🟢 **현행** | **`flange` 분할 스윕 정본** — 20개 + 판정 기준 `full` 4개. §2b 가 이걸 쓴다 |
-| **`flange_top3.json`** | 🟢 **현행** | **`flange` pose 팔 후보 3개**(웹 근거). ⚠️ 실물 스윕(§2b)을 돌렸으면 **그 결과로 대체**한다 |
+| **`real_current.json`** | 🟢 **현행** | **정본** — `--prompts-json` · `--text-prompt` 는 여기서 고른다(§39-28). `full` **4개** + `flange` **2개** |
+| **`flange_real20.json`** | 🟢 **현행(재스윕용)** | **`flange` 분할 스윕 20개** + 판정 기준 `full` 4개. §2b 가 이걸 쓴다. **새 개체·조명이면 이 20개를 다시 돌린다** |
+| **`flange_real_top2.json`** | 🟢 **현행** | **`flange` pose 팔 2개** — 실물 3거리(28·40·50cm) 생존분(`RESULTS.md §41`). `--text-prompt-flange` 는 여기서 고른다 |
+| ~~`flange_top3.json`~~ | ⚪ 이력 | 웹 근거 3개. **실물이 대체했다** — 그 셋 중 3/3 은 하나뿐이고 나머지는 1/3·0/3 이었다 |
 | `tested_prompts.json` | 📘 참조 | 장부 — 이미 시험한 프롬프트 전부. 중복 거르기용(`tools/prompt_ledger.py`). 실험군이 아니다 |
 | `flange_human_labels.json` | 📘 참조 | **사람 라벨 원본** — 시트·마스크가 `runs/`(gitignore)라 **다시 만들 수 없다** |
 | 나머지 26개 | ⚪ 이력 | 좁혀 온 계보. **되돌릴 때만** 연다 |
@@ -45,7 +48,10 @@ EOF
   `real_pass37` → `real_top15` → `real_final14` → `real_final12` → `real_final11` →
   **`real_top4` = 현행 `real_current`**
 - `flange` 계보 — `flange_round3`(35) → `round4`(52) → `round5`(73) → `round6`(43) →
-  `flange_top20`(20) → **`flange_real20`(20, 재정렬) · `flange_top3`(3)**
+  `flange_top20`(20) → **`flange_real20`(20, 재정렬)** → ~~`flange_top3`(3, 웹 근거)~~ →
+  **`flange_real_top2`(2, 실물 3거리) = 현행 `real_current` 의 `flange` 블록**
+  - 🔴 **웹 20개 중 실물 3거리를 다 통과한 것은 2개**이고 그 둘은 **관사만 다른 같은 문장**이다(§41).
+    `full`(136 → 58)에 비해 **여유가 극단적으로 얇다** — 개체·조명이 바뀌면 **0개가 될 수 있다.**
 - ⚠️ **되돌리는 조건**은 둘뿐이다 — **① 「오선택」 축을 열 때**(여러 FOUP·로드포트 전경. 지금까지 전
   표본이 단일 물체 씬이라 **측정된 적이 없는** 축이다) **② 개체·조명이 바뀔 때**. 그냥 넓히는 것은
   얻을 게 없다(§39-30b: 158장을 더해도 서열 +0.943 로 불변).
@@ -153,6 +159,11 @@ envs/seg_sam3/bin/python tools/sam3_prompt_sweep.py \
 ② **`flange` 는 `full` 과 달리 도메인을 안 넘는다**(교훈 #92). 웹 하위권이 실물 상위일 수 있다.
 ★ 리트머스: `origin: real-validated` 인 둘(`top mounting plate with a hole` 웹 1위 ·
 `black square bracket on top` 웹 4위)이 **실물에서도 상위인가** — 그게 «웹→실물 이전이 되는가» 를 말해 준다.
+
+> ✅ **2026-08-31 에 답이 나왔다 — 절반 통과** (§41): 웹 1위는 **3/3**, 웹 4위는 **40cm 만**.
+> 🔴 그런데 더 중요한 것은 **«간격»** 이다 — 웹 CI 는 «13/20 이 1위와 구분 안 됨» 이었는데 실물은
+> **2개만** 남겼다. **웹 서열은 «순서» 는 맞히고 «간격» 은 극단적으로 과소평가한다.**
+> 그래서 20개를 다 가져간 판단 자체는 옳았다(웹 상위 3·5·7위가 0/3, 웹 13·16위가 40cm 에서 산다).
 
 ### ① 스윕 (40장 기준 ≈ 3분)
 
@@ -269,7 +280,24 @@ EOF
 ```
 
 ⚠️ `flange` 는 **개체·조명이 바뀔 때마다 다시 골라야** 한다 — `full` 과 달리 도메인을 안 넘는다(§37-13).
-좁히다 후보가 모자라면 되돌릴 순서는 `flange_top3` → `flange_real20` → `flange_round6`(43) → `flange_round5`(73).
+좁히다 후보가 모자라면 되돌릴 순서는 `flange_real_top2` → `flange_real20` → `flange_round6`(43) → `flange_round5`(73).
+
+> ### 🟢 2026-08-31 실물 결과 — **이 절을 처음 돌린 기록** (`RESULTS.md §41`)
+>
+> ZED X **28·40·50cm** 각 40장에 위 20개를 다 돌렸다. **면적 이탈 0 · 오선택 0.**
+> **셋 다 통과 2개** (`top mounting plate with a hole` · `a top mounting plate with a hole`) ·
+> **40cm 만 3개** (`black square bracket on top` · `black square plastic top panel(± with a hole)`) ·
+> **0/3 이 15개.** → 현행 pose 팔 = **`assets/prompts/flange_real_top2.json`**.
+>
+> 다음에 이 절을 돌릴 때 미리 알아 둘 것:
+> - 🔴 **`black` 을 기대하지 말 것** — 20개 중 16개가 `black` 인데 3/3 생존자는 **0개**다.
+>   실물 flange 가 **실제로 검정인데도** 그렇다. 색어는 «명사구가 부품을 특정 못 할 때» 만 이득이다.
+> - ★ **`top` + `mounting plate` + `with a hole` 셋이 다 필요하다** — 하나만 빼도 0/3 이다.
+> - ⚠️ **거리가 비단조다** — 통과 2/5/2 로 **40cm 이 가장 관대**하다. **28cm 이 50cm 만큼 어렵다** →
+>   *"가까이 찍으면 잘 되겠지"* 로 거리를 고르면 안 된다. **배포 거리에서 스윕한다.**
+> - ✅ `--text-conf` 는 **0.15 로 충분**하다(생존 둘의 최소 score 0.547). 낮추면 오선택 위험만 는다.
+> - 🔴 **2/20 은 «안정» 이 아니라 «여유 없음» 이다** — 새 조건에서 **0개가 나올 수 있다.**
+>   그때는 되돌릴 순서를 따라 43개·73개로 넓힌다.
 
 ### 🔴 `flange_top20.json` 과 헷갈리지 말 것
 
@@ -369,10 +397,15 @@ python3 tools/make_frame_from_zed.py --left L.png --right R.png \
 envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
     --mode all --no-exemplar \
     --text-prompt "<3에서 1위>" --text-conf 0.05 \
-    --text-prompt-flange "<2b-④ 에서 1위>" --text-conf-flange 0.05 \
+    --text-prompt-flange "top mounting plate with a hole" --text-conf-flange 0.15 \
     --note "1차 · 프롬프트 스윕 1위" --true-distance-mm 300
 ```
 
+- 🟢 **위 flange 문장은 실물에서 확정된 것이다**(2026-08-31, §41 — 28·40·50cm 세 거리 3/3).
+  `assets/prompts/flange_real_top2.json` 의 1번이고, 2번(`a top mounting plate with a hole`)을
+  두 번째 팔로 돌리면 **관사 축의 재현 확인**이 된다(그쪽이 세 거리 전부 `score` 가 높다).
+  ⚠️ **개체·조명이 바뀌면 §2b 를 다시 돌린다** — 20개 중 2개만 살아남는 얇은 경로다.
+  ✅ `--text-conf-flange` 는 **0.15** 로 충분하다(생존 둘의 최소 score 0.547 = 문턱의 3.6배).
 - **`--text-prompt-flange` 를 주면 TF 경로**(`seg_txtf` → `fp_txtf --primary flange` → **TF1·TF3**)가 생긴다.
   안 주면 그 두 팔이 통째로 빠진다 — 🔴 **값이 필요해서 `--mode all` 로도 자동으로 못 켠다.**
   (`--sam3-text`·`--ism` 은 `--mode all` 이 알아서 켠다.)
@@ -395,6 +428,96 @@ envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
   아니라 «필요한 문턱» 이다**(§39-13b) — 낮으면 0.05 를 쓴다. 🔴 내리면 배경을 집을 위험이 오르므로
   `segcmp` 시트의 «이탈» 열로 확인한다.
 - 리포트 읽는 순서는 `CLAUDE.md` 의 「열린 항목 #2」 행에 있다 — **⓪ 배선 감사가 ❌ 면 아래를 읽지 말 것.**
+
+## 4b. 🟢 **COMBO + TF 만 돌리기 — 9팔** (프롬프트가 이미 정해졌을 때)
+
+§4 는 «프롬프트를 방금 골랐을 때» 이고, **이제는 `full`·`flange` 둘 다 확정됐다**(§39-30e · §41).
+그러면 넓게 펼칠 이유가 없다 — **실물에서 검증된 COMBO(§38) + 그 대조인 TF·T 만** 돌린다.
+
+```bash
+cd <ws>/src/vision && source envs/env.sh          # 🔴 반드시 먼저
+
+for D in 28 40 50; do
+  envs/pose/bin/python tools/run_group_a.py \
+      --in  runs/real_zedx_${D}cm \
+      --out runs/R${D}_combo \
+      --mode combo,prompts --no-exemplar \
+      --text-prompt        "cube shaped sealed plastic wafer pod" \
+      --text-prompt-flange "top mounting plate with a hole" \
+      --text-conf 0.05 --text-conf-flange 0.15 \
+      --true-distance-mm ${D}0 \
+      --note "COMBO+TF+프롬프트4 · ${D}cm · 검정 몸체"
+done
+```
+
+★ **`--mode prompts` 가 `full` 프롬프트 4개를 다 돌린다** — `--text-prompt` 로 준 하나(기본 팔)와
+`assets/prompts/real_current.json` 의 나머지 3개다. 프롬프트당 **`RP1@<tag>`(단일 단계) +
+`RH1@<tag>`(하이브리드)** 두 팔이 붙는다.
+🔴 **프롬프트당 COMBO 5팔을 복제하지 않는다** — `RP1`/`RP2`/`RP3` 는 §38-9 에서 «구분되지 않는다»
+가 나왔으므로 프롬프트마다 되풀이할 값이 없다. 비용은 프롬프트당 **분할 + FP 한 번**(≈31초/10프레임).
+
+| 인자 | 왜 |
+|---|---|
+| `--mode combo` | RP1(0.75) · RP2(0.5) · RP3(hull) · **RH1**(0.75 하이브리드, 실물 최선) · **RH2**(0.5 하이브리드) |
+| **`,prompts`** | **`full` 프롬프트 4개 전부**. 프롬프트마다 `RP1@<tag>`·`RH1@<tag>`. 출처를 바꾸려면 `--text-prompt-sweep <json 또는 "문장1;문장2">` |
+| **`--no-exemplar`** | 🔴 **없으면 A 팔 4개가 딸려 온다.** sim 참조는 실물에서 전멸했다(§38-1) — 돌릴 값이 없다 |
+| `--text-prompt-flange` | TF1·TF3 이 붙는다. **`--sam3-text` 는 자동으로 켜진다** |
+| `--true-distance-mm` | **줄자 값**. 거리 4다리에서 `fx` 오차를 잡는 **유일한 외부 기준**이다(§35-2n-5) |
+
+**서는 팔 15개** — `T3`·`T1`(텍스트 full, 정합 off/on) · `TF3`·`TF1`(텍스트 flange) ·
+`RP1`·`RP2`·`RP3`·`RH1`·`RH2`(COMBO) · **`RP1@f005`·`RH1@f005` · `@f007` · `@f019`**(프롬프트 3개).
+🔴 **팔 15개면 선택 편향이 크다**(경고 문턱 8) — 여기서 고른 것은 **«이 데이터에서 골랐다»** 이고,
+확정하려면 **새로 찍은 20~40장**을 그 설정으로 다시 돌려야 한다(§35-2o-4).
+`--mode combo` 만 주면 9팔이다(프롬프트 축 없이).
+
+- ⚠️ **`--preset` 은 필요 없다** — `--no-exemplar` 면 참조를 안 쓴다.
+- ★ **처음이면 `--limit-frames 4` 를 붙여** 4장으로 배선부터 확인한다(전 체인 수 분).
+- 🔴 **`T1`·`T3` 은 빼지 않는다** — `RP*` 가 stage2 **on** 인데 `T3` 은 `--no-stage2` 라,
+  둘의 대조가 **§38 이 sim 권고와 갈린 네 지점 중 하나**(stage2)를 그대로 재는 장치다.
+- 재실행은 멱등이다(산출물 있으면 건너뛴다). 특정 단계만 다시: `--only stats,ov` · 강제: `--force`.
+
+### 4b-1. 읽는 순서 — 이 다섯이면 판정된다
+
+| # | 파일 | 무엇을 말하나 |
+|---|---|---|
+| ⓪ | `report.md` 「**배선 감사**」 | 🔴 **❌ 면 아래를 전부 읽지 말 것.** 배선이 어긋나면 숫자는 «틀린» 게 아니라 «다른 뜻» 이 되고 GT 없이 못 잡는다 |
+| ⓪b | `report.md` 「**프롬프트 스윕**」 표 | **프롬프트 4개를 한 표에.** 🔴 순서가 정해져 있다 — **① 검출 → ② pose → ③ 이탈 → ④ 좌우 \|Δdx\|.** `pose` 열이 프레임 수보다 적으면 그 프롬프트는 **탈락**이고 정확도를 볼 것도 없다 |
+| ① | `stats/ranking.png` | **팔 서열** — 좌우 \|Δdx\| 중앙값 순. **유일하게 서열을 맞히는 지표**(실제 KPI 와 r = −0.94). 🔴 `*all-gated`·`Z-fixed`·`init!=` 꼬리표가 붙은 팔은 나란히 놓을 수 없다 |
+| ② | `stats/distance.png` | **거리 4다리**. 실루엣만 갈라짐 → `baseline` · 셋이 붙고 줄자만 다름 → **`fx`** |
+| ③ | `segcmp/seg_compare.png` | 🔴 «**분할이 엉뚱한 걸 집었나**» ↔ «**마스크는 맞는데 pose 가 틀렸나**» — 처방이 정반대다 |
+| ④ | `overlay_combo.png` | 🔴 GT-free 지표는 전부 «자기 일관성» 이라 **«다 같이 틀린» 경우를 못 잡는다 — 그 축은 눈뿐이다** |
+
+★ **프롬프트 판정** — 🔴 «정확도» 로 고르려 하지 말 것. 갈리는 축은 **«검출되느냐» 하나**다
+(§37-5 sim GT · §39-17 실물 136개에서 «갈린 이미지 0장»). 전 프레임 통과한 것이 여럿이면
+그때 **좌우 \|Δdx\|** 로 고른다. 🔴 **게이트 후퇴율 금지**(초기값이 달라지는 비교, 교훈 #82).
+
+★ **TF 채택 판정**(§41-9b)은 ①③ 으로 한다 — **TF1/TF3 의 \|Δdx\| 가 RH1/RH2 보다 뚜렷이 낫고**,
+**TF 와 RH 의 회전이 90°/180° 배수로 어긋나는 프레임이 0** 이며, **TF 검출 0 프레임이 0** 이어야 켠다.
+🔴 하나라도 어긋나면 끈다 — 회전 뒤집힘은 t 이득과 맞바꿀 수 있는 종류가 아니다(§32-1).
+🔴 **게이트 후퇴율로 서열을 매기지 말 것** — 실제 KPI 와 **+0.82**(부호가 반대다, §35-2o-6b).
+
+### 4b-2. 결과를 이 PC 로 되보내기 — **묶음 하나**
+
+```bash
+tar czf R_combo_$(date +%Y%m%d).tgz \
+    runs/R{28,40,50}_combo/{report.md,report.json,run_meta.json,scale_check.json} \
+    runs/R{28,40,50}_combo/stats \
+    runs/R{28,40,50}_combo/lr \
+    runs/R{28,40,50}_combo/{overlay_sheet.png,overlay_combo.png} \
+    runs/R{28,40,50}_combo/segcmp/seg_compare.png \
+    runs/R{28,40,50}_combo/diag/diag_sheet.png \
+    runs/R{28,40,50}_combo/diag/diag_trends.png \
+    runs/R{28,40,50}_combo/worst
+du -h R_combo_*.tgz          # 수십~수백 MB 면 정상
+```
+
+- ✅ 이 묶음이면 **재계산 없이 전부 다시 읽힌다** — `stats/metrics_long.csv` 가 (프레임 × 팔) 긴 형식이라
+  pandas 로 바로 열리고, `report.json` 에 판정 근거가 전부 들어 있다.
+- ❌ **`frame_*/` 하위(오버레이 per-frame · 마스크 · depth)는 안 보낸다** — 수 GB 인데
+  결정에 안 쓴다. 필요하면 `--only ov,ovc,segcmp --force` 로 다시 그린다.
+- 🔴 **원본 촬영(`runs/real_zedx_*cm/`)은 그 PC 에 보관**한다. 나중에 팔을 추가해 다시 돌릴 유일한 길이다.
+- ⚠️ `worst/A1_debug/` 가 있으면 함께 온다 — 🔴 **«Sobel 이 물체 경계를 잡았나 · 융기 능선을 잡았나 ·
+  그림자를 잡았나»** 를 보는 유일한 수단이다(§35-2i 의 검정 몸체 편향).
 
 ## 5. 이 PC 로 되가져올 것
 
@@ -465,6 +588,6 @@ envs/pose/bin/python tools/prompt_sweep_diff.py rank   --run runs/psweep_real01_
 envs/pose/bin/python tools/run_group_a.py --in runs/real01 --out runs/real01_A \
     --mode all --no-exemplar \
     --text-prompt "<full 1위>" --text-conf 0.05 \
-    --text-prompt-flange "<flange 1위>" --text-conf-flange 0.05 \
+    --text-prompt-flange "top mounting plate with a hole" --text-conf-flange 0.15 \
     --note "<메모>" --true-distance-mm 300
 ```

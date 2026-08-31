@@ -1,7 +1,22 @@
 # `flange` 프롬프트 서열 — 웹 «어려운» 40장 **세 벌 합산** (2026-08-29)
 
-> 정본은 `docs/RESULTS.md §39-32 ~ §39-39`. 현행 후보는 `assets/prompts/flange_top3.json`.
-> 갱신은 `runs/psweep_flange8_web40c/graded_pooled.json` 에서 손으로 옮긴다(1회성 표).
+> 정본은 `docs/RESULTS.md §39-32 ~ §39-39`(웹) · **`§41`(실물)**.
+> 🟢 **현행 pose 후보는 `assets/prompts/flange_real_top2.json` 2개**다 — `flange_top3.json` 은 이력.
+> 갱신은 `runs/psweep_flange8_web40c/graded_pooled.json` + 실물 스윕 보고에서 손으로 옮긴다(1회성 표).
+
+## 🔴🔴 실물이 20개를 **2개로** 잘랐다 (2026-08-31, §41)
+
+실물 ZED X **세 거리**(28·40·50cm, 각 40장)에 20개를 다 돌린 결과, **셋 다 통과한 것은 2개**이고
+그 둘은 **관사만 다른 같은 문장**이다. 아래 «실물» 세 열이 그 결과다(값 = `score` 최소값 = 검출 여유).
+
+- 🔴 **웹 CI 는 «20개 중 13개가 1위와 구분되지 않는다» 고 했다.** 실물은 2개만 남겼다 →
+  **웹 서열은 «순서» 는 맞히고 «간격» 은 극단적으로 과소평가한다**(§41-3).
+- 🔴 **`black` 16개가 전멸했다 — 실물 flange 는 실제로 검정인데도.** 40cm 부분생존 3개만 black 이다
+  = «관대한 거리에서만 산다». 웹 flange 에서 `black` 이 다섯 쌍 전부 이득이던 것과 **정반대**(§41-4).
+- ★ **`top` + `mounting plate` + `with a hole` 셋이 다 필요하다** — 홀 제거(#6) 0/3 ·
+  `top`→`square`(#19) 0/3. 웹의 «−5장» 이 실물에서 **전멸**이다(§41-5).
+- ⚠️ **거리가 비단조다** — 통과 2/5/2 로 **40cm 이 가장 관대**하고 28cm 이 50cm 만큼 어렵다(§41-6).
+- ⚠️ 각 런 n=40 → 「40/40」의 실패율 **95% 상한은 7.5%** 다. 단일 물체 씬이라 **오선택 축은 미측정**.
 
 ## 어떻게 잰 값인가
 
@@ -22,31 +37,33 @@
 
 ## 서열
 
-| # | 합산 | 95% 구간 | A(40) | B(25) | C(18) | 축 | 핵명사 | 프롬프트 |
-|---:|---:|:---:|---:|---:|---:|:-:|:-:|---|
-| 1 | **91.6%** | [83.6, 95.9] | 37/40 | 24/25 | 15/18 | old | `plate` | `top mounting plate with a hole` 🟢 |
-| 2 | **91.6%** | [83.6, 95.9] | 37/40 | 23/25 | 16/18 | H | `plate` | `a top mounting plate with a hole` |
-| 3 | **89.2%** | [80.7, 94.2] | 34/40 | 24/25 | 16/18 | old | `bracket` | `black square plastic top bracket` |
-| 4 | **89.2%** | [80.7, 94.2] | 35/40 | 22/25 | 17/18 | old | `bracket` | `black square bracket on top` 🟢 |
-| 5 | **89.0%** | [80.4, 94.1] | 34/39 | 23/25 | 16/18 | old | `coupling` | `black square plastic top coupling` |
-| 6 | **88.0%** | [79.2, 93.3] | 35/40 | 21/25 | 17/18 | H | `plate` | `top mounting plate` |
-| 7 | **87.8%** | [79.0, 93.2] | 37/39 | 20/25 | 15/18 | old | `flange` | `black square top flange` |
-| 8 | **84.1%** | [74.7, 90.5] | 34/39 | 21/25 | 14/18 | F | `flange` | `a black square plastic top flange` |
-| 9 | **84.1%** | [74.7, 90.5] | 36/39 | 17/25 | 16/18 | old | `flange` | `square black plastic top flange` |
-| 10 | **80.5%** | [70.6, 87.6] | 33/39 | 18/25 | 15/18 | old | `flange` | `black square plastic top flange` |
-| 11 | **79.5%** | [69.6, 86.8] | 29/40 | 23/25 | 14/18 | I | `cap` | `black square plastic top cap with a hole` |
-| 12 | **78.3%** | [68.3, 85.8] | 34/40 | 15/25 | 16/18 | old | `flange` | `black plastic square top flange` |
-| 13 | **77.1%** | [67.0, 84.8] | 32/40 | 18/25 | 14/18 | D | `panel` | `black square plastic top panel` |
-| 14 | **76.8%** | [66.6, 84.6] | 32/39 | 16/25 | 15/18 | J | `mount` | `black square top mount` |
-| 15 | **74.4%** | [64.0, 82.6] | 32/39 | 15/25 | 14/18 | F | `flange` | `the black square top flange` 🔴 |
-| 16 | **73.5%** | [63.1, 81.8] | 31/40 | 16/25 | 14/18 | I | `panel` | `black square plastic top panel with a hole` 🔴 |
-| 17 | **73.2%** | [62.7, 81.6] | 28/39 | 19/25 | 13/18 | old | `flange` | `rectangular black plastic top flange` 🔴 |
-| 18 | **72.3%** | [61.8, 80.8] | 28/40 | 18/25 | 14/18 | I | `lid` | `black square top lid with a center hole` 🔴 |
-| 19 | **69.9%** | [59.3, 78.7] | 29/40 | 16/25 | 13/18 | H | `plate` | `square mounting plate with a hole` 🔴 |
-| 20 | **63.9%** | [53.1, 73.4] | 27/40 | 12/25 | 14/18 | old | `flange` | `plastic black square top flange` 🔴 |
+| # | 합산 | 95% 구간 | A(40) | B(25) | C(18) | **실물28** | **실물40** | **실물50** | 축 | 핵명사 | 프롬프트 |
+|---:|---:|:---:|---:|---:|---:|:---:|:---:|:---:|:-:|:-:|---|
+| 1 | **91.6%** | [83.6, 95.9] | 37/40 | 24/25 | 15/18 | **0.701** | **0.594** | **0.547** | old | `plate` | `top mounting plate with a hole` 🟢 |
+| 2 | **91.6%** | [83.6, 95.9] | 37/40 | 23/25 | 16/18 | **0.703** | **0.719** | **0.570** | H | `plate` | `a top mounting plate with a hole` |
+| 3 | **89.2%** | [80.7, 94.2] | 34/40 | 24/25 | 16/18 | · | · | · | old | `bracket` | `black square plastic top bracket` |
+| 4 | **89.2%** | [80.7, 94.2] | 35/40 | 22/25 | 17/18 | · | 0.225 | · | old | `bracket` | `black square bracket on top` 🟢 |
+| 5 | **89.0%** | [80.4, 94.1] | 34/39 | 23/25 | 16/18 | · | · | · | old | `coupling` | `black square plastic top coupling` |
+| 6 | **88.0%** | [79.2, 93.3] | 35/40 | 21/25 | 17/18 | · | · | · | H | `plate` | `top mounting plate` |
+| 7 | **87.8%** | [79.0, 93.2] | 37/39 | 20/25 | 15/18 | · | · | · | old | `flange` | `black square top flange` |
+| 8 | **84.1%** | [74.7, 90.5] | 34/39 | 21/25 | 14/18 | · | · | · | F | `flange` | `a black square plastic top flange` |
+| 9 | **84.1%** | [74.7, 90.5] | 36/39 | 17/25 | 16/18 | · | · | · | old | `flange` | `square black plastic top flange` |
+| 10 | **80.5%** | [70.6, 87.6] | 33/39 | 18/25 | 15/18 | · | · | · | old | `flange` | `black square plastic top flange` |
+| 11 | **79.5%** | [69.6, 86.8] | 29/40 | 23/25 | 14/18 | · | · | · | I | `cap` | `black square plastic top cap with a hole` |
+| 12 | **78.3%** | [68.3, 85.8] | 34/40 | 15/25 | 16/18 | · | · | · | old | `flange` | `black plastic square top flange` |
+| 13 | **77.1%** | [67.0, 84.8] | 32/40 | 18/25 | 14/18 | · | 0.572 | · | D | `panel` | `black square plastic top panel` |
+| 14 | **76.8%** | [66.6, 84.6] | 32/39 | 16/25 | 15/18 | · | · | · | J | `mount` | `black square top mount` |
+| 15 | **74.4%** | [64.0, 82.6] | 32/39 | 15/25 | 14/18 | · | · | · | F | `flange` | `the black square top flange` 🔴 |
+| 16 | **73.5%** | [63.1, 81.8] | 31/40 | 16/25 | 14/18 | · | 0.619 | · | I | `panel` | `black square plastic top panel with a hole` 🔴 |
+| 17 | **73.2%** | [62.7, 81.6] | 28/39 | 19/25 | 13/18 | · | · | · | old | `flange` | `rectangular black plastic top flange` 🔴 |
+| 18 | **72.3%** | [61.8, 80.8] | 28/40 | 18/25 | 14/18 | · | · | · | I | `lid` | `black square top lid with a center hole` 🔴 |
+| 19 | **69.9%** | [59.3, 78.7] | 29/40 | 16/25 | 13/18 | · | · | · | H | `plate` | `square mounting plate with a hole` 🔴 |
+| 20 | **63.9%** | [53.1, 73.4] | 27/40 | 12/25 | 14/18 | · | · | · | old | `flange` | `plastic black square top flange` 🔴 |
 
 🟢 = 실물 ZED X 사진에서 사용자가 눈으로 고른 것(`real-validated`, §37-10).
 🔴 = 1위와 **유의하게 나쁘다**(95% 상한 < 1위 95% 하한).
+**실물 열** = 그 거리에서 **전 이미지 통과**했을 때의 `score` 최소값. `·` = 검출 0(그 거리에서 탈락).
+🔴 «웹 순위» 와 «실물 통과» 가 거의 무관하다 — 웹 3·5·7위가 0/3 이고 웹 13·16위가 40cm 에서 산다.
 
 ## 축 이름
 

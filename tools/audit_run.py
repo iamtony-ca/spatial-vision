@@ -49,6 +49,26 @@ ALIAS = {"A3": ("fp_ns2", "pose_coarse.json"), "I3": ("fp_ism", "pose_coarse.jso
          "RH2": ("hyb_combo2", "pose_coarse.json")}
 # 🔴 여기에 안 적힌 별칭은 ④ lr 파일 수 · ⑤ 오버레이 열 수 검사에서 **초과분으로 잡혀 감사 실패**가 된다.
 #    새 «정합 안 하는 팔» 을 만들 때마다 이 표를 같이 고친다 — 실제로 TF3 을 빠뜨려 잡혔다.
+# ⚠️ **오버레이에 안 들어가는 별칭이 있다.** `--mode prompts` 의 `RP1@<tag>` 는 lr 은 내지만
+#    오버레이 열은 안 만든다(같은 프롬프트의 `RH1@<tag>` 와 **눈으로 분간이 안 된다**, §38-7).
+#    → ④와 ⑤의 기대값이 **다르다.** 하나로 묶으면 감사가 거짓 실패를 낸다.
+NO_OVERLAY = ("RP1@",)
+
+
+def dyn_alias(root: Path) -> dict:
+    """`--mode prompts` 처럼 **이름을 미리 못 아는** 별칭을 디스크에서 찾아 더한다.
+
+    🔴 정적 표만 쓰면 프롬프트 스윕을 켠 런이 통째로 «④⑤ 초과» 로 감사 실패한다.
+    """
+    out = dict(ALIAS)
+    for d in sorted(root.glob("hyb_*")):
+        tag = d.name[len("hyb_"):]
+        if tag in ("combo", "combo2"):
+            continue
+        out[f"RH1@{tag}"] = (d.name, "pose_coarse.json")
+        if (root / f"fp_c075_{tag}").exists():
+            out[f"RP1@{tag}"] = (f"fp_c075_{tag}", "pose_refined.json")
+    return out
 
 
 def _load(p: Path):
@@ -273,9 +293,10 @@ def check(root: Path) -> tuple[list[str], list[str]]:
 
     # ── 4. lr 태그 수 ─────────────────────────────────────────────────────────
     nlr = len(list((root / "lr").glob("lr_consistency_*.json"))) if (root / "lr").exists() else 0
-    want = len(real) + sum(1 for k in ALIAS if (root / ALIAS[k][0]).exists())
+    AL = dyn_alias(root)
+    want = len(real) + sum(1 for k in AL if (root / AL[k][0]).exists())
     (ok if nlr == want else bad).append(
-        f"④ 좌우 일관성 파일 {nlr}개 (기대 {want} = 정합 팔 {len(real)} + 별칭)"
+        f"④ 좌우 일관성 파일 {nlr}개 (기대 {want} = 정합 팔 {len(real)} + 별칭 {want - len(real)})"
         + ("" if nlr == want else " 🔴"))
 
     # ── 5. 오버레이 열 수 ──────────────────────────────────────────────────────
@@ -289,7 +310,9 @@ def check(root: Path) -> tuple[list[str], list[str]]:
         elif abs(ncol - round(ncol)) > 1e-6:
             ok.append(f"⑤ 오버레이 열 수 확인 불가 (타일 폭이 380 이 아니다: {img.shape[1]}px)")
         else:
-            want5 = len(real) + sum(1 for k in ALIAS if (root / ALIAS[k][0]).exists())
+            # 🔴 ④와 다르다 — 오버레이 열을 안 만드는 별칭을 뺀다(위 `NO_OVERLAY`).
+            want5 = len(real) + sum(1 for k in AL if (root / AL[k][0]).exists()
+                                    and not k.startswith(NO_OVERLAY))
             (ok if round(ncol) == want5 else bad).append(
                 f"⑤ 오버레이 {round(ncol)}열 (기대 {want5})" + ("" if round(ncol) == want5 else " 🔴"))
     except Exception as e:

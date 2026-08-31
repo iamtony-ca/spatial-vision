@@ -151,6 +151,18 @@ MODES = {
                 "what": "정합기가 **어느 밝기 경계를 잡는가**: `--polarity` 3종 × `--min-grad` 2종. "
                         "🔴 검정 몸체에서 융기 능선을 잡는 §35-2i 편향을 직접 겨냥한다 — "
                         "한 번도 안 흔들어 본 노브다"},
+    # ★ 프롬프트 축 — `--text-prompt` 는 값이 하나라 4개를 보려면 런을 넷 돌려야 했고, 그러면
+    #   `stats/ranking.png` 한 장에 못 올라간다. 이 모드가 **한 런 안에서** 돌려 같은 표에 올린다.
+    # 🔴 프롬프트당 COMBO 5팔을 복제하지 **않는다** — RP1/RP2/RP3 는 §38-9 에서 «구분되지 않는다»
+    #   가 나왔으므로 프롬프트마다 되풀이할 값이 없다. **RP1 + RH1 둘만**(seg 1 + FP 1 + 병합 1).
+    "prompts": {"arms": "+2×(N−1)", "cost": "+31초/프롬프트",
+                "what": "`full` 텍스트 프롬프트 **여러 개**를 한 런에서 비교 — 기본은 현행 4개"
+                        "(`assets/prompts/real_current.json` 의 `full`). 프롬프트마다 "
+                        "**`RP1@<tag>`·`RH1@<tag>`**. 🔴 `combo` 를 자동으로 켠다. "
+                        "★ 갈리는 축은 «검출되느냐» 다(§37-5·§39-30a — 잡히기만 하면 pose 가 "
+                        "거의 안 바뀐다) → **먼저 «pose 낸 프레임 수», 그다음 좌우 |Δdx|**. "
+                        "⚠️ 초기값이 달라지는 비교라 **게이트 후퇴율로 판정 금지**(교훈 #82). "
+                        "출처는 `--text-prompt-sweep` 으로 바꾼다"},
     "refs":    {"arms": "+N", "cost": "+36초/개",
                 "what": "SAM3 **참조 거리대 스윕** (`--refs-sweep n30black,n40black,…`) + `--n-refs` 1/5. "
                         "🔴 참조는 거리 종속이라 틀리면 조용히 무너진다 — «실제 거리가 몇인가» 를 "
@@ -492,6 +504,33 @@ def build_steps(a) -> list[Step]:
                  chyb2, "meta_hybrid.json"),
         ]
 
+        # ── prompts : `full` 텍스트 프롬프트 **여러 개**를 같은 표에 올린다 ─────────────
+        # 🔴 프롬프트당 COMBO 5팔을 복제하지 않는다 — RP1/RP2/RP3 는 §38-9 에서 «구분되지
+        #    않는다» 가 나왔다. **RP1(단일 단계) + RH1(하이브리드)** 둘이면 §38-7 의 축이 다 잡힌다.
+        # ⚠️ 이 팔들은 **마스크가 서로 다르다** = 초기값이 다르다 → 게이트 후퇴율로 비교 금지(#82).
+        #    갈리는 축은 «검출되느냐» 이므로(§37-5) **먼저 «pose 낸 프레임 수»** 를 본다.
+        for tag, prm in getattr(a, "text_prompt_sweep_list", []):
+            sg_p, fp_p, hy_p = o / f"seg_txt_{tag}", o / f"fp_c075_{tag}", o / f"hyb_{tag}"
+            steps += [
+                Step(f"seg_txt_{tag}", f"segment full (텍스트 · {tag}: {prm!r})",
+                     [PY["sam3"], "-m", "spatial_vision.stages.segment_sam3",
+                      "--in", a.in_dir, "--out", sg_p, "--target", "full",
+                      "--prompt", prm, "--confidence", a.text_conf,
+                      "--select", a.text_select],
+                     sg_p, "meta_segment_full.json"),
+                Step(f"fp_c075_{tag}", f"COMBO P1 · 프롬프트 {tag} (stage2 on · scale 0.75)",
+                     [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
+                      "--in", a.in_dir, "--out", fp_p, "--input-scale", "0.75",
+                      "--obj", obj, "--masks", sg_p, "--depth", "stereo", "--depth-dir", st,
+                      "--primary", "full", "--flange-mask-from", "pose"],
+                     fp_p, "meta_pose.json"),
+                Step(f"hyb_{tag}", f"COMBO H1 · 프롬프트 {tag} (하이브리드)",
+                     [PY["pose"], "-m", "spatial_vision.eval.hybrid_pose",
+                      "--r-dir", fp_p, "--r-name", "pose_coarse.json",
+                      "--t-dir", fp_p, "--t-name", "pose_refined.json", "--out", hy_p],
+                     hy_p, "meta_hybrid.json"),
+            ]
+
     # ══════════════════════════════════════════════════════════════════════════════════
     #  변형(팔) 구성 — `--mode` 로 넓힌다
     # ══════════════════════════════════════════════════════════════════════════════════
@@ -729,6 +768,10 @@ def build_steps(a) -> list[Step]:
                ("RP3", o / "fp_chull", "pose_refined.json"),
                ("RH1", o / "hyb_combo", "pose_coarse.json"),
                ("RH2", o / "hyb_combo2", "pose_coarse.json")]
+        # 프롬프트 스윕 — 팔당 RP1(단일 단계) + RH1(하이브리드) 둘
+        for tag, _ in getattr(a, "text_prompt_sweep_list", []):
+            lr += [(f"RP1@{tag}", o / f"fp_c075_{tag}", "pose_refined.json"),
+                   (f"RH1@{tag}", o / f"hyb_{tag}", "pose_coarse.json")]
     lr += [(sid, Path(a.out) / sid, "pose_refined.json") for sid, *_ in arms]
     for sid, pdir, pname in lr:
         steps.append(Step(f"lr_{sid}", f"좌우 투영 일관성 · {sid}",
@@ -754,6 +797,8 @@ def build_steps(a) -> list[Step]:
             f"{o / 'fp_chull'}:pose_refined.json", f"{o / 'hyb_combo'}:pose_coarse.json",
             f"{o / 'hyb_combo2'}:pose_coarse.json"]
            if "combo" in set(a.mode) and a.sam3_text else []) \
+        + [f"{o / f'hyb_{tag}'}:pose_coarse.json"
+           for tag, _ in getattr(a, "text_prompt_sweep_list", [])] \
         + [str(Path(a.out) / sid) for sid, *_ in arms]
     steps.append(Step("ov", "오버레이 시트 (육안 검사)",
                       lambda: [PY["pose"], "-m", "spatial_vision.viz.overlay_pose",
@@ -790,6 +835,8 @@ def build_steps(a) -> list[Step]:
         + ([f"{o / 'seg_ism'}:mask_full.png:I_ISM_full"] if a.ism else []) \
         + ([f"{o / 'seg_txt'}:mask_full.png:T_text_full"] if a.sam3_text else []) \
         + ([f"{o / 'seg_txtf'}:mask_flange.png:TF_text_flange"] if a.text_prompt_flange else []) \
+        + [f"{o / f'seg_txt_{tag}'}:mask_full.png:P_{tag}"
+           for tag, _ in getattr(a, "text_prompt_sweep_list", [])] \
         + [f"{o / 'seg_full'}:mask_full.png:진단용_full"]
     # ★★ **같은 타일에 그 경로의 FP pose 도 얹는다** — 마스크만 보면
     #    «마스크부터 엉뚱한 걸 잡았다» 와 «마스크는 맞는데 pose 가 틀렸다» 가 안 갈린다.
@@ -871,7 +918,9 @@ def build_steps(a) -> list[Step]:
     stat_ids = [sid for sid, *_ in arms] + ([] if a.no_exemplar else ["A3"]) \
         + (["I3"] if a.ism else []) + (["T3"] if a.sam3_text else []) \
         + (["TF3"] if a.text_prompt_flange else []) \
-        + (["RP1", "RP2", "RP3", "RH1", "RH2"] if combo_on else [])
+        + (["RP1", "RP2", "RP3", "RH1", "RH2"] if combo_on else []) \
+        + [f"{k}@{tag}" for tag, _ in getattr(a, "text_prompt_sweep_list", [])
+           for k in ("RP1", "RH1")]
     stat_alias = ([] if a.no_exemplar else ["A3=fp_ns2:pose_coarse.json"]) \
         + (["I3=fp_ism:pose_coarse.json"] if a.ism else []) \
         + (["T3=fp_txt:pose_coarse.json"] if a.sam3_text else []) \
@@ -879,7 +928,11 @@ def build_steps(a) -> list[Step]:
         + (["RP1=fp_c075:pose_refined.json", "RP2=fp_c050:pose_refined.json",
             "RP3=fp_chull:pose_refined.json", "RH1=hyb_combo:pose_coarse.json",
             "RH2=hyb_combo2:pose_coarse.json"]
-           if combo_on else [])
+           if combo_on else []) \
+        + [f"RP1@{tag}=fp_c075_{tag}:pose_refined.json"
+           for tag, _ in getattr(a, "text_prompt_sweep_list", [])] \
+        + [f"RH1@{tag}=hyb_{tag}:pose_coarse.json"
+           for tag, _ in getattr(a, "text_prompt_sweep_list", [])]
     steps.append(Step("stats", "통계 표·그래프·CSV",
                       [PY["pose"], "-m", "spatial_vision.eval.group_stats",
                        "--root", o, "--variants", ",".join(stat_ids),
@@ -1176,6 +1229,62 @@ def _n_small(areas: list, frac: float = 0.5) -> int:
         return 0
     m = float(np.median(areas))
     return int(sum(1 for x in areas if x < frac * m))
+
+
+def prompt_sweep_rows(root: Path) -> list[dict]:
+    """`--mode prompts` 스윕의 지표를 모은다 — **분할(무엇을 집었나) + pose(몇 장 냈나) + 좌우 일관성**.
+
+    🔴 **갈리는 축은 «검출되느냐» 하나다.** 잡히기만 하면 프롬프트가 달라도 마스크가 거의 같고
+       pose 는 더 안 바뀐다(§37-5 sim GT · §39-17 실물 136개에서 «갈린 이미지 0장»).
+       그래서 **첫 열이 검출이고, 그다음이 «pose 를 낸 프레임 수»** 다.
+    🔴 **게이트 후퇴율로 판정하면 안 된다**(교훈 #82) — 프롬프트가 바뀌면 마스크가 바뀌고
+       **FP 초기값 자체가 달라진다.**
+    ⚠️ IoU 가 아니다(GT 가 없다). «타깃을 집었는가» 의 **대리지표**이고 최종 판정은
+       `segcmp` 육안 + 좌우 `|Δdx|` 다.
+    """
+    out = []
+    # 🔴 **기준 프롬프트(`--text-prompt`)를 첫 줄로 넣는다.** 그게 없으면 표가 «나머지 3개» 가 되고
+    #    «기준보다 나은가» 를 못 본다 — 비교표의 분모가 빠지는 것이다(교훈 #16 의 변형).
+    #    기준의 산출물은 접미사가 없다: `seg_txt` · `hyb_combo` · `lr_consistency_RH1.json`.
+    for d in [root / "seg_txt"] + sorted(root.glob("seg_txt_*")):
+        base_row = d.name == "seg_txt"
+        tag = "base" if base_row else d.name[len("seg_txt_"):]
+        dets = sorted(d.glob("frame_*/det_full.json"))
+        if not dets:
+            continue
+        prm, found, areas, offs, scores = "?", 0, [], [], []
+        for q in dets:
+            j = _read_json(q)
+            prm = j.get("prompt") or prm          # det 에 프롬프트가 박혀 있다 (교훈 #21)
+            if not j.get("found"):
+                continue
+            found += 1
+            areas.append(j.get("area_px", 0))
+            if j.get("score") is not None:
+                scores.append(float(j["score"]))
+            m = cv2.imread(str(q.parent / "mask_full.png"), cv2.IMREAD_GRAYSCALE)
+            if m is not None and (m > 127).any():
+                ys, xs = np.nonzero(m > 127)
+                H, W = m.shape
+                offs.append(float(np.hypot(xs.mean() / W - 0.5, ys.mean() / H - 0.5)))
+        # 🔴 «분할이 됐다» ≠ «pose 가 나왔다» — FP 가 프레임을 건너뛸 수 있다(§35-2m).
+        hyb = root / ("hyb_combo" if base_row else f"hyb_{tag}")
+        n_pose = len(list(hyb.glob("frame_*/pose_coarse.json")))
+        r = {"tag": tag, "prompt": prm, "n": len(dets), "found": found, "n_pose": n_pose,
+             "area_med": float(np.median(areas)) if areas else None,
+             "area_min": float(min(areas)) if areas else None,
+             "n_small": _n_small(areas),
+             "score_min": min(scores) if scores else None,
+             "off_med": float(np.median(offs)) if offs else None,
+             "off_max": float(max(offs)) if offs else None}
+        lr = root / "lr" / ("lr_consistency_RH1.json" if base_row
+                            else f"lr_consistency_RH1@{tag}.json")
+        if lr.exists():
+            j = _read_json(lr)
+            r["lr_ddx"] = j.get("abs_median", {}).get("ddx_px")
+            r["lr_ddx_signed"] = j.get("median", {}).get("ddx_px")
+        out.append(r)
+    return out
 
 
 def refs_sweep_rows(root: Path, base_preset: str) -> list[dict]:
@@ -1977,6 +2086,11 @@ def report(a) -> int:
     for k in ("RP1", "RP2", "RP3", "RH1", "RH2"):
         if (root / "lr" / f"lr_consistency_{k}.json").exists():
             v[k] = read_variant(root, k)
+    # 프롬프트 스윕 팔(`RP1@f005`…) — 이름을 미리 못 아니까 **lr 파일에서 찾아낸다**
+    for f in sorted((root / "lr").glob("lr_consistency_R*@*.json")):
+        k = f.stem[len("lr_consistency_"):]
+        if k not in v:
+            v[k] = read_variant(root, k)
     labels = {"A1": "A1 홀 제외 (배포본)", "A2a": "A2a 홀 윤곽 (규격부)",
               "A2b": "A2b 홀 중심", "A3": "A3 정합 off (FP 단독)", "A4": "A4 refine 초기값",
               "I1": "I1 ISM 초기값 + 정합 (CAD only)", "I3": "I3 ISM 정합 off",
@@ -2062,11 +2176,21 @@ def report(a) -> int:
     L.append("|---|---|---|---|---|---|---|---|---|")
     # ⚠️ ISM 경로도 **같은 표**에 넣는다 — 따로 내면 나란히 비교가 안 된다.
     all_gated: list[str] = []
+    # 🔴 프롬프트 스윕 팔은 tag 를 미리 못 아니까 **여기서** 라벨을 만든다.
+    #    라벨에 **프롬프트 문장을 넣는다** — `RP1@f005` 만 보고는 무엇인지 알 수 없다(교훈 #88).
+    _pr = {r["tag"]: r["prompt"] for r in prompt_sweep_rows(root)}
+    for k in list(v):
+        if "@" in k and k.split("@")[0] in ("RP1", "RH1"):
+            base, tag = k.split("@", 1)
+            what = "단일 단계" if base == "RP1" else "**하이브리드**"
+            labels[k] = f"{k} {what} · 프롬프트 “{_pr.get(tag, tag)}”"
+
     order = ["A3", "A1", "A2a", "A2b", "A4"] + (["I3", "I1"] if a.ism else []) \
         + (["T3", "T1"] if a.sam3_text else []) \
         + [k for k in ("TF3", "TF1", "RP1", "RP2", "RP3", "RH1", "RH2") if k in v] \
         + [k for k in ("Cs16", "Cs32", "Cg0", "Cg07", "Cg3", "Cz", "H1", "Ccas", "IX1",
                        "Ed", "Eb", "Ea", "Eg3", "Eg05") if k in v] \
+        + sorted(k for k in v if "@" in k and k.split("@")[0] in ("RP1", "RH1")) \
         + sorted(k for k in v if k.startswith("R_") or (k.startswith("Rn") and k[2:].isdigit()))
     for sid in order:
         r = v.get(sid, {})
@@ -2141,6 +2265,56 @@ def report(a) -> int:
     L.append("")
 
     # ── `--mode refs` 스윕 요약 ────────────────────────────────────────────────────
+    ps_rows = prompt_sweep_rows(root)
+    if ps_rows:
+        L.append("## 프롬프트 스윕 (`--mode prompts`) — **`full` 텍스트 프롬프트 비교**\n")
+        L.append("🔴 **읽는 순서가 정해져 있다: ① 검출 → ② pose → ③ 이탈 → ④ 좌우 |Δdx|.** "
+                 "갈리는 축은 «검출되느냐» 하나다 — 잡히기만 하면 프롬프트가 달라도 마스크가 거의 "
+                 "같고 pose 는 더 안 바뀐다(§37-5 sim GT · §39-17 실물 136개에서 «갈린 이미지 0장»). "
+                 "**프롬프트를 «정확도» 로 고르려 하지 말 것.**\n")
+        L.append("🔴 **이 표를 게이트 후퇴율로 읽지 말 것**(교훈 #82) — 프롬프트가 바뀌면 마스크가 "
+                 "바뀌고 **FP 초기값 자체가 달라진다.**\n")
+        L.append("| 프롬프트 | 검출 | **pose** | 면적 중앙 | **면적 최소** | **쪼그라든 장** | "
+                 "score 최소 | 이탈 중앙 | **이탈 최대** | 좌우 \\|Δdx\\| |")
+        L.append("|---|---|---|---|---|---|---|---|---|---|")
+        for r in ps_rows:
+            f_ = lambda x, d=0: (f"{x:,.{d}f}" if x is not None else "—")
+            det = f"{r['found']}/{r['n']}" + (" 🔴" if r["found"] < r["n"] else "")
+            pos = f"**{r['n_pose']}**/{r['n']}" + (" 🔴" if r["n_pose"] < r["n"] else " ✅")
+            ns = r.get("n_small", 0)
+            ox = (f_(r["off_max"], 3) + (" 🔴" if (r["off_max"] or 0) > 0.25 else ""))
+            dd = f_(r.get("lr_ddx"), 2)
+            nm = f"`{r['prompt']}`" + ("  ← **기준**" if r["tag"] == "base" else "")
+            L.append(f"| {nm} | {det} | {pos} | {f_(r['area_med'])} | "
+                     f"{f_(r['area_min'])} | {'**' + str(ns) + '** 🔴' if ns else '0'} | "
+                     f"{f_(r.get('score_min'), 3)} | {f_(r['off_med'], 3)} | {ox} | {dd} |")
+        L.append("")
+        L.append("- **① 검출 / ② pose 는 다른 수다.** 분할이 돼도 FP 가 프레임을 건너뛸 수 있다"
+                 "(§35-2m). **`pose` 열이 프레임 수보다 적으면 그 프롬프트는 탈락**이다 — "
+                 "정확도를 볼 것도 없다.")
+        L.append("- **③ 이탈 >0.25 면 엉뚱한 물체다**(§34-10 의 사전 위치 가드를 화면 좌표로 옮긴 값). "
+                 "🔴 **`--text-conf` 를 내렸다면 이 열을 반드시 본다** — 미검출과 오선택을 맞바꾼 것이다.")
+        L.append("- 🔴🔴 **«쪼그라든 장»(면적이 중앙의 0.5배 미만)과 «면적 최소» 를 중앙값보다 먼저 본다.** "
+                 "중앙값은 **부분 실패를 통째로 가린다** — 검출 20/20 · 면적 중앙 정상인데 "
+                 "한 프레임이 중앙의 0.15배로 쪼그라들어 **KPI 9/20** 이었던 전례가 있다(교훈 #6·#13).")
+        L.append("- **첫 줄이 «기준»**(`--text-prompt` 로 준 것)이다 — 나머지는 그것과 비교해서 읽는다. "
+                 "그 줄의 팔 이름은 `RH1`(접미사 없음)이고 나머지는 `RH1@<tag>` 다.")
+        L.append("- **④ 좌우 `|Δdx|`** 는 `RH1@<tag>`(하이브리드) 기준이다. "
+                 "**살아남은 것들끼리만** 이 열로 서열을 매긴다(실제 KPI 와 r = −0.94, §35-2o-6b).")
+        L.append("- **`score` 최소값 = 미검출까지의 여유**다. 🔴 «품질» 이 아니다(마스크 품질과 "
+                 "r = +0.06, 교훈 #90). `--text-conf` 문턱의 **몇 배**인지로 읽는다 — "
+                 "1.5배 근처면 조건이 조금만 나빠져도 통째로 사라진다(§41-7).")
+        alive = [r for r in ps_rows if r["n_pose"] == r["n"] and (r.get("off_max") or 0) <= 0.25]
+        L.append(f"- **전 프레임 통과 + 이탈 정상: {len(alive)}/{len(ps_rows)}개.** "
+                 + ("🔴 **0개다 — 프롬프트를 다시 발굴해야 한다**(§41-9a 방아쇠 ①). "
+                    "되돌릴 순서: `real_final12` → `real_pass37` → `real_pass58` → `real_testset`."
+                    if not alive else
+                    ("⚠️ **1개뿐이다 — 여유가 없다.** 조건이 조금만 바뀌면 0 이 될 수 있다."
+                     if len(alive) == 1 else
+                     "✅ 여럿이 살아남았다 — 여기서는 **좌우 `|Δdx|`** 로 고른다.")))
+        L.append("- 🔴 **여기서 고른 프롬프트는 «이 데이터에서 골랐다»** — 확정하려면 "
+                 "**새로 찍은 20~40장**을 그 프롬프트로 다시 돌린다(§35-2o-4 선택 편향).\n")
+
     rs = refs_sweep_rows(root, a.preset)
     if len(rs) > 1:
         L.append("## 참조 거리대 스윕 (`--mode refs`)\n")
@@ -2399,6 +2573,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--text-prompt", default="black plastic box",
                     help="T그룹 프롬프트. 🔴 실물 몸체 색에 맞출 것 "
                          "(예: \"orange plastic box\" · \"clear plastic box\")")
+    # ★ 프롬프트 **스윕** — `--text-prompt` 는 값이 하나라 4개를 보려면 런을 넷 돌려야 했다.
+    #   런이 갈리면 `stats/ranking.png` 한 장에 못 올라가고 `compare_runs.py` 를 거쳐야 한다.
+    #   → 한 런 안에서 돌려 **같은 표·같은 서열 그림**에 올린다.
+    # 🔴 프롬프트당 **COMBO 5팔을 전부 복제하지 않는다** — RP1/RP2/RP3 는 §38-9 에서
+    #    «구분되지 않는다» 가 나왔으므로 프롬프트마다 되풀이해도 얻을 게 없다. 대신
+    #    **RP1(단일 단계) + RH1(하이브리드)** 둘만 만든다 = seg 1 + FP 1 + 병합 1.
+    ap.add_argument("--text-prompt-sweep", default=None,
+                    help="`full` 텍스트 프롬프트를 **여러 개** 한 런에서 비교한다. "
+                         "값은 **프롬프트 json 경로**(그 파일의 `full` 블록을 쓴다. 예: "
+                         "assets/prompts/real_current.json) 또는 **`;` 로 구분한 문장들**. "
+                         "프롬프트마다 `RP1@<tag>`·`RH1@<tag>` 두 팔이 붙는다. "
+                         "🔴 `--mode combo` + `--sam3-text` 필요. `--text-prompt` 와 같은 문장은 "
+                         "기본 팔이 이미 담당하므로 자동으로 뺀다")
     # 🔴🔴 **기본값을 0.05 → 0.15 로 되돌렸다 (2026-08-20).** 0.05 는 §35-2m-2 의 sim 측정
     #   («검출 20/20 · 오선택 0»)에 근거했는데, 그 씬은 **`distractors: 0 · occluders: 0`** 이었다.
     #   **고를 다른 물체가 없는 씬에서 «오선택 0» 은 공허하다** — 실물에서 배경 물체를 집었다.
@@ -2558,6 +2745,44 @@ def main(argv: list[str] | None = None) -> int:
               "다르다.** 방해물이 없으면 두 팔이 같은 결과인 것이 정상이다", flush=True)
 
     # ── `--mode refs` 의 스윕 목록을 여기서 확정한다 (build_steps 는 결과만 받는다) ──────────
+    # ── `--mode prompts` / `--text-prompt-sweep` 의 목록을 여기서 확정한다 ────────────────
+    # 🔴 조용히 빈 목록으로 넘어가면 «돌렸는데 팔이 없다» 가 된다 — 이유를 말하고 죽거나 뺀다.
+    a.text_prompt_sweep_list = []
+    if "prompts" in a.mode or a.text_prompt_sweep:
+        a.mode = list(dict.fromkeys(a.mode + ["prompts", "combo"]))
+        a.sam3_text = True
+        src = a.text_prompt_sweep or "assets/prompts/real_current.json"
+        pairs: list[tuple[str, str]] = []
+        if ";" in src or not Path(src).exists():
+            if not Path(src).suffix == ".json":
+                pairs = [(f"p{i+1}", s.strip())
+                         for i, s in enumerate(src.split(";")) if s.strip()]
+            else:
+                print(f"❌ `--text-prompt-sweep {src}` — 그런 파일이 없다", file=sys.stderr)
+                return 2
+        else:
+            try:
+                blk = json.load(open(src)).get("full", [])
+            except Exception as e:                       # noqa: BLE001
+                print(f"❌ `--text-prompt-sweep {src}` 을 못 읽는다: {e}", file=sys.stderr)
+                return 2
+            # 항목은 [slug, label, prompt, meta] 꼴. slug 이 곧 tag 다(프롬프트에 붙박이).
+            pairs = [(x[0], x[2]) for x in blk if isinstance(x, list) and len(x) > 2]
+            if not pairs:
+                print(f"❌ `{src}` 의 `full` 블록이 비었다", file=sys.stderr)
+                return 2
+        base = a.text_prompt.strip()
+        a.text_prompt_sweep_list = [(t, p) for t, p in pairs if p.strip() != base]
+        skipped = len(pairs) - len(a.text_prompt_sweep_list)
+        print(f"    · 프롬프트 스윕: {len(pairs)}개 중 **{len(a.text_prompt_sweep_list)}개**를 팔로 "
+              f"추가한다 (출처 {src})" + (f" · {skipped}개는 `--text-prompt` 와 같아 뺐다"
+                                       if skipped else ""), flush=True)
+        if not skipped:
+            print("    ⚠️ `--text-prompt` 가 스윕 목록에 **없다** — 기본 팔(T·RP·RH)과 스윕 팔이 "
+                  f"서로 다른 {len(pairs) + 1}개 프롬프트를 쓴다. 의도한 것인지 확인할 것", flush=True)
+        for t, p in a.text_prompt_sweep_list:
+            print(f"        {t}  {p!r}", flush=True)
+
     a.refs_sweep_list, a.refs_sweep_n = [], []
     if "refs" in a.mode:
         if a.refs_sweep:
