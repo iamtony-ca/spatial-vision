@@ -6,8 +6,13 @@
     «같다» 는 다른 말이다(교훈 #86). 여기서 **프레임마다 짝지어** ΔR·Δt 를 직접 계산해
     **이미 측정해 둔 잡음 바닥**과 견준다:
 
-      · `pose_fp` 재실행 잡음  ΔR 중앙 **0.146°** / 최대 0.662°            (교훈 #24)
-      · 하이브리드 ADD 재실행 폭 중앙 **0.071~0.095mm** / 최대 0.147mm     (§38-9)
+      같은 입력으로 FP 를 두 번 돌렸을 때의 **프레임별 짝지은** 값 (`RESULTS.md §37-6`, n=20):
+      · **|ΔR| 중앙 0.082°** / 최대 0.701°   (교훈 #24 의 다른 측정은 중앙 0.146° — **큰 쪽을 쓴다**)
+      · **|Δt| 중앙 0.252mm** / 최대 2.565mm
+
+    🔴 **문턱은 «이 도구가 재는 것과 같은 양» 이어야 한다**(교훈 #26). 초판은 §38-9 의
+       «ADD 재실행 폭»(0.095mm)을 썼는데 ADD 는 R·t 가 섞인 다른 양이라 **2.7배 엄격**했고,
+       실물 런에서 **모든 짝이 «다르다» 로 나왔다.**
 
     차이가 그 바닥 안이면 **«구분되지 않는다» 가 증명된 것**이고, 넘으면 «눈이 못 본 것» 이다.
 
@@ -36,8 +41,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from spatial_vision.contracts import rotation_angle_deg          # noqa: E402
 
 # 이미 측정해 둔 잡음 바닥 — 🔴 «정상 범위» 가 아니라 «같은 설정을 다시 돌렸을 때의 폭» 이다.
-NOISE_R_MED, NOISE_R_MAX = 0.146, 0.662      # 교훈 #24 (pose_fp 재실행)
-NOISE_T_MED, NOISE_T_MAX = 0.095, 0.147      # §38-9 (하이브리드 ADD 재실행 4회)
+# ★★ **이 도구가 재는 것과 «정확히 같은 양»** 을 쓴다 (`RESULTS.md §37-6`, n=20):
+#     «같은 입력으로 FP 를 두 번 돌렸을 때의 **프레임별 짝지은** |ΔR| · |Δt| 의 중앙/최대».
+# 🔴🔴 **초판은 `NOISE_T` 로 §38-9 의 «ADD 재실행 폭»(0.095mm)을 썼다 — 다른 양이다**
+#     (ADD 는 메쉬 정점 평균 거리라 R·t 가 섞인다). 실제 ‖Δt‖ 바닥은 **2.7배**이고,
+#     그 탓에 실물 런에서 **모든 짝이 «다르다» 로 나왔다.** 교훈 #26 의 재발이다 —
+#     «두 값을 비교하기 전에 «같은 양인가» 를 먼저 확인한다».
+NOISE_T_MED, NOISE_T_MAX = 0.252, 2.565      # §37-6 — 프레임별 |Δt| 중앙 / 최대
+# ⚠️ ΔR 은 같은 양의 측정이 둘 있다 — §37-6 의 0.082° 와 교훈 #24 의 0.146°.
+#    **큰 쪽을 쓴다**: «다르다» 고 주장하려면 어느 잡음 추정치도 넘어야 한다.
+NOISE_R_MED, NOISE_R_MAX = 0.146, 0.701      # 교훈 #24 중앙 · §37-6 최대
 
 
 def R_of(row: dict) -> np.ndarray | None:
@@ -92,8 +105,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--arms", default=None, help="쉼표로 골라 쓴다. 안 주면 CSV 에 있는 전부")
     ap.add_argument("--ref", default=None,
                     help="기준 팔. 주면 «기준 대비» 만 낸다(짝이 많으면 표가 길어진다)")
-    ap.add_argument("--md-out", default=None, help="표를 마크다운으로도 쓴다")
+    ap.add_argument("--md-out", default=None,
+                    help="표를 마크다운으로도 쓴다. **상대경로면 «명령을 실행한 디렉토리»** 에 "
+                         "떨어진다(보통 `<ws>/src/vision/`). 런 안에 두려면 "
+                         "`--md-out runs/R28_combo/arm_diff.md` 처럼 경로째 준다")
+    ap.add_argument("--list-arms", action="store_true",
+                    help="각 런에 **어떤 팔이 있는지만** 찍고 끝낸다 (`--arms` 이름을 확인할 때)")
     a = ap.parse_args(argv)
+
+    if a.list_arms:
+        for run in [Path(r) for r in a.run]:
+            d = load(run)
+            print(f"{run.name}: {len(d)}개 — {sorted(d)}" if d else f"{run.name}: 없음")
+        return 0
 
     L: list[str] = []
 
@@ -105,8 +129,14 @@ def main(argv: list[str] | None = None) -> int:
         d = load(run)
         if not d:
             continue
-        arms = [x.strip() for x in a.arms.split(",")] if a.arms else sorted(d)
-        arms = [x for x in arms if x in d]
+        want = [x.strip() for x in a.arms.split(",")] if a.arms else sorted(d)
+        arms = [x for x in want if x in d]
+        # 🔴 **조용히 빼지 않는다**(교훈 #21·#22) — 이름을 하나 잘못 주면 «비교했다고 믿는
+        #    빠진 비교» 가 된다. 실제로 `RP3` ↔ `RP3_hull` 처럼 이름이 갈리는 자리가 있다.
+        miss = [x for x in want if x not in d]
+        if miss:
+            print(f"🔴 {run.name}: `--arms` 에 **없는 이름 {len(miss)}개** — {miss}\n"
+                  f"   있는 팔: {sorted(d)}", file=sys.stderr)
         if len(arms) < 2:
             print(f"⚠️ {run.name}: 비교할 팔이 {len(arms)}개다 — 건너뛴다", file=sys.stderr)
             continue
@@ -114,6 +144,10 @@ def main(argv: list[str] | None = None) -> int:
                  else list(itertools.combinations(arms, 2)))
 
         say(f"\n## {run.name} — 팔 {len(arms)}개 · 짝 {len(pairs)}개")
+        say("")
+        say(f"판정 문턱(§37-6, FP 재실행 프레임별 짝): "
+            f"**ΔR 중앙 ≤{NOISE_R_MED}° · Δt 중앙 ≤{NOISE_T_MED}mm** "
+            f"(꼬리 참고 ΔR 최대 {NOISE_R_MAX}° · Δt 최대 {NOISE_T_MAX}mm)")
         say("")
         say("| 짝 | n | ΔR 중앙 | ΔR p90 | **ΔR 최대** | Δt 중앙 | Δt p90 | **Δt 최대** | 판정 |")
         say("|---|---:|---:|---:|---:|---:|---:|---:|:--|")
@@ -155,9 +189,12 @@ def main(argv: list[str] | None = None) -> int:
         say(f"- 🔴 **«하이브리드 ↔ refined» 의 ΔR ~2° 는 잡음이 아니라 구조**다 — 하이브리드는 R 을 "
             f"`coarse` 에서 받고 refined 는 `refine` 을 거친다. §27-7 이 «refine 이 R 을 악화시킨다» "
             f"고 잰 바로 그 간격이다. **같은 축의 팔끼리만** 나란히 놓는다.")
-        say(f"- 잡음 바닥은 **같은 설정을 다시 돌렸을 때의 폭**이다 — `pose_fp` 재실행 "
-            f"ΔR 중앙 {NOISE_R_MED}°/최대 {NOISE_R_MAX}°(교훈 #24) · 하이브리드 ADD "
-            f"{NOISE_T_MED}mm(§38-9). **그 안이면 «설정 효과의 증거가 아니다».**")
+        say(f"- 잡음 바닥은 **같은 입력으로 FP 를 두 번 돌렸을 때의 «프레임별 짝지은» 폭**이다 "
+            f"(§37-6, n=20) — ΔR 중앙 **{NOISE_R_MED}°**/최대 {NOISE_R_MAX}° · "
+            f"Δt 중앙 **{NOISE_T_MED}mm**/최대 {NOISE_T_MAX}mm. "
+            f"**그 안이면 «설정 효과의 증거가 아니다».**")
+        say(f"- ⚠️ **Δt 최대 바닥이 {NOISE_T_MAX}mm 로 크다** — 재실행만으로도 한 프레임이 "
+            f"그만큼 튄다. **꼬리로 팔을 가르지 않는다.**")
 
     say("")
     say("🔴 **이 표는 «얼마나 다른가» 이지 «누가 맞나» 가 아니다.** GT 가 없으므로 정확도는 못 잰다 —")
@@ -167,8 +204,10 @@ def main(argv: list[str] | None = None) -> int:
     say("   🔴 로봇이 필요 없다(카메라를 안 움직인다).")
 
     if a.md_out:
-        Path(a.md_out).write_text("\n".join(L) + "\n", encoding="utf-8")
-        print(f"\n→ {a.md_out}")
+        q = Path(a.md_out)
+        q.parent.mkdir(parents=True, exist_ok=True)
+        q.write_text("\n".join(L) + "\n", encoding="utf-8")
+        print(f"\n→ {q.resolve()}")          # 🔴 «어디에 떨어졌나» 를 절대경로로 말한다
     return 0
 
 
