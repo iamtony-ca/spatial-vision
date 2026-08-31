@@ -8,10 +8,18 @@
     여기서 배선을 한 번만 정하고, **없는 팔은 이유를 찍고 뺀다.**
 
 무엇을 내나 (`<run>/inspect/` 아래, 프레임마다 한 장)
+    ★★ **`flange/`** — 🟢 **최종 pose 를 «top flange 외곽 + X/Y/Z 축» 으로 전부 겹친다.**
+                 팔마다 색이 다르고 **축 색 = 그 팔 색**이다. 물체에 **크롭해서** 확대하므로
+                 mm 눈금이 촘촘하다. 🔴 **회전 오차는 윤곽보다 축에서 훨씬 잘 보인다** —
+                 60mm 지렛대가 각도를 화면 거리로 늘린다. (`viz.overlay_pose --combine --axes-all`)
     `arms/`    — 마스크 1개(기준 프롬프트) + **pose 팔 3개**(RH1·RH2·RP3).
-                 마스크가 같으므로 **«pose 알고리즘 차이» 만** 남는다.
+                 마스크가 같으므로 **«pose 알고리즘 차이» 만** 남는다. **몸체 전체(`full.ply`)** 다.
     `prompts/` — **프롬프트마다 마스크 + 그 pose**. 마스크가 다르므로 «분할 차이» 가 보인다.
     `all/`     — 위를 전부 겹친 것. 한 장에서 다 보고 싶을 때.
+
+🔴 **`flange/` 와 나머지는 «무엇을 그리나» 가 다르다** — `flange` 는 **pose 만**(마스크 없음,
+   `top_flange.ply`, 크롭 O), 나머지는 **마스크 + pose**(`full.ply`, 크롭 X)다.
+   «pose 끼리 얼마나 어긋났나» 는 `flange`, «마스크와 pose 가 합의하나» 는 `arms`/`prompts` 다.
 
 🔴 **읽는 법** — 실선 채움 `[M]` = 마스크 · **점선 + 십자** `[P]` = pose 투영 실루엣.
    ① 점선이 실선 안에 잘 들어가면 그 팔은 «마스크와 합의» 다.
@@ -22,9 +30,14 @@
 ⚠️ pose 투영은 **`full.ply`** 다 — 마스크가 `mask_full` 이라서. 두 메쉬는 원점이 같다.
 ⚠️ 인터프리터는 **`envs/pose`**(trimesh 필요).
 
+🔴 **`--run` 과 `--in` 은 다른 것이다** — `--run` 은 러너 **출력**(마스크·pose 를 읽는 곳),
+   `--in` 은 **촬영**(그림을 그릴 바탕 사진). 겹쳐 그리려면 둘 다 필요하다.
+   ★ **`--in` 은 보통 안 줘도 된다** — `<run>/run_meta.json` 에서 읽는다.
+
 사용
-    envs/pose/bin/python tools/inspect_frames.py --in runs/real_zedx_28cm --run runs/R28_combo
-    envs/pose/bin/python tools/inspect_frames.py --in ... --run ... --only prompts --prompts f002,f005,f007
+    envs/pose/bin/python tools/inspect_frames.py --run runs/R28_combo
+    envs/pose/bin/python tools/inspect_frames.py --run ... --only prompts --prompts f002_base,f005,f007
+    envs/pose/bin/python tools/inspect_frames.py --run ... --in runs/real_zedx_28cm   # 촬영을 옮겼을 때
 """
 from __future__ import annotations
 
@@ -83,25 +96,55 @@ def build(run: Path, arms: list, view: str) -> tuple[list[str], list[str]]:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--in", dest="in_dir", required=True, help="촬영 디렉토리 (frame_*/left.png)")
-    ap.add_argument("--run", required=True, help="러너 출력 디렉토리 (seg_txt·hyb_combo… 가 있는 곳)")
+    ap.add_argument("--run", required=True,
+                    help="러너 **출력** 디렉토리 (`seg_txt`·`hyb_combo`… 가 있는 곳). "
+                         "= `run_group_a.py --out` 에 준 값")
+    ap.add_argument("--in", dest="in_dir", default=None,
+                    help="**촬영** 디렉토리 (`frame_*/left.png`) — 그림을 그릴 바탕 사진. "
+                         "= `run_group_a.py --in` 에 준 값. "
+                         "★ **안 주면 `<run>/run_meta.json` 에서 읽는다**(보통 안 줘도 된다)")
     ap.add_argument("--out", default=None, help="기본 `<run>/inspect`")
     ap.add_argument("--obj", default="assets/obj/foup_300_semi_r2")
-    ap.add_argument("--only", default="arms,prompts,all",
-                    help="낼 시점. 쉼표로. `arms` · `prompts` · `all`")
+    ap.add_argument("--only", default="flange,arms,prompts",
+                    help="낼 시점. 쉼표로. **`flange`**(pose 만 · flange 외곽 + X/Y/Z 축 · 크롭 O) · "
+                         "`arms`(마스크+pose) · `prompts` · `all`")
     ap.add_argument("--prompts", default=None,
                     help="프롬프트 tag 를 골라 쓴다(쉼표, 예 `f002_base,f005,f007`). "
                          "안 주면 **디스크에 있는 전부**")
     ap.add_argument("--width", type=int, default=1600, help="프레임당 이미지 가로 픽셀")
+    ap.add_argument("--flange-tile", type=int, default=1100,
+                    help="`flange` 시점의 한 변 픽셀 (물체에 크롭한 정사각)")
+    ap.add_argument("--flange-mesh", default="top_flange.ply",
+                    help="`flange` 시점에 그릴 메쉬. 몸체 전체를 보려면 `full.ply`")
     ap.add_argument("--frames", type=int, default=0, help="0 = 전부")
     a = ap.parse_args(argv)
 
-    run, cap = Path(a.run), Path(a.in_dir)
+    run = Path(a.run)
     if not run.exists():
-        print(f"❌ `{run}` 이 없다", file=sys.stderr); return 2
+        print(f"❌ `--run {run}` 이 없다", file=sys.stderr); return 2
+    # ★ 촬영 경로는 러너가 `run_meta.json` 에 적어 둔다 — 손으로 다시 주게 하면 «결과 폴더를
+    #   넣는 것 아닌가» 로 헷갈린다(실제로 헷갈렸다). 🔴 `--limit-frames` 를 썼으면 그 값이
+    #   `<run>/_in_firstN` 이라 **러너가 실제로 본 프레임 집합**과 정확히 맞는다.
+    if a.in_dir:
+        cap = Path(a.in_dir)
+    else:
+        mj = run / "run_meta.json"
+        if not mj.exists():
+            print(f"❌ `--in` 도 없고 `{mj}` 도 없다 — 촬영 디렉토리를 알 수 없다", file=sys.stderr)
+            return 2
+        cap = Path(json.loads(mj.read_text())["in"])
+        if not cap.is_absolute():
+            cap = HERE / cap
+        print(f"★ 촬영 디렉토리를 `run_meta.json` 에서 읽었다 — {cap}")
+    if not cap.exists():
+        print(f"❌ 촬영 디렉토리 `{cap}` 가 없다 (다른 PC 에서 옮겨 왔다면 `--in` 으로 직접 준다)",
+              file=sys.stderr)
+        return 2
     n_frames = len(list(cap.glob("frame_*/left.png")))
     if n_frames == 0:
-        print(f"❌ `{cap}` 에 frame_*/left.png 가 없다", file=sys.stderr); return 2
+        print(f"❌ `{cap}` 에 frame_*/left.png 가 없다 — **결과 폴더가 아니라 «촬영» 폴더**여야 한다",
+              file=sys.stderr)
+        return 2
     out = Path(a.out) if a.out else run / "inspect"
 
     pa = prompt_arms(run)
@@ -114,7 +157,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         pa = [x for x in pa if x[0] in want]
 
-    VIEWS = {"arms": POSE_ARMS, "prompts": pa, "all": POSE_ARMS + pa}
+    VIEWS = {"flange": POSE_ARMS + pa, "arms": POSE_ARMS, "prompts": pa, "all": POSE_ARMS + pa}
     print(f"★ 프레임 {n_frames}장 · 프롬프트 팔 {len(pa)}개 {[x[0] for x in pa]}")
     rc = 0
     for v in [x.strip() for x in a.only.split(",") if x.strip()]:
@@ -126,6 +169,21 @@ def main(argv: list[str] | None = None) -> int:
         if len(pose) > 7:      # `seg_compare.POSE_COLORS` 가 7색이다
             print(f"    ⚠️ [{v}] pose {len(pose)}개 — 색이 순환한다. `--prompts` 로 줄이는 편이 낫다")
         d = out / v
+        if v == "flange":
+            # ★ pose 만 겹친다 — `overlay_pose --combine` 이 **크롭 + 축 + 색 맞춘 주석**을 한다.
+            #   🔴 마스크는 안 깐다(윤곽이 여럿이라 가려진다) — 그건 `arms`/`prompts` 의 몫이다.
+            cmd = [str(PY), "-m", "spatial_vision.viz.overlay_pose",
+                   "--capture", str(cap), "--obj", a.obj, "--mesh", a.flange_mesh,
+                   "--combine", "--axes-all", "--max-combine", "8",
+                   "--frames", str(a.frames or n_frames), "--tile", str(a.flange_tile),
+                   "--per-frame-dir", str(d), "--out", str(d / "_sheet.png")]
+            for lab, _sd, pd, pn in VIEWS[v]:
+                if len(list((run / pd).glob(f"frame_*/{pn}"))):
+                    cmd += ["--pred", f"{run / pd}:{pn}"]
+            print(f"\n── [{v}] pose {len(cmd) // 2 and sum(1 for x in cmd if x == '--pred')}개 "
+                  f"(flange 외곽 + X/Y/Z 축) → {d}/overlay_frame_*.png")
+            rc |= subprocess.run(cmd, cwd=HERE).returncode
+            continue
         cmd = [str(PY), "-m", "spatial_vision.viz.seg_compare",
                "--capture", str(cap), "--obj", a.obj, "--mesh", "full.ply",
                "--frames", str(a.frames or n_frames), "--width", str(a.width),

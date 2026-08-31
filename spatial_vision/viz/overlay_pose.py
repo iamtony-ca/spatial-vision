@@ -80,8 +80,13 @@ def rot_deg(A: np.ndarray, B: np.ndarray) -> float:
     return rotation_angle_deg(A[:3, :3], B[:3, :3])
 
 
-def draw_axes(img, T, K, mm: float) -> None:
-    """물체 원점의 X/Y/Z. **글자로 라벨을 찍는다** — 색만으로는 다른 도구와 헷갈린다."""
+def draw_axes(img, T, K, mm: float, col=None) -> None:
+    """물체 원점의 X/Y/Z. **글자로 라벨을 찍는다** — 색만으로는 다른 도구와 헷갈린다.
+
+    ★ `col` 을 주면 **세 축을 그 색으로** 그린다(`--axes-all`). 팔을 여럿 겹칠 때는
+      «어느 축인가»(X/Y/Z 라벨)와 «어느 팔인가»(색)를 **둘 다** 알아야 해서, 축 색을
+      팔 색으로 넘기고 축 구분은 라벨에 맡긴다. 🔴 `col=None` 이면 기존 R/G/B 규약 그대로다.
+    """
     P = np.array([[0, 0, 0], [mm, 0, 0], [0, mm, 0], [0, 0, mm]], float)
     Xc = (T[:3, :3] @ P.T + T[:3, 3:4]).T
     if (Xc[:, 2] <= 1e-6).any():
@@ -89,9 +94,10 @@ def draw_axes(img, T, K, mm: float) -> None:
     uv = (K @ Xc.T).T
     uv = np.rint(uv[:, :2] / uv[:, 2:3]).astype(int)
     o = tuple(uv[0])
-    for i, (lab, col) in enumerate(((("X"), (0, 0, 255)), ("Y", (0, 255, 0)), ("Z", (255, 0, 0))), 1):
-        cv2.arrowedLine(img, o, tuple(uv[i]), col, 2, tipLength=0.18)
-        cv2.putText(img, lab, tuple(uv[i]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, col, 2)
+    for i, (lab, c) in enumerate(((("X"), (0, 0, 255)), ("Y", (0, 255, 0)), ("Z", (255, 0, 0))), 1):
+        c = col if col is not None else c
+        cv2.arrowedLine(img, o, tuple(uv[i]), c, 2, tipLength=0.18)
+        cv2.putText(img, lab, tuple(uv[i]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, c, 2)
     cv2.circle(img, o, 4, (255, 255, 255), -1)
 
 
@@ -238,13 +244,16 @@ COMBO_COLORS = [(0, 255, 0), (255, 255, 0), (0, 255, 255), (255, 0, 255),
 
 
 def make_combo_tile(frame: Path, preds: list, mesh, K, box, tile: int, axes_for: int = 0,
-                    scalebar: bool = True):
+                    scalebar: bool = True, axes_all: bool = False):
     """★ **예측 여러 개를 «한 장» 에 겹쳐** 그린다 (`--combine`).
 
     타일을 나눠 그리면 *"coarse 와 refined 가 얼마나 어긋나는가"* 를 눈으로 못 잰다 —
     같은 화소 위에 놓아야 보인다. 분할 백엔드별 FP 결과를 겹치는 것도 같은 이유다.
 
-    ⚠️ 마스크는 안 깐다(윤곽이 여럿이라 가려진다) · 축 삼각대는 **하나만** 그린다(`axes_for`).
+    ⚠️ 마스크는 안 깐다(윤곽이 여럿이라 가려진다) · 축 삼각대는 기본이 **하나**다(`axes_for`).
+    ★ `axes_all=True` 면 **팔마다** 그리고 **축 색을 팔 색으로** 맞춘다(`--axes-all`).
+      회전 오차는 윤곽보다 축에서 훨씬 잘 보인다 — 60mm 지렛대가 각도를 화면 거리로 늘린다.
+      🔴 대신 원점이 겹쳐 있어 팔이 많으면 화살표가 뭉친다. 4~6팔까지가 읽을 만하다.
     """
     img = cv2.imread(str(frame / "left.png"))
     hw = img.shape[:2]
@@ -270,7 +279,9 @@ def make_combo_tile(frame: Path, preds: list, mesh, K, box, tile: int, axes_for:
         cs, _ = cv2.findContours(silhouette(mesh, T, K, hw),
                                  cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cv2.drawContours(img, cs, -1, col, 2)
-        if i == axes_for:
+        if axes_all:
+            draw_axes(img, T, K, 60.0, col=col)
+        elif i == axes_for:
             draw_axes(img, T, K, 60.0)
 
     if box:
@@ -341,6 +352,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="`--combine` 에서 그릴 예측 수 상한. 🔴 팔레트가 8색이라 넘으면 색이 "
                          "순환해 구분이 안 되고, 주석 줄이 타일을 통째로 덮는다(30팔에서 실제로 "
                          "그랬다). 넘치면 **앞에서 자르고 범례에 밝힌다**")
+    ap.add_argument("--axes-all", action="store_true",
+                    help="★ `--combine` 에서 **팔마다** X/Y/Z 축을 그린다(축 색 = 그 팔 색). "
+                         "회전 오차는 윤곽보다 축에서 잘 보인다 — 60mm 지렛대가 각도를 화면 "
+                         "거리로 늘린다. 🔴 원점이 겹쳐 있어 **4~6팔까지가 읽을 만하다**")
     ap.add_argument("--combine", action="store_true",
                     help="★ 예측 전부를 **한 이미지에 겹쳐** 그린다(예측마다 다른 색 + 색 맞춘 주석). "
                          "coarse↔refined 어긋남, 분할 백엔드별 FP 차이를 눈으로 재려면 이것이다")
@@ -393,7 +408,7 @@ def main(argv: list[str] | None = None) -> int:
         box, tiles = None, []
         if args.combine:                       # ★ 전부 한 장에 겹친다
             t, box = make_combo_tile(f, preds, mesh, K, box, args.tile,
-                                     scalebar=not args.no_scalebar)
+                                     scalebar=not args.no_scalebar, axes_all=args.axes_all)
             tiles.append(t)
         else:
             for d, name, _ in preds:           # ★ 행 안에서 크롭 박스를 공유해야 나란히 비교된다
