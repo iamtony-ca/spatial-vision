@@ -177,11 +177,21 @@ def main(argv: list[str] | None = None) -> int:
                    "--combine", "--axes-all", "--max-combine", "8",
                    "--frames", str(a.frames or n_frames), "--tile", str(a.flange_tile),
                    "--per-frame-dir", str(d), "--out", str(d / "_sheet.png")]
+            n_arm = 0
             for lab, _sd, pd, pn in VIEWS[v]:
-                if len(list((run / pd).glob(f"frame_*/{pn}"))):
-                    cmd += ["--pred", f"{run / pd}:{pn}"]
-            print(f"\n── [{v}] pose {len(cmd) // 2 and sum(1 for x in cmd if x == '--pred')}개 "
-                  f"(flange 외곽 + X/Y/Z 축) → {d}/overlay_frame_*.png")
+                n = len(list((run / pd).glob(f"frame_*/{pn}")))
+                if n == 0:
+                    print(f"    ⚠️ [{v}] {lab:10s} 건너뜀 — `{pd}/frame_*/{pn}` 이 0개다")
+                    continue
+                # 🔴 라벨을 넘긴다 — 안 주면 `hyb_combo/coarse` 로 찍혀 «어느 팔인가» 를 모른다
+                cmd += ["--pred", f"{run / pd}:{pn}:{lab}"]
+                n_arm += 1
+            if n_arm == 0:
+                print(f"    🔴 [{v}] 그릴 pose 가 하나도 없다 — 건너뛴다"); continue
+            if n_arm > 6:
+                print(f"    ⚠️ [{v}] pose {n_arm}개 — **원점이 겹쳐 축 화살표가 뭉친다.** "
+                      "`--prompts` 로 4~6개까지 줄이는 편이 읽기 좋다")
+            print(f"\n── [{v}] pose {n_arm}개 (flange 외곽 + X/Y/Z 축) → {d}/overlay_frame_*.png")
             rc |= subprocess.run(cmd, cwd=HERE).returncode
             continue
         cmd = [str(PY), "-m", "spatial_vision.viz.seg_compare",

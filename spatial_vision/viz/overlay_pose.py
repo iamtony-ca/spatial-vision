@@ -152,13 +152,24 @@ def scale_terms(K, T, box, hw, tile: int) -> tuple[float, float]:
 
 
 def parse_pred(spec: str, default_name: str) -> tuple[Path, str, str]:
-    """`경로[:pose_이름]` → (디렉토리, pose 파일명, 라벨)."""
-    if ":" in spec and not spec.split(":")[-1].startswith(("/", "\\")):
-        head, name = spec.rsplit(":", 1)
-    else:
-        head, name = spec, default_name
-    d = Path(head)
-    lab = d.name if name == default_name else f"{d.name}/{name.replace('pose_', '').replace('.json', '')}"
+    """`경로[:pose_이름[:라벨]]` → (디렉토리, pose 파일명, 라벨).
+
+    ★ **라벨을 직접 줄 수 있다** — 안 주면 디렉토리 이름에서 만든다. 팔을 여럿 겹칠 때
+      `hyb_combo/coarse` 같은 **디렉토리 이름은 «어느 팔인가» 를 말해 주지 않는다**(`RH1` 이어야 한다).
+      부르는 쪽이 이름을 아는데 그림이 모르면 시트를 읽을 수 없다(교훈 #88).
+    ⚠️ 절대경로의 `C:\\` 를 구분자로 오해하면 안 되므로, 조각이 «파일명처럼» 생겼을 때만 자른다.
+    """
+    parts = spec.split(":")
+    # 앞에서부터: 경로 · (pose 파일) · (라벨). pose 파일은 `.json` 으로 끝나는 조각으로 판별한다.
+    d, name, lab = Path(parts[0]), default_name, None
+    rest = parts[1:]
+    if rest and rest[0].endswith(".json"):
+        name, rest = rest[0], rest[1:]
+    if rest:
+        lab = ":".join(rest)
+    if lab is None:
+        lab = (d.name if name == default_name
+               else f"{d.name}/{name.replace('pose_', '').replace('.json', '')}")
     return d, name, lab
 
 
@@ -334,7 +345,10 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="pose overlay 컨택트 시트 (GT 없어도 된다)")
     ap.add_argument("--capture", required=True, help="left.png·cam.json (+sim 이면 pose_gt.json) 디렉토리")
     ap.add_argument("--pred", action="append", required=True,
-                    help="pose 산출 디렉토리. `경로:pose_이름` 으로 파일도 지정한다. 여러 번 주면 열로 나란히 놓는다")
+                    help="pose 산출 디렉토리. **`경로:pose_이름:라벨`** — 뒤 둘은 선택. "
+                         "★ 라벨을 주면 주석·범례에 그대로 쓴다. 팔을 여럿 겹칠 때 "
+                         "`hyb_combo/coarse` 같은 디렉토리 이름은 «어느 팔인가» 를 말해 주지 않는다. "
+                         "여러 번 주면 열로 나란히 놓는다(`--combine` 이면 한 장에 겹친다)")
     ap.add_argument("--obj", required=True, help="투영에 쓸 obj (밴드 런이면 밴드 obj)")
     ap.add_argument("--mesh", default="top_flange.ply")
     ap.add_argument("--pose-name", default="pose_refined.json", help="--pred 에 `:이름` 이 없을 때의 기본값")
