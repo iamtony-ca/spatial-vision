@@ -159,7 +159,8 @@ def build(checkpoint_path: Path, confidence: float):
 
 
 def segment_frame(processor, rgb_path: Path, prompt: str, merge: bool, select: str = "score",
-                  box: tuple | None = None, use_text: bool = True, min_area_frac: float = 0.3):
+                  box: tuple | None = None, use_text: bool = True, min_area_frac: float = 0.3,
+                  score_frac: float = 0.9):
     """→ (mask bool HxW | None, score, bbox, n_instances).
 
     SAM3 는 concept 에 맞는 **인스턴스 여러 개**를 낸다.
@@ -212,7 +213,7 @@ def segment_frame(processor, rgb_path: Path, prompt: str, merge: bool, select: s
 
     from spatial_vision.contracts import select_index
 
-    k = select_index(m, s, select, min_area_frac)
+    k = select_index(m, s, select, min_area_frac, score_frac)
     return m[k].astype(bool), float(s[k]), b[k].tolist(), n
 
 
@@ -253,6 +254,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ckpt", default=str(DEFAULT_CKPT))
     ap.add_argument("--confidence", type=float, default=DEFAULT_CONFIDENCE)
     ap.add_argument("--merge", action="store_true", help="검출 인스턴스를 전부 합집합")
+    # 🔴 **점수 게이트는 양날이다** — `--select center` 는 점수 상위(≥ `score_frac`×max)로 먼저
+    #   거르는데, **SAM3 점수가 방해물을 더 높게 주는 일이 잦아**(실측: 정답 IoU 0.96·점수 0.816 ↔
+    #   방해물 0.930) 그 게이트가 **정답을 버린다**(오선택 43/120, §42-6).
+    #   🔴🔴 **그렇다고 그냥 끄면 안 된다 — `--confidence` 와 짝이다**(§42-9):
+    #   게이트 OFF 는 conf 0.15 → **0%** 인데 conf 0.05 → **76.7%** 다. 게이트가 없으면
+    #   «중앙 근접» 이 잡동사니를 못 거르고, conf 를 낮추면 후보가 5 → 14개로 는다.
+    ap.add_argument("--select-score-frac", type=float, default=0.9,
+                    help="`--select center` 의 **점수 게이트** — 상위 `이 비율 × 최고점수` 만 후보로 "
+                         "둔다. 🔴 **0 이면 끈다. 단 `--confidence` 와 짝이다**(§42-9) — "
+                         # 🔴 argparse 가 help 를 `%` 포맷으로 확장한다 — 리터럴 `%` 는 `%%` 로 쓴다
+                         # (안 그러면 `--help` 자체가 ValueError 로 죽는다)
+                         "conf 0.15 면 0 이 낫고(35.8%%→0%%), **conf 0.05 면 0 이 76.7%% 로 훨씬 나쁘다**")
     ap.add_argument("--select", default="score", choices=["score", "center", "largest"],
                     help="인스턴스가 여럿일 때 타깃을 고르는 규칙 (동일 인스턴스 씬에서 결정적)")
     ap.add_argument("--refs", default=None,
@@ -327,7 +340,7 @@ def main(argv: list[str] | None = None) -> int:
             pbox = _make_box(args, f, rng)
             mask, score, box, n = segment_frame(processor, f / "left.png", prompt, args.merge,
                                                 args.select, pbox, not args.no_text,
-                                                args.select_min_area_frac)
+                                                args.select_min_area_frac, args.select_score_frac)
         dt = (time.time() - ts) * 1000
         t_frames.append(dt)
 
@@ -351,7 +364,13 @@ def main(argv: list[str] | None = None) -> int:
         "mode": "exemplar_refs" if args.refs else ("box" if args.box_source else "text"),
         "refs": args.refs, "n_refs": args.n_refs,
         "refs_mode": args.refs_mode, "refs_fuse": args.refs_fuse,
-        "select": args.select, "box_source": args.box_source,
+        "select": args.select,
+        # 🔴 게이트 값을 안 남기면 0.9 런과 0.3 런이 **메타만으로 구분되지 않는다**
+        #   (실측: 오선택 18/80 ↔ 1/80 로 갈리는 축인데 `compare_runs.py` 가 못 본다, §44-24h).
+        #   ⚠️ `select != "center"` 면 이 값은 **읽히지 않는다**(`contracts.py:223`) — 그래서 그 사실도 같이 적는다.
+        "select_score_frac": args.select_score_frac,
+        "select_params_effective": args.select == "center",
+        "box_source": args.box_source,
         "box_frac": args.box_frac, "box_jitter": args.box_jitter, "use_text": not args.no_text,
         "prompts_file": args.prompts_file,
         "mean_ms": float(np.mean(t_frames)), "frames": results,

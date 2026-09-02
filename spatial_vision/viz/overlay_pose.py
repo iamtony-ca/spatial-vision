@@ -248,10 +248,21 @@ def make_tile(frame: Path, pred_dir: Path, pose_name: str, mesh, K, box, tile: i
     return img, box
 
 
-# ★ `--combine` 전용 팔레트 (BGR). 🔴 **빨강은 GT 전용이라 뺀다** — 위 규약과 충돌하면
-#   시트를 잘못 읽는다. 밝기·색상이 충분히 갈리는 순서로 고정한다(런마다 색이 바뀌면 안 된다).
-COMBO_COLORS = [(0, 255, 0), (255, 255, 0), (0, 255, 255), (255, 0, 255),
-                (0, 165, 255), (255, 128, 0), (128, 255, 128), (200, 200, 255)]
+# ★ 겹쳐 그리기 전용 팔레트 (BGR) — **16색**. 🔴 **빨강은 GT 전용이라 뺀다** · 흰색은 중심 십자다.
+#   🔴🔴 **8색이던 것을 16색으로 늘렸다 (2026-08-31)** — 팔이 8개를 넘으면 색이 순환해
+#   **다른 팔이 같은 색으로 그려졌다.** «구분이 안 된다» 가 아니라 **오독**이다.
+#   ⚠️ 눈대중으로 고르지 않았다: 황금각 색상 sweep 을 **CIE Lab 최소 쌍거리**로 골랐고
+#   예약색(GT 빨강·흰색·검정)을 **씨앗으로 넣은 최원점 샘플링**(farthest-point)으로 골랐고
+#   **최소 쌍거리 44.3 · 인접 순서쌍 58.1** 이다(JND ≈ 2.3).
+#   ⚠️ 초판은 «황금각 색상 sweep» 이었는데 OpenCV 의 H 범위가 0~179 라 137.5 를 그대로
+#   쓰면 색이 안 퍼진다 — 최소 19.9 로 **파랑끼리·초록끼리 닮아 실제로 못 갈랐다.**
+#   런마다 색이 바뀌면 안 되므로 **순서를 고정**한다.
+COMBO_COLORS = [
+    (255, 0, 128), (0, 205, 0), (205, 143, 0), (0, 179, 255),
+    (175, 55, 255), (185, 205, 0), (55, 255, 215), (205, 82, 0),
+    (155, 255, 55), (44, 125, 205), (82, 0, 205), (255, 55, 215),
+    (255, 195, 55), (255, 255, 0), (0, 255, 76), (44, 205, 173),
+]
 
 
 def make_combo_tile(frame: Path, preds: list, mesh, K, box, tile: int, axes_for: int = 0,
@@ -273,6 +284,8 @@ def make_combo_tile(frame: Path, preds: list, mesh, K, box, tile: int, axes_for:
     drawn = []                                    # (라벨, 색, T) — 범례·주석에 그대로 쓴다
     for i, (d, name, lab) in enumerate(preds):
         T = load_pose(d / frame.name / name)
+        if i >= len(COMBO_COLORS):
+            lab += " ⚠️색순환"          # 🔴 같은 색이 두 번 나오면 시트를 오독한다
         drawn.append((lab, COMBO_COLORS[i % len(COMBO_COLORS)], T, d, name))
     first = next((T for _, _, T, _, _ in drawn if T is not None), None)
 
@@ -362,7 +375,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--cols", type=int, default=3, help="예측이 하나일 때의 열 수")
     ap.add_argument("--mask-alpha", type=float, default=0.22,
                     help="마스크 반투명도. 0 이면 안 그린다 — 실물 테두리를 가리지 않고 보고 싶을 때")
-    ap.add_argument("--max-combine", type=int, default=8,
+    ap.add_argument("--max-combine", type=int, default=16,
                     help="`--combine` 에서 그릴 예측 수 상한. 🔴 팔레트가 8색이라 넘으면 색이 "
                          "순환해 구분이 안 되고, 주석 줄이 타일을 통째로 덮는다(30팔에서 실제로 "
                          "그랬다). 넘치면 **앞에서 자르고 범례에 밝힌다**")
@@ -387,7 +400,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.combine and args.max_combine and len(preds) > args.max_combine:
         # 🔴 조용히 자르지 않는다(교훈 #22) — 몇 개를 왜 뺐는지 로그와 **범례 양쪽**에 남긴다.
         n_dropped = len(preds) - args.max_combine
-        print(f"⚠️ --combine 은 {args.max_combine}개까지만 그린다 (팔레트 8색). "
+        print(f"🔴 --combine 은 {args.max_combine}개까지만 그린다 (팔레트 {len(COMBO_COLORS)}색 — "
+              f"넘으면 색이 순환해 **다른 팔이 같은 색**이 된다). "
               f"뒤 {n_dropped}개를 뺀다: {[l for _, _, l in preds[args.max_combine:]]}")
         preds = preds[:args.max_combine]
     mesh = trimesh.load(Path(args.obj) / args.mesh, process=False)
@@ -454,7 +468,7 @@ def main(argv: list[str] | None = None) -> int:
         # 🔴 색 규약을 **이미지 안에** 박는다 — 이 시트는 색으로만 구분되므로 밖에서 설명하면 안 된다.
         legend = ("red=GT  | " if has_gt else "GT 없음  | ") + "  ".join(
             f"[{i + 1}]{lab}" for i, (_, _, lab) in enumerate(preds)) + \
-            f"  (색 순서: green,cyan,yellow,magenta,orange…)  / {Path(args.obj).name}" + \
+            f"  (색은 아래 주석 줄과 같다)  / {Path(args.obj).name}" + \
             (f"  ⚠️ 뒤 {n_dropped}개 생략 — 전부 보려면 overlay_sheet.png" if n_dropped else "")
     else:
         legend = ("red=GT  green=pred  " if has_gt else "green=pred (GT 없음)  ") + \

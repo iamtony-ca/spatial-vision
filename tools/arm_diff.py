@@ -151,8 +151,9 @@ def main(argv: list[str] | None = None) -> int:
             f"**ΔR 중앙 ≤{NOISE_R_MED}° · Δt 중앙 ≤{NOISE_T_MED}mm** "
             f"(꼬리 참고 ΔR 최대 {NOISE_R_MAX}° · Δt 최대 {NOISE_T_MAX}mm)")
         say("")
-        say("| 짝 | n | ΔR 중앙 | ΔR p90 | **ΔR 최대** | Δt 중앙 | Δt p90 | **Δt 최대** | 판정 |")
-        say("|---|---:|---:|---:|---:|---:|---:|---:|:--|")
+        say("| 짝 | n | ΔR 중앙 | ΔR p90 | **ΔR 최대** | Δt 중앙 | Δt p90 | **Δt 최대** "
+            "| **편향비** | 판정 |")
+        say("|---|---:|---:|---:|---:|---:|---:|---:|---:|:--|")
         n_same = 0
         for u, v in pairs:
             common = sorted(set(d[u]) & set(d[v]))
@@ -160,7 +161,15 @@ def main(argv: list[str] | None = None) -> int:
                 say(f"| `{u}` ↔ `{v}` | 0 | — | — | — | — | — | — | 🔴 공통 프레임 0 |")
                 continue
             dr = [rotation_angle_deg(d[u][f][0], d[v][f][0]) for f in common]
-            dt = [float(np.linalg.norm(d[u][f][1] - d[v][f][1])) for f in common]
+            dvec = np.array([d[v][f][1] - d[u][f][1] for f in common])       # 부호 있는 Δt
+            dt = [float(np.linalg.norm(x)) for x in dvec]
+            # ★★ **«일관된 편향» 인가 «흔들림» 인가** — 부호를 살려야 갈린다(교훈 #83).
+            #   ‖평균 벡터‖ / 평균 ‖벡터‖ 는 1 에 가까우면 **매 프레임 같은 방향**(계통 편향),
+            #   0 에 가까우면 방향이 흩어진다(잡음). 🔴 이 구분이 처방을 바꾼다:
+            #   계통 편향이면 «둘 중 하나가 치우쳤다» 이고, 흔들림이면 «둘 다 같은 것을 본다».
+            mean_n = float(np.linalg.norm(dvec.mean(axis=0)))
+            bias = mean_n / max(float(np.mean(dt)), 1e-9)
+            axis = "xyz"[int(np.argmax(np.abs(dvec.mean(axis=0))))]
             rm, r9, rx = quantiles(dr)
             tm, t9, tx = quantiles(dt)
             # ★ **구조상 같은 값을 공유하는 짝**을 먼저 가른다 — 하이브리드(R=coarse·t=refined)는
@@ -178,8 +187,10 @@ def main(argv: list[str] | None = None) -> int:
             mark = ("구분 안 됨" if med_ok and rx <= NOISE_R_MAX and tx <= NOISE_T_MAX else
                     "⚠️ 중앙은 바닥 안 · **꼬리 초과**" if med_ok else
                     "🔴 **다르다** (" + "·".join(over) + ")") + tag
+            b = (f"**{bias:.2f}** ({axis} {dvec.mean(axis=0)[ 'xyz'.index(axis)]:+.2f})"
+                 if bias >= 0.7 else f"{bias:.2f}")
             say(f"| `{u}` ↔ `{v}` | {len(common)} | {rm:.3f}° | {r9:.3f}° | **{rx:.3f}°** "
-                f"| {tm:.3f} | {t9:.3f} | **{tx:.3f}** | {mark} |")
+                f"| {tm:.3f} | {t9:.3f} | **{tx:.3f}** | {b} | {mark} |")
         say("")
         n_com = max((len(set(d[u]) & set(d[v])) for u, v in pairs), default=0)
         say(f"- **{n_same}/{len(pairs)} 짝이 «중앙값» 기준 잡음 바닥 안**이다 "
@@ -188,6 +199,15 @@ def main(argv: list[str] | None = None) -> int:
             say(f"- 🔴🔴 **n={n_com} 이라 `p90`·`최대` 열은 읽지 말 것** — 표본이 10 미만이면 "
                 f"꼬리 통계가 곧 잡음이다(교훈 #58: n=40 무결점도 실패율 상한이 7.5% 였다). "
                 f"**중앙값 열만** 본다.")
+        say("- 🔴🔴 **«서로 다르다» 는 «하나가 더 낫다» 가 아니다.** 팔 A 가 +0.3mm, B 가 "
+            "−0.3mm 치우쳤으면 **둘 다 똑같이 정확한데 서로는 0.6mm** 다르다. GT 가 없으므로 "
+            "이 표로 **우열은 못 정한다** — 그건 `stats/ranking.png`(좌우 |Δdx|, r = −0.94)와 "
+            "**상대 GT**(`tools/relative_gt.py`)의 몫이다.")
+        say("- ★★ **«편향비» 가 그 차이의 «성격» 을 말한다** — `‖평균 Δt 벡터‖ / 평균 ‖Δt‖`. "
+            "**1 에 가까우면 매 프레임 같은 방향 = 계통 편향**(둘 중 하나가 치우쳤다. 괄호 안이 "
+            "지배 축과 mm 값이다) · **0 에 가까우면 방향이 흩어진다 = 흔들림**(둘 다 같은 것을 "
+            "보는데 잡음만 다르다). 🔴 **처방이 갈린다** — 계통 편향은 캘리브레이션·CAD 축이고, "
+            "흔들림은 그냥 잡음이라 **줄일 대상이 아니다.**")
         say(f"- ★ **`t 동일`·`R 동일` 은 그 축이 «정확히 0» 인 짝**이다 — 하이브리드는 자기 기반 "
             f"FP 와 **t 를 정확히 공유**한다(R=coarse·t=refined, §27-7). `0.000` 이 정상이고 "
             f"**0 이 아니면 하이브리드가 깨진 것**이다. 성능 비교로 읽지 말 것.")

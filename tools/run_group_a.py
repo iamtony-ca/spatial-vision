@@ -417,7 +417,8 @@ def build_steps(a) -> list[Step]:
                  [PY["sam3"], "-m", "spatial_vision.stages.segment_sam3",
                   "--in", a.in_dir, "--out", seg_t, "--target", "full",
                   "--prompt", a.text_prompt, "--confidence", a.text_conf,
-                  "--select", a.text_select],
+                  "--select", a.text_select,
+                  "--select-score-frac", str(a.text_score_frac)],
                  seg_t, "meta_segment_full.json"),
             # 🔴 `--primary full` 이다 — 텍스트로는 `flange` 를 따로 못 뽑는다(§ M4: SAM3 의 결손이
             #    flange 에 몰린다, recall 0.844 vs body 0.968). I그룹과 같은 이유로 `full` 만 쓴다.
@@ -447,7 +448,8 @@ def build_steps(a) -> list[Step]:
                      [PY["sam3"], "-m", "spatial_vision.stages.segment_sam3",
                       "--in", a.in_dir, "--out", seg_tf, "--target", "flange",
                       "--prompt", a.text_prompt_flange, "--confidence", a.text_conf_flange,
-                      "--select", a.text_select],
+                      "--select", a.text_select,
+                  "--select-score-frac", str(a.text_score_frac)],
                      seg_tf, "meta_segment_flange.json"),
                 Step("fp_txtf", "FoundationPose (텍스트 flange 마스크 · --primary flange)",
                      [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
@@ -516,7 +518,8 @@ def build_steps(a) -> list[Step]:
                      [PY["sam3"], "-m", "spatial_vision.stages.segment_sam3",
                       "--in", a.in_dir, "--out", sg_p, "--target", "full",
                       "--prompt", prm, "--confidence", a.text_conf,
-                      "--select", a.text_select],
+                      "--select", a.text_select,
+                  "--select-score-frac", str(a.text_score_frac)],
                      sg_p, "meta_segment_full.json"),
                 Step(f"fp_c075_{tag}", f"COMBO P1 · 프롬프트 {tag} (stage2 on · scale 0.75)",
                      [PY["pose"], "-m", "spatial_vision.stages.pose_fp",
@@ -2594,6 +2597,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--text-conf", type=float, default=0.15,
                     help="T그룹 검출 임계값. 실물 검증값 0.15. 🔴 내리면 미검출은 줄지만 "
                          "**배경 물체를 집을 위험**이 는다(sim 측정은 방해물 없는 씬이라 이 축을 못 봤다)")
+    # 🔴🔴 **점수 게이트를 끄는 것은 `--text-conf` 에 강하게 딸려 있다** (§42-9, 120프레임 전수).
+    #   게이트 ON 은 conf 무관(35.8%)인데 **OFF 는 conf 0.15 → 0% · conf 0.05 → 76.7%** 다.
+    #   게이트가 없으면 «중앙 근접» 이 잡동사니를 못 거른다 — conf 를 낮추면 후보가 5 → 14개다.
+    ap.add_argument("--text-score-frac", type=float, default=0.9,
+                    help="`--text-select center` 의 **점수 게이트**(≥ 비율×최고점만 후보). "
+                         "🔴 **0 이면 끈다 — 그런데 `--text-conf` 와 짝이다**(§42-9): "
+                         "conf 0.15 면 끄는 쪽이 낫고(35.8%→0%), **conf 0.05 면 끄면 76.7% 로 "
+                         "훨씬 나빠진다.** 현행 실물은 conf 0.05 이므로 **0.9 를 유지한다.** "
+                         "⚠️ 단일 물체 씬에서는 차이가 없다")
     ap.add_argument("--text-select", default="center", choices=["center", "score", "largest"],
                     help="⚠️ center 는 «카메라가 타깃을 겨눈다» 는 규약에 기댄다(교훈 #15)")
     # ── TF그룹 — flange 를 텍스트로 직접 뽑아 `--primary flange` ───────────────────────
