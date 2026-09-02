@@ -143,7 +143,10 @@ def frame_metrics(f: Path, a, mesh, K, hw) -> tuple[dict, dict]:
 
     # 폴백 = 캡처 루트. sim 이면 GT 마스크가 거기 있고, 실환경이면 아무것도 없다
     m_full = find("mask_full.png", a.seg_full, f.parent)
-    m_fl = find("mask_flange.png", a.seg_flange, f.parent)
+    # 🔴 `RH1` 처럼 «분할이 아니라 CAD 투영» 으로 flange 마스크를 만드는 경로는 파일명이
+    #    `mask_flange_proj.png` 다(`pose_fp.py` 가 pose 디렉토리에 쓴다). 실환경에는 GT 가 없으므로
+    #    그 투영본이 **stage2 가 실제로 소비한 유일한 flange 마스크**다 → 이름을 받는다.
+    m_fl = find(a.flange_name, a.seg_flange, f.parent)
     valid = find("valid.png", a.depth_dir)
     depth = None
     for cand in ([Path(a.depth_dir) / f.name / "depth.png"] if a.depth_dir else []) + [f / "depth_gt.png"]:
@@ -376,7 +379,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--in", dest="in_dir", required=True, help="<dir>/frame_XXXX/left.png")
     ap.add_argument("--out", required=True)
     ap.add_argument("--seg-full", default=None, help="mask_full.png 이 있는 디렉토리")
-    ap.add_argument("--seg-flange", default=None, help="mask_flange.png 이 있는 디렉토리")
+    ap.add_argument("--seg-flange", default=None, help="flange 마스크가 있는 디렉토리")
+    ap.add_argument("--flange-name", default="mask_flange.png",
+                    help="flange 마스크 파일명. **`RH1` 은 `mask_flange_proj.png`** 다 — "
+                         "그 경로는 분할이 아니라 CAD 투영으로 마스크를 만들고 "
+                         "`pose_fp` 가 pose 디렉토리에 그 이름으로 쓴다(`--seg-flange <fp 디렉토리>` 와 함께)")
     ap.add_argument("--depth-dir", default=None, help="depth.png·valid.png 이 있는 디렉토리")
     ap.add_argument("--pose-dir", default=None)
     ap.add_argument("--pose-name", default="pose_refined.json")

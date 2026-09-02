@@ -9,7 +9,7 @@
 | 기전 | 논문 | 코드 | 강도 |
 |---|---|---|---|
 | **① crop 이 «물체 지름» 으로 정해진다 → 작은 메쉬일수록 유효 해상도가 높다** | ✅ **§3.3 에 명시** | ✅ `Utils.py:605` | **A — 논문 + 코드** |
-| **② 평행이동 갱신 보폭만 «물체 지름» 에 비례한다(회전은 상수)** | 🔴 **논문에 없다** | ✅ `predict_pose_refine.py:228-229` vs `:221` | **B — 코드만** |
+| **② 평행이동 갱신 보폭만 «물체 지름» 에 비례한다(회전은 상수)** | 🟡 **절반** — 회전 상수 **20° 는 논문 p14**(학습 교란 크기), 평행이동의 **지름 정규화는 논문에 없다** | ✅ `predict_pose_refine.py:228-229` vs `:221` | **B — 코드만** |
 | **③ 그래서 R 과 t 를 갈라 쓸 수 있다(하이브리드)** | ✅ **§5.3 (supplementary)** | ✅ `Utils.py:850-857` | **A — 논문 + 코드** |
 
 🔴 **②를 논문 근거로 인용하면 안 된다** — 확인 결과 논문은 `Δt ∈ ℝ³` 를 *"object's translation shift in the
@@ -114,6 +114,13 @@ end_header
 
 ### 2.3 배포 가중치의 상수 (`weights/*/config.yml` — 원문)
 
+🟢 **`input_resize = 160` 은 논문에도 있다** — supplementary(p14):
+> *"Both the rendering and input observation are **cropped based on the perturbed pose and resized into
+> 160 × 160** before sending to the network."*
+
+🔴 반면 **`crop_ratio` 의 값 1.2 / 1.1 은 논문에 없다** — 설정 파일에만 있다(논문은 *"slightly enlarged"* 라고만 한다).
+
+
 | 네트워크 | 디렉토리 | `crop_ratio` | `input_resize` | 근거 |
 |---|---|---|---|---|
 | **refiner** | `2023-10-28-18-33-37` | **1.2** | **160 × 160** | `predict_pose_refine.py:97` 이 이 이름을 하드코딩 |
@@ -136,6 +143,13 @@ end_header
 | `top_flange.ply` | 73,131 | 183.4~183.5mm | **1.376mm** |
 
 → **stage2 에서 유효 해상도가 3.16배 좋아진다**(정본 `RESULTS.md §22`).
+
+🟢 **depth 전처리의 «존재» 도 논문에 있다** — §5 Implementation(p13):
+> *"We perform **denoising to the depth images** implemented in Warp, which includes
+> **erosion and bilateral filtering**. The pose-conditioned cropping is implemented in batch using Kornia."*
+
+🔴 **다만 `radius=2` 가 «픽셀 단위» 라는 것은 코드에만 있다**(`estimater.py:173-174`) —
+§38-10 의 *"`--input-scale` 이 전처리 반경의 물리 크기를 바꾼다"* 는 **코드 근거뿐**이다.
 
 ⚠️ **`mesh_diameter` 는 결정론이 아니다** — `estimater.py:54` 가
 `compute_mesh_diameter(model_pts=mesh.vertices, n_sample=10000)` 로 부르는데, 그 분기
@@ -179,6 +193,15 @@ end_header
 | **회전** | 무차원 `output["rot"]` | `rot_normalizer` = **20° 상수** | ❌ **없음** |
 
 배포 자산: `full` 289.4mm ↔ `top_flange` **91.7mm** → **평행이동 보폭만 3.16배 세밀해진다.**
+
+🟢 **`rot_normalizer = 20°` 는 논문에 근거가 있다** (2026-09-02 확인) — supplementary p14:
+> *"the pose is randomly perturbed by adding **translation noise under the magnitude of 0.02m, 0.02m,
+> 0.05m** for XYZ axis respectively and **rotation under the magnitude of 20°**"*
+
+★ **네트워크의 회전 출력 범위(±20°)가 학습 교란 크기와 정확히 일치한다** — `tanh(out) × 0.3490658 rad = ±20.0°`.
+🔴 **반면 평행이동 쪽은 논문이 «절대 미터»(0.02/0.02/0.05 m)로 적고 `mesh_diameter` 정규화를 언급하지 않는다.**
+출시된 설정은 `normalize_xyz: true` 로 **지름에 비례**시킨다 → **그 정규화는 여전히 코드 근거뿐**이다.
+
 회전 보폭은 두 단계에서 **완전히 같다.**
 
 ### 3.3 🔴 논문 대조 결과 — 이 항목은 논문 근거가 없다
@@ -252,6 +275,9 @@ stage2(작은 메쉬)는 **평행이동이 세밀하고 회전 증거가 적다*
 | crop 중심 = 물체 원점 투영 · crop 크기 = **물체 지름**(쌍거리 최댓값)을 조금 키워 투영 | **논문 §3.3** (arXiv:2312.08344, CVPR 2024) |
 | 갱신이 **disentangled** — 평행이동에 회전 의존이 없다 | **논문 §5.3** (supplementary) |
 | 회전은 **axis-angle** 로 파라미터화 | 논문 §3.3 |
+| **crop 을 160×160 으로 리사이즈** | 🟢 **논문 supplementary p14** |
+| **depth 를 erosion + bilateral 로 denoise** | 🟢 **논문 §5 Implementation p13** |
+| **테스트 시 refinement iteration = 5** | 🟢 **논문 supplementary p14** (*"5 for pose estimation, 1 for tracking"*) |
 | crop 을 3D 에서 `mesh_diameter × crop_ratio` 로 잡는다 | `Utils.py:605` (+ 호출 `predict_pose_refine.py:31`, `method='box_3d'` at `:30`) |
 | crop 창 → `input_resize` 로 리사이즈 | `Utils.py:597-598` |
 | `crop_ratio` 1.2(refiner) / 1.1(scorer) · `input_resize` 160 | `weights/2023-10-28-18-33-37/config.yml` · `weights/2024-01-11-20-02-45/config.yml` |

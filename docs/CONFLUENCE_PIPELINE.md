@@ -78,7 +78,7 @@ FoundationStereo → SAM3 → FoundationPose
 | 스테레오 상업화 | GitHub 코드가 **research-only** — 그대로 쓰면 상업 경로가 막힌다 |
 | 같은 물체가 여럿 | *"어느 FOUP 이 타깃인가"* 를 **모델이 못 푼다** |
 | 평행이동 정밀도 | `full` 메쉬 기준 **네트워크 1px = 4.34mm** — 구조적 천장 |
-| 회전 vs 평행이동 | 한 단계에서 **둘 다 최적일 수 없다** (아래 3.2) |
+| 회전 vs 평행이동 | 한 단계에서 **둘 다 최적일 수 없다** (아래 3.4) |
 
 ### 2.2 우리가 더한 것 — 네 가지
 
@@ -102,14 +102,149 @@ FoundationStereo → SAM3 → FoundationPose
 
 ★ **가장 큰 효과를 내는 부품이 가장 작다** — `hybrid_pose.py` 는 85줄이고 GPU 를 안 쓴다.
 
+### 2.3 `RH1` 전체 흐름 — 단계별로 무엇이 들어가고 무엇이 나오나
+
+입력은 **세 파일뿐**이다: `left.png` · `right.png` · `cam.json`(rectified · PNG 무손실 · BGR8).
+스테이지는 **서로 다른 가상환경의 독립 프로세스**이고 **디스크로만** 통신한다.
+
+| # | 단계 | 입력 | 하는 일 | 출력 |
+|:-:|---|---|---|---|
+| **1** | `stereo_onnx` | `left/right.png`, `cam.json` | ONNX 세션으로 disparity 추론 (+ 전·후처리, §3.1) | `disparity.npy` · `depth.png`(16-bit mm) · `valid.png` |
+| **2** | `segment_sam3` | `left.png` + **텍스트 프롬프트** | SAM3 가 개념에 맞는 **인스턴스 여러 개**를 냄 → **선택 규칙**으로 하나 고름 | `mask_full.png` · `det_full.json` |
+| **3a** | `pose_fp` **stage1** | `left.png` + `depth.png` + `mask_full.png` + **`full.ply`** | `est1.register(...)` — 마스크로 초기 위치 추정 후 render-and-compare | **`pose_coarse.json`** |
+| **3b** | `pose_fp` **stage2** | 3a 의 pose + **`top_flange.ply`** | ① flange 마스크를 **메쉬 투영**으로 생성 ② 그 밖 depth 를 0 으로 ③ 씨앗 주입 후 `est2.track_one(...)` | **`pose_refined.json`** · `mask_flange_proj.png` |
+| **4** | `hybrid_pose` | 3a·3b 의 JSON 두 개 | **`R` 은 3a 에서, `t` 는 3b 에서** 가져와 합침 (추론 0) | ★ **`pose_coarse.json`** (= `RH1` 최종) |
+
+**단계별로 중요한 점**
+
+- **1 → 2 는 서로 독립**이다. 분할은 `left.png` 만 보고, depth 는 pose 단계에서 처음 만난다.
+  → 분할이 틀려도 depth 는 멀쩡하고, 그 반대도 성립한다. 진단 시 두 축을 따로 봐야 하는 이유다.
+- **2 의 어려움은 «분할» 이 아니라 «선택» 이다.** SAM3 는 개념에 맞는 것을 **전부** 내주므로
+  FOUP 이 여러 대면 *"어느 것이 타깃인가"* 는 모델이 답할 수 없다(§3.7).
+- **3a 에서 마스크는 «초기값 계산에만»** 쓰인다. 네트워크에 들어가는 `rgb`/`depth` 는 마스킹되지 않는다
+  (upstream 그대로). 그래서 마스크 품질이 조금 나빠도 pose 는 잘 버틴다.
+- **3b 가 이 파이프라인의 핵심 설계**다. 메쉬가 `full` → `top_flange` 로 **바뀌면서**
+  유효 해상도가 3.16배 올라간다(§3.3). 🔴 그 마스크를 **분할이 아니라 CAD 투영으로** 만들기 때문에
+  **SAM3 의 flange 검출에 의존하지 않는다**(§3.6).
+- **4 는 파일 병합이다.** GPU 를 안 쓰고 85줄인데, 3a(회전이 좋음)와 3b(평행이동이 좋음)의
+  **장점만 취한다**(§3.5). 출력 파일 이름이 `pose_coarse.json` 인 것은 하류 도구가 그 이름을 찾기 때문이다.
+
+**비용** (1920×1200, RTX 5090): 콜드 스타트 ~40초(ONNX 세션 31.5s + FP 7.1s) + 프레임당 **약 2.5초**.
+🔴 **운용상 진짜 위험은 추론이 아니라 콜드 스타트**다 — 요청마다 프로세스를 띄우면 매번 40초다.
+배포 시 **venv 별 상주 서버 + IPC** 가 선결 과제다.
+
 ---
 
 ## 3. 설계 근거 — 논문과 코드
 
 > 인용은 전부 **원문 확인**(2026-09-02). 줄 번호 17개를 그날 코드에 재대조했다.
 > 논문 = Wen, Yang, Kautz, Birchfield, **FoundationPose**, CVPR 2024 (arXiv:2312.08344).
+> ⚠️ **«논문 §3.3» 은 그 논문의 절 번호**이고 **«3.3» 은 이 문서의 절 번호**다 — 숫자가 겹치니 주의.
+>
+> **근거의 성격을 세 단계로 표시한다**: 🟢 **논문 + 코드** / 🟡 **코드만**(논문에 없음) / 🔴 **우리 측정뿐**.
 
-### 3.1 왜 «메쉬를 갈아타면» 평행이동이 좋아지나 — **논문 §3.3 + 코드**
+| 절 | 구성요소 | 근거 |
+|---|---|---|
+| 3.1 | 스테레오 전·후처리 | 🟢 **논문 §3.1 + upstream 코드**(정규화 상수·패딩 32) · 🔴 배율·범위 게이트는 우리 측정 |
+| 3.2 | 프롬프트 `f002` | 🟢 **SAM3 논문 §1·§2·§3** + 3표본 실험 |
+| 3.3 | crop = 물체 지름 → 유효 해상도 | 🟢 **논문 §3.3 + supplementary p14**(160×160) + `Utils.py:605`. 🔴 `crop_ratio` 값 1.2/1.1 은 설정 파일에만 |
+| 3.4 | 갱신 보폭 비대칭 | 🟡 **절반** — 회전 상수 20°는 **논문 p14**, 평행이동의 지름 정규화는 **코드만** |
+| 3.5 | R·t 접합 가능 (하이브리드) | 🟢 **논문 §5.3** + `Utils.py:850` |
+| 3.6 | stage2 입력 depth 처리 | 🟡 depth denoising **존재는 논문 p13**, `radius=2` 픽셀 단위는 코드만 + 우리 측정 |
+| 3.7 | 인스턴스 선택 규칙 | 🟡 **과제 정의상 모델 밖**(논문 §2) + 🔴 규칙 자체는 우리 것 |
+
+### 3.1 스테레오 — **전·후처리를 직접 구현했다** (라이선스 + 정확도)
+
+🔴 **왜 재구현했나**: GitHub `FoundationStereo` 는 **research-only** 이고, 상업 사용이 열려 있는 것은
+**NGC/TAO 의 ONNX 가중치**뿐이다. **가중치가 상업 가능해도 저장소 코드는 아니므로**
+`stereo_onnx.py` 는 `third_party/FoundationStereo` 를 **한 줄도 import 하지 않는다.**
+⚠️ 이 파일에 그 repo 를 import 하면 **상업 경로가 그 순간 깨진다.**
+
+**전처리** (`stereo_onnx.py`)
+
+| # | 처리 | 왜 |
+|:-:|---|---|
+| 1 | **축소** `--scale 0.5` (`INTER_AREA`) | 🔴 **우리 측정** — 1920×1200 원본은 ONNX Runtime 에서 **실행 불가**(Softmax 단일 버퍼 OOM). 상한은 0.5625 |
+| 2 | **replicate 패딩 (32 배수)** | 🟢 **논문 §3.1** — 특징 피라미드가 `i ∈ {4,8,16,32}` 라 **가장 깊은 단계가 1/32** · 🟢 upstream `run_demo.py:82` 도 `divis_by=32` |
+| 3 | **ImageNet 정규화** `(x/255 − mean)/std` | 🟢 **upstream `core/foundation_stereo.py:43-48·204-205`** 이 `Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])(img/255)` 를 쓴다(논문 §3.1 의 단안 prior 가 DepthAnythingV2 = DINOv2 계보). ONNX 그래프에는 이 레이어가 **없어서** 우리가 넣는다. 🔴 우리 측정: raw 0–255 면 **MAE 1.43px** 어긋난다 |
+| 4 | NCHW float32 배치화 | ONNX 입력 규약 (`left_image`/`right_image`) |
+
+⚠️ **패딩 «방향» 은 등가다 (2026-09-02 정정)** — 초판에 *"왼쪽에 패딩하면 disparity 가 오프셋된다"* 고
+적었는데 **틀렸다.** 좌·우 영상에 **같은** 패딩을 주면 `x_L − x_R` 이 보존된다. 실측: 가로 10px 를
+왼쪽에 줘도 disparity 차이가 **중앙 0.038px**(모델 잡음 수준)이고, **upstream 은 오히려 좌우 대칭**
+패딩이다(`InputPadder(mode='sintel')`). 우리가 오른쪽·아래를 쓰는 이유는 **되돌리기가 단순 슬라이스**여서다.
+🔴 피해야 할 것은 **«좌·우에 서로 다른 패딩을 주는 것»** 뿐이다.
+
+**후처리**
+
+| # | 처리 | 왜 |
+|:-:|---|---|
+| 5 | 패딩 제거 `disp[:hs,:ws]` | 유효 영역만 남긴다 |
+| 6 | **배율 복원** — 크기 되돌리고 **값도 `/scale`** | disparity 는 **길이량**이라 축소하면 값도 같은 비율로 작아진다. 크기만 되돌리면 **깊이가 2배 틀린다** |
+| 7 | **`depth = fx · baseline / disparity`** | rectified 스테레오 기본식. `cam.json` 의 실측 `fx`·`baseline` 사용 |
+| 8 | `disparity < 0.05 px` → **NaN** | 0 근처에서 depth 가 발산한다 |
+| 9 | 범위 게이트 `100 mm ≤ z ≤ 10,000 mm` → `valid.png` | 명백한 이상치 제거. ⚠️ **범위 검사일 뿐이라 «맞다» 를 뜻하지 않는다** |
+| 10 | **16-bit PNG, `np.rint`, 0 = invalid** | 🔴 `astype(uint16)` 는 **버림**이라 depth 가 평균 **0.5mm 작아진다**(실제로 겪은 버그) |
+
+⚠️ **ONNX 세션 초기화가 ~31초**(53k 노드)다. **반드시 재사용**해야 한다 — 프레임마다 프로세스를 띄우면
+84프레임에 43분이 초기화로만 날아간다.
+★ 산출물은 `contracts.write_stereo_frame()` 을 통해서만 쓴다 — 백엔드(ONNX / PyTorch)가 달라도
+**스키마가 하나**여야 비교가 가능하기 때문이다.
+
+### 3.2 프롬프트 `f002` — **설계에서 유도하고 실험으로 확인했다**
+
+채택: **`cube shaped sealed plastic wafer pod`**
+
+**(가) SAM3 는 «짧은 명사구(NP)» 를 받도록 설계됐다** — 🟢 **논문 원문**
+
+> Ravi et al., **SAM 3: Segment Anything with Concepts**, arXiv:2511.16719v2 (`docs/papers/`)
+
+| 위치 | 원문 |
+|---|---|
+| **§2 과제 정의** (p3) | *"…**detect, segment and track all instances** of a visual concept specified by a short text phrase, image exemplars… **We restrict concepts to those defined by simple noun phrases (NPs) consisting of a noun and optional modifiers.**"* |
+| **§1 서론** (p2) | *"To focus on recognizing **atomic visual concepts, we constrain text to simple noun phrases (NPs)** … While **SAM 3 is not designed for long referring expressions or queries requiring reasoning**…"* |
+| **§3 Presence Token** (p4) | *"…**p(NP is present in input)** … Each proposal query qᵢ only needs to solve **p(qᵢ is a match | NP is present in input)**. **The final score … is the product of its own score and the presence score.**"* |
+| **§2** (p3) | *"Our vocabulary includes any simple noun phrase groundable in a visual scene, **which makes the task intrinsically ambiguous** … subjective descriptors ('cozy', 'large')…"* |
+
+★ **«NP = 명사 + 선택적 수식어» 가 논문의 정의**다 — 아래 (나)의 규칙들이 그 정의의 따름정리다.
+(보조: 저장소 `README:49·351`, `agent_core.py:238` 실패 시 *"simple noun phrase"* 로 재시도.)
+
+**(나) 우리 경험 규칙이 그 설계의 따름정리다**
+
+| 측정된 규칙 | 설계로부터의 설명 |
+|---|---|
+| **약어 단독은 죽는다** — `FOUP` **0/9** ↔ `front opening unified pod` **9/9** | SA-Co 는 **NP 표층형**으로 라벨링됐다. 약어는 그 분포에 거의 없다 |
+| **형상어는 «수식어 자리» 에서만 접지된다** — `cube shaped case` 9/9 ↔ **`plastic cube` 0/9** | NP = `[modifier*] + HEAD`. `plastic cube` 는 **head 가 `cube`**(우리 물체가 아니다) |
+| **핵명사를 빼면 검출 자체가 깨진다** (9/9 → 7/9) | **head 가 개념을 정하고 modifier 는 좁힐 뿐**이다 |
+| **슬롯별 최적을 조합하면 최적이 안 나온다** | phrase 를 **통째로 임베딩**한다 — 단어별 기여의 합이 아니다 |
+| **색어는 조건부다** — 맞는 색에서만 걸리고 아니면 **조용히 검출 0** | 🔴 버그가 아니라 **presence token 의 설계된 동작**이다 |
+| **영어 전용** — 한/일/독 전부 0/9 | SA-Co 가 **영어 NP** 데이터셋이다 |
+| **제조사명은 해롭다** — 그 제조사 사진에만 붙는다 | 270K 개념이라도 **상표는 특정 외관과 결합**한 spurious correlation |
+
+**(다) 그래서 `f002` 는 설계 요건의 교집합이다**
+
+| 요건 | 충족 |
+|---|---|
+| 짧은 명사구(문장 아님) | 6단어 NP ✅ |
+| 도메인 head noun | `pod` · `wafer` ✅ |
+| 형상 접지가 **수식어 자리** | `cube shaped` ✅ |
+| 재질·상태 수식어 | `sealed` · `plastic` ✅ |
+| **약어 · 색어 · 마침표 · 제조사명 없음** | ✅ |
+
+**(라) 실험으로 좁혔다 — 표본을 넓혀 가며 세 벌**
+
+| 표본 | 규모 | 결과 |
+|---|---|---|
+| 웹 사진 | **237장** × 136개 프롬프트 (사용자가 79장 직접 판정) | 서열화 |
+| 실물 사진 | 3라운드(28·40·50cm) × 40장 | **136 → 81 → 70 → 58** (신규 0 = 중첩으로 좁혀짐) |
+| 최종 | — | **58 → 12 → 4**, 그중 `f002` 가 **웹·실물 양쪽 1위** |
+
+🔴 **주의 셋** — ① **`score` 로 순위를 매기면 안 된다**(마스크 품질과 상관 r=+0.06). `score` 는
+**문턱 지표**라 «미검출까지의 여유(최소값)» 로 읽는다. ② **웹 서열은 «순서» 는 맞히고 «간격» 은
+과소평가한다** — 웹에서 «구분 안 됨» 이던 것들이 실물에서 크게 갈렸다. ③ **프롬프트를 바꿔도
+pose 는 거의 안 바뀐다** — 갈리는 축은 **«검출되느냐» 하나**이고, 그게 곧 KPI 다.
+
+### 3.3 왜 «메쉬를 갈아타면» 평행이동이 좋아지나 — **논문 §3.3 + 코드**
 
 > 논문 §3.3: *"We then project the object origin to the image space to determine the crop center.
 > We then project the **slightly enlarged object diameter (the maximum distance between any pair of
@@ -119,7 +254,8 @@ FoundationStereo → SAM3 → FoundationPose
 ```python
 radius = mesh_diameter * crop_ratio / 2      # crop 을 3D 에서 정의한다
 ```
-그 창을 `input_resize`(=160)로 줄인다(`Utils.py:597`). 따라서
+그 창을 `input_resize`(=**160**)로 줄인다(`Utils.py:597`). 🟢 **이 값도 논문에 있다** — supplementary p14:
+*"cropped based on the perturbed pose and **resized into 160 × 160** before sending to the network."* 따라서
 
 ```
 네트워크 1px = mesh_diameter × crop_ratio / 160  [mm]     ← 거리에도 fx 에도 무관
@@ -133,7 +269,7 @@ radius = mesh_diameter * crop_ratio / 2      # crop 을 3D 에서 정의한다
 → ★ **stage2 에서 유효 해상도가 3.16배 좋아진다.** 거리를 당겨서가 아니라 **메쉬가 작아서**다.
 🔴 그래서 `--primary full` 만 쓰면 t 에 **구조적 천장**이 있고, 그 천장은 **거리로 못 낮춘다.**
 
-### 3.2 왜 회전과 평행이동이 서로 다른 단계에서 좋은가 — **코드**
+### 3.4 왜 회전과 평행이동이 서로 다른 단계에서 좋은가 — **코드**
 
 `predict_pose_refine.py` (배포 가중치 `trans_rep: tracknet` · `normalize_xyz: true` · `rot_rep: axis_angle`):
 
@@ -148,11 +284,19 @@ radius = mesh_diameter * crop_ratio / 2      # crop 을 3D 에서 정의한다
 | 평행이동 | **`mesh_diameter/2`** (579→183.5mm 이면 3.16배 세밀) | ✅ |
 | 회전 | `rot_normalizer` = **20° 상수** | ❌ |
 
+🟢 **`rot_normalizer = 20°` 는 논문에 근거가 있다** (2026-09-02 확인) — supplementary p14:
+> *"the pose is randomly perturbed by adding **translation noise under the magnitude of 0.02m, 0.02m,
+> 0.05m** for XYZ axis respectively and **rotation under the magnitude of 20°**"*
+
+★ **네트워크의 회전 출력 범위(±20°)가 학습 교란 크기와 정확히 일치한다** — `tanh(out) × 0.3490658 rad = ±20.0°`.
+🔴 **반면 평행이동 쪽은 논문이 «절대 미터»(0.02/0.02/0.05 m)로 적고 `mesh_diameter` 정규화를 언급하지 않는다.**
+출시된 설정은 `normalize_xyz: true` 로 **지름에 비례**시킨다 → **그 정규화는 여전히 코드 근거뿐**이다.
+
 동시에 `top_flange` 는 근사 4회 대칭이고 **방향 정보가 표면의 3.5%·전부 경계**에 있다.
 → ★★ **stage2 는 «회전 증거» 를 «평행이동 해상도» 와 맞바꾼다.**
-🔴 **이 항목은 논문에 없다** — 공개 구현의 학습 설정에만 있다. 인용 시 *"공개 구현에서"* 라고 쓴다.
+🔴 **평행이동의 «지름 정규화» 만 논문에 없다** — 그 부분만 *"공개 구현의 학습 설정에서"* 라고 쓴다.
 
-### 3.3 왜 R 과 t 를 갈라 써도 되나 (= 하이브리드) — **논문 §5.3 + 코드**
+### 3.5 왜 R 과 t 를 갈라 써도 되나 (= 하이브리드) — **논문 §5.3 + 코드**
 
 > 논문 §5.3 (supplementary): *"this **disentangled representation removes the dependency on the
 > updated orientation when applying the translation update**."*
@@ -165,7 +309,7 @@ B_in_cam[:,:3,:3] = rot_mat_delta @ A_in_cam[:,:3,:3]    # R ← ΔR · R   (t �
 → ★ **한 단계의 `R` 과 다른 단계의 `t` 를 접합해도 각각이 그 단계에서 최적화된 값 그대로 유지된다.**
 🔴 물체 좌표계 갱신(`t ← R·Δt + t`)이었다면 접합이 의미를 잃는다 — **이 파라미터화가 전제 조건**이다.
 
-### 3.4 stage2 의 입력 처리 — flange 밖 depth 를 «측정값 없음» 으로
+### 3.6 stage2 의 입력 처리 — flange 밖 depth 를 «측정값 없음» 으로
 
 1. refiner 는 **A(메쉬 렌더) ↔ B(관측)** 를 비교한다.
 2. stage2 는 메쉬를 `top_flange.ply` 로 바꾸므로 **A 가 만들 수 없는 기하가 B 에 남는다.**
@@ -180,15 +324,27 @@ B_in_cam[:,:3,:3] = rot_mat_delta @ A_in_cam[:,:3,:3]    # R ← ΔR · R   (t �
 → **`RH1` 은 SAM3 의 flange 검출에 전혀 의존하지 않는다.** (실물 flange 프롬프트는 20개 중 **2개**만
 살아남았으므로 이 설계가 그 취약축을 아예 안 밟는다.)
 
-### 3.5 🔴 정직하게 — **근거가 upstream 에 없는 구성요소가 하나 있다**
+### 3.7 🔴 정직하게 — **근거가 upstream 에 없는 구성요소가 하나 있다**
 
-**`--select center` + `score_frac 0.9`**(다중 인스턴스에서 타깃 고르기)는 **우리 휴리스틱**이고
-상위 문헌·코드에 대응물이 없다. 다만:
+**`--select center` + `score_frac 0.9`**(다중 인스턴스에서 타깃 고르기)는 **우리 휴리스틱**이다.
+
+🟢 **다만 «근거 없는 자유 파라미터» 가 아니라 «과제 정의상 모델 밖의 문제» 다** — 논문 §2 (p3)가
+PCS 를 ***"detect, segment and track **all instances** of a visual concept"*** 로 정의한다.
+즉 **«여럿 중 어느 것인가» 는 PCS 의 출력이 아니다.** 그리고 §3 (p4)의 점수 분해식
+`final = p(qᵢ 가 매치 | NP 존재) × p(NP 존재)` 에서 앞 항은 ***"이 개체가 그 개념의 인스턴스인가"*** 에
+답하므로 **동종 물체를 점수로 구분할 수 없는 것은 성능 한계가 아니라 정의**다.
+
+🔴 **논문이 제시하는 해법은 «단일 객체 경로(PVS)» 다** — §1 (p1): PVS 는 *"points, boxes or masks to
+**segment a single object per prompt**"*. ⚠️ **PCS 의 exemplar 박스는 해법이 아니다** —
+*"given a positive bounding box on a dog, the model will detect **all** dogs"*(p4).
+→ 어느 쪽이든 **«대략적 위치» 라는 외부 정보가 필요**하고, 현 환경엔 로봇이 없어 그 정보가 없다.
+
+측정 결과는 다음과 같다:
 
 - ✅ **검증 조건(단일 대상 장면)에서는 결과를 바꾸지 않는다** — 세 규칙이 **304 사례에서 동일한 마스크**.
 - ✅ 그 이유가 **기전 수준으로 측정됐다**: 점수 게이트를 통과하는 후보가 **60/60 프레임에서 1개**라
   뒤 단계가 관여하지 않는다(차순위 점수가 최고점의 **최대 0.33배**).
-- 🔴 **동종 방해물이 있는 장면에서만** 문제가 된다 → 5.5 참조.
+- 🔴 **동종 방해물이 있는 장면에서만** 문제가 된다 → §5.5 참조.
 
 ---
 
@@ -202,7 +358,7 @@ B_in_cam[:,:3,:3] = rot_mat_delta @ A_in_cam[:,:3,:3]    # R ← ΔR · R   (t �
 
 ### 4.1 하이브리드가 어느 단일 단계보다 낫다 — **설계의 핵심 주장**
 
-3.2 가 예측하는 «coarse 는 R 이 좋고 t 가 나쁘다 / refined 는 반대» 가 **세 파이프라인에서 동시에** 관측된다:
+3.4 가 예측하는 «coarse 는 R 이 좋고 t 가 나쁘다 / refined 는 반대» 가 **세 파이프라인에서 동시에** 관측된다:
 
 | 출처 | coarse R / t | refined R / t |
 |---|---|---|
@@ -216,7 +372,7 @@ B_in_cam[:,:3,:3] = rot_mat_delta @ A_in_cam[:,:3,:3]    # R ← ΔR · R   (t �
 
 ### 4.2 ★★ 반증 가능한 예측을 세우고 시험했다
 
-> 3.2 가 옳다면 — **`--primary flange` 로 돌리면 stage1·stage2 가 «같은 메쉬」라 이득이 사라져야 한다.**
+> 3.4 가 옳다면 — **`--primary flange` 로 돌리면 stage1·stage2 가 «같은 메쉬」라 이득이 사라져야 한다.**
 
 측정: `--primary flange` 에서 stage2 의 t 이득이 **1.100 → 1.042mm (0.058mm)** 인데
 **FP 재실행 잡음 바닥이 0.512mm** 다 → **측정되지 않는다.** ✅ **예측대로 사라졌다.**

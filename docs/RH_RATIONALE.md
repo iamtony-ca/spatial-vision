@@ -132,6 +132,15 @@ rot_mat_delta = torch.tanh(output["rot"]) * self.cfg['rot_normalizer']   # 0.349
 trans_delta  *= (mesh_diameter / 2)                                       # 메쉬 크기에 비례
 ```
 🔴 **평행이동 보폭은 `mesh_diameter` 에 비례하고 회전 보폭은 상수(±20°)다.**
+
+🟢 **`rot_normalizer = 20°` 는 논문에 근거가 있다** (2026-09-02 확인) — supplementary p14:
+> *"the pose is randomly perturbed by adding **translation noise under the magnitude of 0.02m, 0.02m,
+> 0.05m** for XYZ axis respectively and **rotation under the magnitude of 20°**"*
+
+★ **네트워크의 회전 출력 범위(±20°)가 학습 교란 크기와 정확히 일치한다** — `tanh(out) × 0.3490658 rad = ±20.0°`.
+🔴 **반면 평행이동 쪽은 논문이 «절대 미터»(0.02/0.02/0.05 m)로 적고 `mesh_diameter` 정규화를 언급하지 않는다.**
+출시된 설정은 `normalize_xyz: true` 로 **지름에 비례**시킨다 → **그 정규화는 여전히 코드 근거뿐**이다.
+
 메쉬가 3.16배 작아지면 **평행이동 보폭만 3.16배 세밀해지고 회전 보폭은 안 바뀐다.**
 
 **(c) 회전 증거는 오히려 줄어든다**
@@ -232,7 +241,20 @@ D2 와 D4 가 같은 문제의 두 답이고, 하이브리드가 그 절충이�
 sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-6 부속)다.
 → 주장은 **«이런 구조의 명사구를 쓴다»** 이고, `f002` 는 **그 구조의 대표**다.
 
-### 5.1 SAM3 는 «짧은 명사구(NP)» 를 개념 프롬프트로 받도록 설계됐다 (원문)
+### 5.1 SAM3 는 «짧은 명사구(NP)» 를 개념 프롬프트로 받도록 설계됐다
+
+★★★ **논문 원문이 근거다** (2026-09-02 추가 — 그전까지는 README 만 인용하고 있었다).
+`docs/papers/sam3_2511_16719v2.pdf`, Ravi et al., **SAM 3: Segment Anything with Concepts**, arXiv:2511.16719v2.
+
+| # | 위치 | 원문 | 무엇을 세워 주나 |
+|:-:|---|---|---|
+| **P1** | **§2 PCS 과제 정의** (p3) | *"We define the Promptable Concept Segmentation task as follows: given an image or short video, **detect, segment and track all instances** of a visual concept specified by a short text phrase, image exemplars, or a combination of both. **We restrict concepts to those defined by simple noun phrases (NPs) consisting of a noun and optional modifiers.**"* | 🔴 **두 가지를 한꺼번에** — ① 프롬프트 단위가 **NP = 명사 + 선택적 수식어** ② 반환은 **모든 인스턴스**(→ «어느 것이 타깃인가» 는 **과제 정의상 범위 밖**, §6.4) |
+| **P2** | §1 서론 (p2) | *"To focus on recognizing **atomic visual concepts, we constrain text to simple noun phrases (NPs)** such as 'red apple' or 'striped cat'. While **SAM 3 is not designed for long referring expressions or queries requiring reasoning**…"* | **문장·지시표현을 쓰면 안 되는 이유** — 설계 제약으로 명시돼 있다 |
+| **P3** | §3 Presence Token (p4) | *"…introducing a learned **global presence token**. This token is solely responsible for predicting whether the target concept … is present in the image/frame, i.e. **p(NP is present in input)**. Each proposal query qᵢ only needs to solve **p(qᵢ is a match | NP is present in input)**. **The final score for each proposal query is the product of its own score and the presence score.**"* | 🔴 **§6.4 의 핵심 근거** — 점수 분해식이 논문에 그대로 있다 |
+| **P4** | §2 (p3) | *"Our vocabulary includes any simple noun phrase groundable in a visual scene, **which makes the task intrinsically ambiguous** … subjective descriptors ('cozy', 'large') …"* | **색·크기 수식어가 조건부로 작동하는 것이 «설계된 모호성»** 임 |
+| **P5** | §1 (p1) | PVS 는 *"points, boxes or masks to **segment a single object per prompt**"* ↔ PCS 는 *"finding and segmenting **all** instances of a concept"* | **단일 객체 경로(PVS)와 개념 경로(PCS)는 다른 과제**다 — §6.5 |
+
+**보조 근거 (저장소 원문)** — 논문과 같은 내용을 구현 쪽에서 재확인한 것들:
 
 | 근거 | 원문 |
 |---|---|
@@ -352,10 +374,10 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 | # | 구성요소 | 결정 | **기전 근거** | 측정 | 등급 |
 |---|---|:-:|---|:-:|:-:|
 | 1 | stereo = NGC ONNX | O | **L** 라이선스 문서 — GitHub 배포는 research-only, NGC 는 *"ready for commercial use"* | M | A ⚠️ **정확도로 고른 게 아니다** |
-| 2 | 텍스트 분할 | O | **P** `sam3/README:49` *"short text phrase"* · `:351` SA-Co 는 **noun phrase** 라벨 · **T** `agent_core.py:238·273·423` 실패 시 *"simple noun phrase"* 로 재시도 | M §38-1 | **A** |
-| 3 | 프롬프트 `f002` | O | **P/T** 위와 같음 + **T** `decoder.py:104-137` **presence token**(수식어 구분) | M 3표본 | **A** |
+| 2 | 텍스트 분할 | O | **P** 🟢 **논문 §2**(p3) *"restrict concepts to … **simple noun phrases (NPs) consisting of a noun and optional modifiers**"* · **§1**(p2) *"not designed for long referring expressions"* · (보조) `README:49·351` · **T** `agent_core.py:238·273·423` 실패 시 *"simple noun phrase"* 로 재시도 | M §38-1 | **A** |
+| 3 | 프롬프트 `f002` | O | **P/T** 위와 같음 + 🟢 **논문 §3**(p4) **presence token** — `final score = own score × presence score` | M 3표본 | **A** |
 | 4 | `--select center` + `score_frac 0.9` | O | 🔴 **없다 — 기전이 O 다.** upstream 에 대응물이 없는 **우리 휴리스틱**이고, §6.4 가 **왜 `score` 로는 원리적으로 안 되는지**를 upstream 코드로 보인다 | ✅ **M §44-17 — 배포 조건에서 «무영향»**: 단일 물체 씬 **304케이스에서 `score`·`center0.9`·`center0.3` 이 0% 불일치**. ★★ **§44-24k 가 이를 «기전 수준» 으로 올렸다** — 점수 게이트 통과 후보가 **60/60 프레임에서 정확히 1개**라 뒤의 두 단계가 **결과에 관여하지 않는다**(차순위 점수가 최고점의 **최대 0.33배** = 게이트까지 ×2.74 여유). 즉 «우연히 같다» 가 아니라 **«단일 대상 장면에서는 `argmax(score)` 로 구조적으로 축약된다»** 다. 🔴 동종 방해물 씬에서만 13.6% 오선택(§44-24j) | **D** ⚠️ **단 배포 조건에서는 «결과» 가 아니라 «계산» 이 같다**(§44-24k) |
-| 5 | `--text-conf 0.05` | O | **T** `sam3_image_processor.py:199` `keep = out_probs > confidence_threshold` (절대 문턱). 🔴 **값의 근거는 없다** | M §35-2m-2 | **B** |
+| 5 | `--text-conf 0.05` | O | **T** `sam3_image_processor.py:199` `keep = out_probs > confidence_threshold`(절대 문턱). 🟢 **논문에 기준값이 있다**(2026-09-02 확인) — SAM3 논문 §4(p7): *"we only evaluate predictions with **confidence above 0.5**, effectively introducing a threshold that mimics downstream usages and enforces good calibration"*. 🔴 **우리는 0.05 로 10배 낮췄다 — 의도적 이탈**이다. 근거는 «벤치마크 정밀도» 가 아니라 «단일 타깃 산업 환경의 재현율» — §35-2m-2 에서 `score 0.099` 인 프레임이 **IoU 0.988** 이었다(«분할이 틀린» 게 아니라 «자신감만 낮은» 것). ⚠️ 하류에 기하 검증(FP)이 있어 오검출 비용이 낮다는 전제다 | M §35-2m-2 | **B+** ⚠️ 이탈을 명시할 것 |
 | 6 | `--primary full` | O | **T** `Utils.py:605` crop = `diameter × crop_ratio`(3D) → 유효 해상도 | M §37-9b | **A** |
 | 7 | `--input-scale 0.75` | O | **T** `estimater.py:173-174` `erode_depth(radius=2)`·`bilateral_filter_depth` 가 **픽셀 단위** → 배율이 전처리 반경을 바꾼다 | 🔴 **구분 안 됨** | **B** |
 | 8 | stage2(메쉬 교체) | **O** | **T** `Utils.py:605`(crop) · `predict_pose_refine.py:229`(`trans_delta *= mesh_diameter/2`) · `:221`(`rot_normalizer` **상수**) | M §27-7·§38-7 | **A** |
@@ -364,12 +386,14 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 | 11 | CAD `foup_300_semi_r2` | O | **S** SEMI E47.1-1101 원문(`z49`·`d63` 정의) | M §31·§36 실측 | **A** |
 | 12 | pose 원점 = flange 상면 | **O** | **T** `estimater.py:137-150` `guess_translation` 이 `zc = median(depth[mask])` — **원점이 관측 표면 근처여야** 초기값이 맞는다 | M `verify_obj` | **A** |
 | 13 | 카메라 ZED X 2.2mm | O | 기본 기하(`σ_Z ∝ Z²/(fx·B)`) | M §34 | **A** |
-| 14 | ★ `--est-iter 5` | — | **T** `run_demo.py:20` `est_refine_iter` **기본 5** + `estimater.py:159` `def register(…, iteration=5)` — **저자 기본값 두 곳**. RH1 의 stage1 은 init 이 없어 `register` 경로(`pose_fp.py:374`)라 **정확히 그 경로**다 | — | **A** ★ *"저자 기본값을 그대로 썼다"* 로 쓸 수 있다 |
-| 15 | `--refine-iter 5` | **O** | **upstream 과 어긋난다** — stage2 는 `est2.track_one(…)`(`pose_fp.py:416`)인데 `run_demo.py:21` 의 `track_refine_iter` 기본은 **2** 다 | ✅ **M §44-12 — 2·5·10 이 구분 안 됨**(차이가 재실행 잡음 바닥 아래) | **A−** ★ *"어긋남을 확인했고 무해함을 측정했다"* |
+| 14 | ★ `--est-iter 5` | — | 🟢 **P 논문 supplementary**(p14): *"The refinement iteration is set to 1 for training efficiency, **At test time, it is set to 5 for pose estimation** and 1 for tracking"* · **T** `run_demo.py:20` `est_refine_iter` **기본 5** + `estimater.py:159` `def register(…, iteration=5)`. RH1 의 stage1 은 init 이 없어 `register` 경로(`pose_fp.py:374`)라 **정확히 그 경로**다 | — | **A** ★ *"저자 기본값을 그대로 썼다"* 로 쓸 수 있다 |
+| 15 | `--refine-iter 5` | **O** | **upstream 과 어긋난다** — stage2 는 `est2.track_one(…)`(`pose_fp.py:416`)인데 `run_demo.py:21` 의 `track_refine_iter` 기본은 **2**, 🟢 **논문(p14)은 «tracking 에 1»** 이다. ★ **다만 우리 stage2 는 시간축 추적이 아니라 «메쉬를 바꾼 재추정»** 이라 논문의 «pose estimation → 5» 쪽이 더 가까운 유비다 | ✅ **M §44-12 — 2·5·10 이 구분 안 됨**(차이가 재실행 잡음 바닥 아래) | **A−** ★ *"어긋남을 확인했고 무해함을 측정했다"* |
 | 16 | `--stereo-scale 0.5` | O | ✅ **T/M — 제약과 비용이 정한다.** 1920×1200 에서 **0.625·0.75 가 CUDA EP 로 실행 불가**(31GB 유휴 GPU 에서 재현 · ORT 세션 옵션 5조합 전부 실패 — `arena_extend_strategy` 는 Softmax OOM 을 넘기지만 ConvTranspose cuDNN 워크스페이스에서 다시 막힌다), 상한은 **0.5625**. ⚠️ `PYTORCH_CUDA_ALLOC_CONF` 는 **다른 프레임워크**라 무관하다(그건 `--input-scale` 용). 남은 여유의 값어치를 **정량화했다** — 0.5→0.5625 는 t **0.147mm**(KPI 의 2.9%) 이득에 **+36% 비용**(예산의 5.4%)이고 **회전은 불변**(p=1.000) | M §44-13 (n=60·3반복) | **A** ⚠️ 정확도 최적은 0.5625 다 |
 | 17 | `--flange-mask-proj faces` | O | **M** 교훈 #20 — `convexHull` 은 오목 노치를 메워 GT 대비 **평균 1.55% 부푼다**. 기전 근거는 없고 **측정으로 선다** | M | **B** |
 | 18 | `--flange-mask-from pose` | — | 기본값. **T** stage2 의 flange 마스크를 coarse pose 투영으로 만든다 = SAM3 flange 의존을 없앤다 | M §38-12 동등 | **A** ⚠️ 정확도 근거 아님(의존성 축소) |
 | 19 | ★ **배포 거리 «≥56cm»** (하한만) | **O** | 🔴🔴 **기전이 «가설» 로 내려갔다**(§44-24d, 2026-09-02) — ~~`estimater.py:142-150` `guess_translation` = bbox 중심 → 잘리면 초기값이 수렴 분지 경계~~ 는 **sim 이 재현하지 못했다**: 씬 고정 사다리 0.291m 에서 **85% 가 잘리는데** 「잘렸는데 마스크는 맞은」 50장이 **ADD 중앙 1.135mm · 실패 0** 이다. 잘림이 때린 것은 pose 가 아니라 **분할**이었다(오선택 18/68 vs 안 잘린 0/12). · **T** `Utils.py:605` crop 이 3D 기준이라 **t 천장은 거리 무관**(이 항은 유효) | ✅ **M §44-2 실물 n=40×3거리** — 28cm `full` **19.4% [14.0, 26.2] 대실패**(팔로 못 품) ↔ 56·66cm **0/40** | **B**(하한) ⚠️ **관측은 실물로 확고한데 기전이 없다** · 🔴 **«대역» 은 미정**(§44-18c) |
+| 21 | `input_resize 160×160` | — | 🟢 **P 논문**(p14) *"cropped based on the perturbed pose and **resized into 160×160** before sending to the network"* + **T** `config.yml` | — | **A** ★ 저자 값 그대로 |
+| 22 | depth 전처리(erode·bilateral) | — | 🟢 **P 논문**(p13) *"We perform **denoising to the depth images** … which includes **erosion and bilateral filtering**"* · 🔴 **`radius=2`(픽셀 단위)는 논문에 없고 코드에만** 있다(`estimater.py:173-174`) — §38-10 의 «배율이 전처리 반경을 바꾼다» 는 **코드 근거뿐**이다 | M §44-24e | **A−** |
 | 20 | ★★ **KPI `t ≤ 5mm · R ≤ 3°`** | **O** | 🔴 **유도가 기록돼 있지 않다** — `RESULTS.md §KPI` 는 *"2026-08-07 확정"* 이라고만 적혀 있고 `CONSUMER_6DPOSE.md`(요구사항 근거 문서)에도 공차 유도가 없다. ★ **사후 정합성은 세울 수 있다**(§8): 두 항이 **flange 좌표계에서만 균형이 맞는다**(R 3° 의 flange 표면 최대 변위 **4.81mm** ≈ t 예산 5mm. 같은 3° 가 `full` 표면에서는 **22.4mm** = 4.5배 불균형) | ✅ **M §8.4 — 현행 배포 팔이 예산의 16~27%** 만 쓴다 | **D** 🔴 **#4 에 이은 두 번째 «결정도 기전도 우리 것»** — 닫으려면 **그리퍼 포획 반경 1개** 가 필요하다(§8.3) |
 
 ### 6.3 🔴 «기전조차 우리 코드» 인 것은 **#4 하나**다
@@ -381,7 +405,7 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 
 | | 항목 | 상태 |
 |---|---|---|
-| 🟡 **①** | **`--select center` + `score_frac 0.9`** | 🔴 **기전 근거는 끝까지 없다**(등급 D). §6.4 가 **왜 `score` 로는 원리적으로 안 되는지**를 upstream 코드로 보인다. ★★ **그러나 «배포 조건에서 무영향» 임이 측정됐다**(§44-17) — 단일 물체 씬 **304케이스에서 `score`·`center0.9`·`center0.3` 이 0% 불일치**. → **논문에서 «근거 없는 자유 파라미터» 가 아니라 «검증 조건에서 결과를 바꾸지 않는 구성요소» 로 쓸 수 있다.** 🔴 **동종 방해물 씬에서만** 문제가 된다 — 오선택 **13.6%**(씬 고정 8거리 640프레임, §44-24j) ~ **15~36%**(zx 세트, §44-15). ★ **처방이 정량화됐다**: `score_frac` 0.9 → **0.3** 이면 오선택 **87/640 → 9/640**, KPI **87.5% → 98.1%**(8/8 거리에서 개선, McNemar p=3.9e-18). 🔴 **기본값은 0.9 로 유지 중**(사용자 결정 — 현행 파이프라인으로 보고서 작성). 바른 설계는 **박스 프롬프트**(§6.5) — upstream 이 지원하나 **위치 정보 필요** |
+| 🟡 **①** | **`--select center` + `score_frac 0.9`** | 🟡 **정정(2026-09-02, 논문 확인)** — ~~기전 근거가 끝까지 없다~~ → **과제 정의상 «모델 밖» 의 문제**임이 논문에 있다(§2 *"detect … **all instances**"*). 규칙 «자체» 는 여전히 우리 것이지만, **«근거 없는 자유 파라미터» 가 아니라 «PCS 가 답하지 않는 질문에 대한 시스템 측 해법»** 으로 서술한다. §6.4 참조. ★★ **그러나 «배포 조건에서 무영향» 임이 측정됐다**(§44-17) — 단일 물체 씬 **304케이스에서 `score`·`center0.9`·`center0.3` 이 0% 불일치**. → **논문에서 «근거 없는 자유 파라미터» 가 아니라 «검증 조건에서 결과를 바꾸지 않는 구성요소» 로 쓸 수 있다.** 🔴 **동종 방해물 씬에서만** 문제가 된다 — 오선택 **13.6%**(씬 고정 8거리 640프레임, §44-24j) ~ **15~36%**(zx 세트, §44-15). ★ **처방이 정량화됐다**: `score_frac` 0.9 → **0.3** 이면 오선택 **87/640 → 9/640**, KPI **87.5% → 98.1%**(8/8 거리에서 개선, McNemar p=3.9e-18). 🔴 **기본값은 0.9 로 유지 중**(사용자 결정 — 현행 파이프라인으로 보고서 작성). 바른 설계는 **박스 프롬프트**(§6.5) — upstream 이 지원하나 **위치 정보 필요** |
 | 🟡 ② | `--text-conf 0.05` | **①에 딸린다**(§42-9 — 문턱과 선택 규칙이 얽혀 있다). ①이 배포 조건에서 무영향이므로 **이것도 그 조건에서는 검출 여부만 정한다** — 그 축은 `score_min`(§43-7·§44-5)으로 근거가 있다 |
 | ⚠️ ③ | `--input-scale 0.75` | 🔴 **«못 채움» 이 결론이다** — 4회 재실행·n=120 에서 0.75↔0.5 가 **p=1.000**(§38-9). 논문에는 *"구분되지 않으므로 비용·OOM 위험으로 골랐다"* 로 쓴다 |
 | ✅ ④ | `--stereo-scale 0.5` | **닫혔다**(§44-13) — 상한이 0.5625 이고, 남은 여유의 값어치가 **t 0.147mm ↔ 비용 +36%** 로 정량화됐다 |
@@ -397,9 +421,11 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 > 둘은 **측정으로 선다**(윤곽 정합 비사용 · flange 마스크 투영 방식),
 > 하나는 **관측은 확고하나 기전이 미규명**이다(배포 거리 하한).
 > upstream 에 대응물이 **아예 없는** 것은 **인스턴스 선택 규칙 하나**인데, 그 한계는
-> SAM3 의 점수 정의(`presence_score` 가 이미지 단위라 상대 문턱에서 상쇄되고, 남는
-> `out_probs` 는 «이 개체가 그 개념인가» 에 답하므로 동종 물체를 구분하지 못함)에서
-> **원리적으로 따라 나온다.** 다만 **본 연구의 평가 조건(단일 대상 장면)에서는 이 규칙이
+> **SAM 3 의 과제 정의와 점수 분해식에서 원리적으로 따라 나온다** — 해당 과제(Promptable Concept
+> Segmentation)는 *"개념에 맞는 **모든** 인스턴스를 검출·분할한다"* 로 정의되며(SAM 3 논문 §2),
+> 질의별 점수는 `p(질의가 매치 | 개념 존재) × p(개념 존재)` 로 분해되어(같은 논문 §3) 뒤 항은
+> 이미지 단위라 상대 문턱에서 상쇄되고 앞 항은 «이 개체가 그 개념의 인스턴스인가» 에 답한다.
+> 즉 **동종 물체의 구분은 모델의 성능 한계가 아니라 과제 범위 밖**이다. 다만 **본 연구의 평가 조건(단일 대상 장면)에서는 이 규칙이
 > 결과를 바꾸지 않음을 확인했다** — 세 가지 선택 규칙이 304개 사례에서 동일한 마스크를 냈다.
 > 동종 방해물이 존재하는 장면으로 확장할 때의 처방은 **위치 사전정보를 이용한 박스 프롬프트**이며,
 > 이는 상위 구현이 지원한다.
@@ -435,7 +461,28 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 «구분되지 않는다» 다. ⚠️ 이 측정은 **초기값이 좋은 구간**(0.686m, 잘림 없음)의 것이고,
 28cm 처럼 초기 오차가 큰 조건에서는 다를 수 있다.
 
-### 6.4 ★★ `score` 가 왜 타깃을 못 고르나 — **T 근거**
+### 6.4 ★★★ `score` 가 왜 타깃을 못 고르나 — **논문이 정의로 말한다** (P + T)
+
+🟢 **논문 근거 (2026-09-02 추가 — 그전까지 T 근거뿐이었다)**
+
+**① 과제 정의부터 «모든 인스턴스» 다** — 논문 §2 (p3):
+> *"detect, segment and track **all instances** of a visual concept…"*
+→ 🔴 **«여럿 중 어느 것인가» 는 PCS 의 출력이 아니다.** 우리 선택 규칙이 «근거 없는 휴리스틱» 인 것이
+아니라, **과제 정의상 모델 밖에서 풀어야 하는 문제**다. 이 서술이 훨씬 정확하고 방어된다.
+
+**② 점수 분해식이 논문에 있다** — 논문 §3 Presence Token (p4):
+> *"…predicting whether the target concept … is present in the image/frame, i.e. **p(NP is present in input)**.
+> Each proposal query qᵢ only needs to solve **p(qᵢ is a match | NP is present in input)**.
+> **The final score for each proposal query is the product of its own score and the presence score.**"*
+
+★ 즉 우리가 보는 `score` 는 `p(qᵢ 가 매치 | NP 존재) × p(NP 존재)` 다.
+- 뒤 항은 **이미지당 하나**이므로 **상대 문턱(`score_frac`)에서 완전히 상쇄**된다.
+- 앞 항은 ***"이 개체가 그 개념의 인스턴스인가"*** 에 답한다 — ***"이 개체가 내가 원하는 그것인가"*** 가 아니다.
+→ ★★★ **동종 물체를 점수로 구분할 수 없는 것은 성능 한계가 아니라 «정의»** 다.
+
+---
+
+**T 근거 (구현이 그 식 그대로다)**
 
 `third_party/sam3/sam3/model/sam3_image_processor.py:195-199`
 ```python
@@ -445,8 +492,7 @@ out_probs      = out_probs * presence_score               # ← 우리가 보는
 keep = out_probs > self.confidence_threshold              # ← --confidence (절대 문턱)
 ```
 
-★ **`presence_score` 는 이미지당 하나**라 한 이미지 안의 모든 후보에 **같은 값이 곱해진다.**
-→ **상대 문턱(`score_frac`)에서는 완전히 상쇄**되고 **`out_probs` 의 순위만** 남는다.
+★ **코드가 논문 §3 의 식과 1:1로 대응한다** — `presence_score` 는 이미지당 하나라 상대 문턱에서 상쇄되고 `out_probs` 순위만 남는다.
 
 🔴 그런데 `out_probs` 는 *"이 개체가 그 명사구에 맞나"* 에 답한다. FOUP 이 세 대면
 **셋 다 똑같이 잘 맞는 것이 정상**이고, 진짜 타깃과 방해물의 점수 차는 **신호가 아니라 잡음**이다.
@@ -502,13 +548,25 @@ SAM3 의 점수는 «이 개체가 그 개념인가» 에 답하므로 동종 �
 정답을 배제할 수 있다. 원리적 해법은 위치 사전정보를 이용한 박스 프롬프트다(§6.5)."*
 ★ **«튜닝했는데 부족했다» 가 아니라 «설계 가정이 장면 종류에 묶여 있었다» 가 정확한 서술**이다.
 
-### 6.5 ★★★ 바른 설계도 upstream 에 있다 — **박스 프롬프트** (P/T)
+### 6.5 ★★★ 바른 설계도 upstream 에 있다 — **기하 프롬프트** (P/T)
 
-- **P** `sam3/README:49` — *"using text or **visual prompts such as points, boxes, and masks**"*
-- **T** `sam3_image_processor.py:129` `add_geometric_prompt(box, label, state)` —
-  `[center_x, center_y, width, height]` 정규화 좌표로 **«이것» 이라고 직접 가리킨다.**
+🔴🔴 **정정 (2026-09-02, 논문 확인)** — 초판은 *"박스 프롬프트를 주면 «이것» 이라고 직접 가리킨다"* 라고
+적었는데 **PCS 의 exemplar 박스는 그렇지 않다.** 논문 §3 (p4):
 
-→ 타깃 지정을 **점수(개념 유사도)가 아니라 기하 프롬프트**로 옮기면 #4 가 **D → A** 가 된다.
+> *"given a positive bounding box on a dog, the model will detect **all** dogs in the image"*
+
+즉 **PCS 의 박스는 «인스턴스 지시자» 가 아니라 «개념 지시자»** 다. 정확한 구분은 이것이다:
+
+| 경로 | 프롬프트 | 반환 | 논문 |
+|---|---|---|---|
+| **PVS** (SAM/SAM2 계보) | points · boxes · masks | **프롬프트당 객체 하나** | §1 (p1) *"segment a **single object** per prompt"* |
+| **PCS** (SAM3 신규, **우리가 쓰는 것**) | 짧은 NP · exemplar | **개념에 맞는 모든 인스턴스** | §2 (p3) |
+
+→ ★ **그래서 «타깃 하나 고르기» 의 바른 해법은 둘이다:**
+**(가) PVS 경로를 쓴다** — 사전 위치를 알 때 그 좌표로 단일 객체를 뽑는다.
+**(나) PCS 를 쓰되 기하 프롬프트로 후보를 좁히고 그 박스와의 겹침으로 고른다** — 우리 `--select exemplar`(F5)가 이 형태다.
+🔴 어느 쪽이든 **«대략적 위치» 라는 외부 정보가 필요**하고, 그것이 없으면 **원리적으로 못 푼다**(§6.4).
+**T** `sam3_image_processor.py:129` `add_geometric_prompt(box, label, state)` — 정규화 `[cx,cy,w,h]`.
 
 🔴 **§38-1 에서 실패한 것과 혼동하지 말 것** — 그건 **«미리 만든 참조 이미지 세트»** 이고
 이건 **«이 프레임의 좌표»** 다. 참조 세트는 도메인 갭에 노출되지만 **좌표는 그렇지 않다.**

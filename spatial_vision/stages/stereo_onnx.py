@@ -33,8 +33,11 @@ from spatial_vision.contracts import (  # noqa: E402
     write_stereo_frame,
 )
 
-# ImageNet 통계. 모델 그래프에 정규화가 없어서 여기서 적용한다.
-# 실측 민감도: raw 0-255 로 넣으면 MAE 1.43px 어긋난다 → 반드시 정규화할 것.
+# ImageNet 통계. ONNX 그래프에 정규화 레이어가 없어서 여기서 적용한다.
+# ★ 근거는 추측이 아니다 — upstream `core/foundation_stereo.py:43-48` 이
+#   `Normalize(mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225])(img/255)` 를 쓴다(`:204-205`).
+#   논문 §3.1 의 단안 prior 가 DepthAnythingV2(DINOv2 계보)라 그 관례를 그대로 따른다.
+# 실측 확인: raw 0-255 로 넣으면 MAE 1.43px 어긋난다.
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], np.float32).reshape(1, 3, 1, 1)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], np.float32).reshape(1, 3, 1, 1)
 
@@ -55,10 +58,17 @@ def _normalize(img_rgb_u8: np.ndarray, mode: str) -> np.ndarray:
 
 
 def _pad_to_multiple(img: np.ndarray, m: int) -> tuple[np.ndarray, int, int]:
-    """오른쪽·아래로만 replicate 패딩.
+    """오른쪽·아래로만 replicate 패딩 (32 배수).
 
-    **왼쪽/위로 패딩하면 안 된다** — 좌영상의 x 원점이 밀리면 disparity 가 통째로 오프셋된다.
-    오른쪽·아래 패딩은 유효 영역의 disparity 의미를 바꾸지 않는다.
+    **왜 32 인가** — 논문(arXiv:2501.09898) §3.1 이 특징 피라미드를 `i ∈ {4, 8, 16, 32}` 로 쓴다
+    (가장 깊은 단계가 1/32). upstream 도 `run_demo.py:82` 에서 `divis_by=32` 를 준다.
+
+    **왜 오른쪽·아래인가** — ⚠️ **«왼쪽에 패딩하면 disparity 가 오프셋된다» 는 틀렸다**
+    (2026-09-02 실측 정정). 좌·우 영상에 **같은** 패딩을 주면 `x_L − x_R` 이 보존된다.
+    실제로 가로 10px 를 왼쪽에 줘도 disparity 차이는 **중앙 0.038px** 로 모델 잡음 수준이었다
+    (upstream 은 오히려 좌우 대칭 패딩 `mode='sintel'` 이다).
+    → 오른쪽·아래를 쓰는 이유는 **되돌리기가 단순한 슬라이스(`[:h, :w]`)** 라서다. 등가 선택이다.
+    🔴 단 **좌·우 영상에 «다른» 패딩을 주면 그때는 실제로 오프셋된다** — 그것만 피하면 된다.
     """
     h, w = img.shape[:2]
     ph, pw = (-h) % m, (-w) % m
