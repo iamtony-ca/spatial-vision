@@ -239,10 +239,18 @@ def main(argv: list[str] | None = None) -> int:
     #   **물체 depth 를 지우는 비율이 1.32% → 3.56% 로 2.7배** 달라진다.
     #   이 옵션을 주면 `radius = max(1, round(v · input_scale))` 로 물리 크기를 맞춘다.
     #   🔴 기본 0 = **끄기(FP 원래 동작)** — 켜는 것이 기본값이 되면 옛 수치와 비교가 깨진다.
+    ap.add_argument("--stage2-depth", choices=["masked", "full"], default="masked",
+                    help="stage2 가 refiner 에 넘길 depth. **기본 `masked` = 현행 동작**(flange 마스크 "
+                         "밖을 0 으로). `full` 은 마스킹 없이 넘긴다 — **제거 실험 전용**이다. "
+                         "🔴 upstream `track_one` 은 마스크 인자가 없어(`estimater.py:250`) depth 가 "
+                         "«어디를 볼지» 를 정하는 유일한 통로다. 근거·측정은 `RH_RATIONALE.md §9.5`")
     ap.add_argument("--preproc-radius-px", type=float, default=0.0,
                     help="FP depth 전처리(erode·bilateral) 반경을 **원본 해상도 픽셀**로 고정한다. "
                          "0=끄기(FP 기본 radius 2, 축소하면 물리적으로 넓어진다). "
-                         "권장 4 — 0.75→3 · 0.5→2 로 둘 다 정수 (RESULTS §38-11)")
+                         "권장 4 — 0.75→3 · 0.5→2 로 둘 다 정수. "
+                         "🔴 **실험용이고 배포에 안 쓴다** — 켜면 upstream `estimater` 의 "
+                         "`erode_depth`/`bilateral_filter_depth` 를 **런타임 교체**한다. "
+                         "근거·범위는 `docs/RH_RATIONALE.md §9.4`, 기전은 `RESULTS.md §38-10`")
     args = ap.parse_args(argv)
 
     in_dir, out_dir = Path(args.in_dir), Path(args.out_dir)
@@ -407,8 +415,12 @@ def main(argv: list[str] | None = None) -> int:
                     mf = to_band(mf, args.mask_band_mm, args.mask_hub_r_mm, cam["fx"],
                                  mask_depth_median_m(mf, depth_m))
             if mf is not None:
-                # flange 밖의 depth 를 지운다 — refiner 는 마스크를 따로 받지 않고 depth 를 본다.
-                depth_crop = np.where(mf > 127, depth_m, 0.0)
+                # flange 밖의 depth 를 지운다 — refiner 는 마스크를 따로 받지 않고 depth 를 본다
+                # (`estimater.py:250` `track_one(rgb, depth, K, iteration)` 에 마스크 인자가 없다).
+                # 🔴 stage2 crop(= flange diameter × 1.2 = 220mm) 안 물체 픽셀의 **61~64% 가 몸체**라
+                #    안 지우면 «flange 렌더 ↔ 대부분 몸체인 관측» 을 비교하게 된다 (RH_RATIONALE §9.5).
+                depth_crop = (depth_m if args.stage2_depth == "full"
+                              else np.where(mf > 127, depth_m, 0.0))
                 # pose_last 는 centered mesh 기준 → T(+model_center) 를 곱해 되돌린다.
                 c = np.asarray(est2.model_center, dtype=np.float64).reshape(3)
                 T = np.eye(4); T[:3, 3] = c

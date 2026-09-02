@@ -67,6 +67,8 @@ envs/bin/
 # envs/fetch_env_assets.sh 로 재생성 (HDRI 14 + 텍스처 50).
 assets/env/
 
+assets/real_imgs/zedx_*/
+
 # ── 생성된 3D 자산 (976M) ─────────────────────────────────────────────────────
 # 🔴 여기는 «전부 무시 → 씨앗 파일만 되살리기» 방식이다.
 #    메쉬(ply/usda)·ISM 템플릿·SAM3 참조는 전부 크고 전부 재생성 가능한데,

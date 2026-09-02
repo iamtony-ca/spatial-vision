@@ -36,6 +36,43 @@ camera frame"* 이라고만 쓰고 **지름 정규화를 언급하지 않는다.
 ⚠️ 두 인스턴스는 **같은 `scorer`·`refiner` 네트워크 객체를 공유**한다(`pose_fp.py:284`). 즉 **가중치는
 동일**하고 **바뀌는 것은 오직 `mesh` 와 그로부터 나오는 `mesh_diameter`** 다. 이것이 아래 두 기전의 유일한 입력이다.
 
+### 1.1 ★ 그 `.ply` 는 무엇인가 — **점군이 아니라 «면이 있는» 메시다**
+
+`assets/obj/foup_300_semi_r2/*.ply` 헤더 (원문):
+
+```
+format binary_little_endian 1.0
+comment https://github.com/mikedh/trimesh
+element vertex 88179            ← full.ply  (top_flange.ply 는 73131)
+property float x / y / z
+element face 140970             ← ★ 면이 있다 (top_flange.ply 는 110882)
+property list uchar int vertex_indices
+end_header
+```
+
+| | `full.ply` | `top_flange.ply` |
+|---|--:|--:|
+| 정점 | 88,179 | 73,131 |
+| **면** | **140,970** | **110,882** |
+| 파일 크기 | 2.8 MB | 2.3 MB |
+
+🔴 **면이 없으면 이 파이프라인은 성립하지 않는다** — 면이 쓰이는 곳이 셋이다:
+
+1. **정점 법선** — `pose_fp.py:286·291` 이 `model_normals=mesh.vertex_normals` 를 넘기는데,
+   trimesh 는 그것을 **면에서 계산**한다. 점군이면 값 자체가 없다.
+2. **render-and-compare** — refiner/scorer 는 nvdiffrast 로 메시를 **래스터화**한다
+   (`Utils.py:135 nvdiffrast_render`, `mesh_tensors['faces']` 필수).
+3. **`mesh_diameter`** 는 예외다 — 정점만 쓴다(`Utils.py:569-575`). 즉 §2 의 crop 기전만 놓고 보면
+   점군으로도 계산은 되지만, 위 ①②가 막혀 **파이프라인이 돌지 않는다.**
+
+⚠️ **색·UV·법선은 파일에 없다**(`property` 가 `x,y,z` 뿐). 그래서 trimesh 가 기본 회색
+`[102,102,102,255]` 를 **전 정점에 균일하게** 채워 넣고(`ColorVisuals`), `Utils.py:121-125` 의
+`else` 분기가 그것을 `vertex_color` 로 쓴다. → ★ **네트워크의 RGB 입력에 들어가는 렌더는
+«무늬 없는 균일 회색 물체»** 다. 형상·음영만 있고 텍스처는 **원리적으로 없다.**
+🔴 이것이 «CAD 만으로 실물 pose 를 낸다» 가 성립하는 이유이자 한계다 — RGB 가담분이 **실루엣·음영뿐**이라
+기하(XYZ 채널)가 정보를 지고, 검정 몸체처럼 **경계 대비가 사라지는 조건에서 취약**해진다(§35-2i).
+⚠️ `is_watertight = False` 인데 **FP 는 요구하지 않는다**(래스터화·법선 모두 무관).
+
 ---
 
 ## 2. 근거 ① — crop 이 «물체 지름» 으로 정해진다 (**논문 + 코드**)
@@ -98,7 +135,7 @@ camera frame"* 이라고만 쓰고 **지름 정규화를 언급하지 않는다.
 | `full.ply` | 88,179 | 578.6~579.0mm | **4.341mm** |
 | `top_flange.ply` | 73,131 | 183.4~183.5mm | **1.376mm** |
 
-→ **stage2 에서 유효 해상도가 3.15배 좋아진다.**
+→ **stage2 에서 유효 해상도가 3.16배 좋아진다**(정본 `RESULTS.md §22`).
 
 ⚠️ **`mesh_diameter` 는 결정론이 아니다** — `estimater.py:54` 가
 `compute_mesh_diameter(model_pts=mesh.vertices, n_sample=10000)` 로 부르는데, 그 분기
@@ -141,7 +178,7 @@ camera frame"* 이라고만 쓰고 **지름 정규화를 언급하지 않는다.
 | **평행이동** | 무차원 `output["trans"]` | **`mesh_diameter / 2`** | ✅ **비례** |
 | **회전** | 무차원 `output["rot"]` | `rot_normalizer` = **20° 상수** | ❌ **없음** |
 
-배포 자산: `full` 289.4mm ↔ `top_flange` **91.7mm** → **평행이동 보폭만 3.15배 세밀해진다.**
+배포 자산: `full` 289.4mm ↔ `top_flange` **91.7mm** → **평행이동 보폭만 3.16배 세밀해진다.**
 회전 보폭은 두 단계에서 **완전히 같다.**
 
 ### 3.3 🔴 논문 대조 결과 — 이 항목은 논문 근거가 없다
