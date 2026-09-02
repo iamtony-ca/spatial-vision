@@ -64,6 +64,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--panel5", default="stage2", choices=["valid", "stage2"],
                     help="5번 패널. **기본 `stage2`** = stage2 가 실제로 먹는 «flange 로 가린 depth». "
                          "`valid` 는 범위 검사라 거의 항상 100%% 여서 정보가 없다")
+    ap.add_argument("--depth-pct", type=float, nargs=2, default=[2.0, 98.0], metavar=("LO","HI"),
+                    help="depth 컬러맵 백분위. 기본 `2 98`. **포화 없이 물체 끝까지 색을 내려면 `0 100`** "
+                         "(대비는 줄어든다). ⚠️ 표시 전용 — 계산에 안 들어간다")
     ap.add_argument("--order", default="pipeline", choices=["default", "pipeline"],
                     help="패널 배치. **기본 `pipeline`** = 인과 순서(원본 → depth → mask_full → "
                          "mask_flange → stage2 입력 → pose). `mask_flange` 는 분할이 아니라 "
@@ -154,6 +157,7 @@ def main(argv: list[str] | None = None) -> int:
             break
     if fl_dir is None and (sdir / "frame_0000" / "mask_flange.png").exists():
         fl_dir = sdir
+    print(f"  ℹ️ depth 백분위    {a.depth_pct[0]:g} ~ {a.depth_pct[1]:g}%" + ("  (포화 없음)" if a.depth_pct==[0.0,100.0] else "  (양끝 포화 = 대비 확보)"))
     print(f"  ℹ️ 패널 배치       {a.order}" + ("  (인과 순서 — depth 가 mask 보다 앞)" if a.order=="pipeline" else "  (기존 배치)"))
     print(f"  ℹ️ stage2 패널       {a.panel5}" + ("  (stage2 가 실제로 먹는 flange-가린 depth)" if a.panel5=="stage2" else "  (범위 검사 — 거의 항상 100%)"))
     print(f"  ℹ️ pose 패널 메쉬  {a.mesh}  (기본은 top_flange.ply — FOUP 전체는 `--mesh full.ply`)")
@@ -165,7 +169,8 @@ def main(argv: list[str] | None = None) -> int:
     cmd = [PY_POSE, "-m", "spatial_vision.viz.diag_sheet",
            "--in", str(cap), "--out", str(out),
            "--seg-full", str(sdir), "--depth-dir", str(st),
-           "--pose-dir", str(pdir), "--pose-name", pname, "--obj", str(obj), "--mesh", a.mesh, "--panel5", a.panel5, "--order", a.order]
+           "--pose-dir", str(pdir), "--pose-name", pname, "--obj", str(obj), "--mesh", a.mesh, "--panel5", a.panel5, "--order", a.order,
+           "--depth-pct", str(a.depth_pct[0]), str(a.depth_pct[1])]
     if fl_dir:
         cmd += ["--seg-flange", str(fl_dir), "--flange-name", fl_name]
     if a.pick:

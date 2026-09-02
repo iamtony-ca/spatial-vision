@@ -185,11 +185,11 @@ def frame_metrics(f: Path, a, mesh, K, hw) -> tuple[dict, dict]:
             if fl is not None and fl.any() else None)
         b = (basis & v) if basis is not None else None
         if b is not None and b.sum() > 200:
-            lo, hi, src = *np.percentile(d[b], [2, 98]), "obj"
+            lo, hi, src = *np.percentile(d[b], a.depth_pct), f"obj {a.depth_pct[0]:g}-{a.depth_pct[1]:g}%"
             if hi - lo < 40:                   # 정면 평면이면 구간이 붕괴한다 — 최소 폭을 준다
                 c = 0.5 * (lo + hi); lo, hi = c - 20, c + 20
         else:
-            lo, hi, src = *np.percentile(d[v], [2, 98]), "all"
+            lo, hi, src = *np.percentile(d[v], a.depth_pct), f"all {a.depth_pct[0]:g}-{a.depth_pct[1]:g}%"
         dep = {"scale_src": src, "scale_lo": round(float(lo), 1), "scale_hi": round(float(hi), 1),
                "med_all": round(float(np.median(d[v])), 1)}
         if fl is not None and (v & fl).any():
@@ -297,7 +297,7 @@ def render_frame(f: Path, a, met: dict, raw: dict, w: int, h: int) -> np.ndarray
         d = raw["depth"].astype(np.float32)
         din = fl & v                                       # flange ∧ 유효 = 네트워크에 들어가는 픽셀
         if din.any():                                      # 색 구간은 **flange 안에서만** 잡는다
-            lo, hi = float(np.percentile(d[din], 2)), float(np.percentile(d[din], 98))
+            lo, hi = (float(x) for x in np.percentile(d[din], a.depth_pct))
         else:
             lo, hi = dep["scale_lo"], dep["scale_hi"]
         n = np.clip((d - lo) / max(hi - lo, 1e-6), 0, 1)
@@ -434,6 +434,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--pose-name", default="pose_refined.json")
     ap.add_argument("--obj", default=None, help="--pose-dir 를 쓸 때 필요")
     ap.add_argument("--mesh", default="top_flange.ply")
+    ap.add_argument("--depth-pct", type=float, nargs=2, default=[2.0, 98.0],
+                    metavar=("LO", "HI"),
+                    help="depth 컬러맵 구간을 잡을 백분위. **기본 `2 98`**. "
+                         "🔴 컬러맵은 256색뿐이라 «어느 범위를 색에 대응시킬지» 를 반드시 골라야 하고, "
+                         "범위 밖은 끝 색으로 포화된다 — 그것이 «잘려 보이는» 것의 정체다. "
+                         "기본값은 이상치 몇 픽셀이 구간을 늘려 **물체가 통째로 단색이 되는 것**을 막는다"
+                         "(실측: 센서 전 범위로 잡으면 물체 중간50%%가 256단계 중 **2단계**, 현행은 103단계). "
+                         "★ 포화 없이 물체 끝까지 색을 내려면 **`--depth-pct 0 100`**"
+                         " — 대비는 줄어든다(103 → 81단계). ⚠️ **표시 전용이고 어떤 계산에도 안 들어간다.**")
     ap.add_argument("--order", default="default", choices=["default", "pipeline"],
                     help="패널 배치. `default`(기존) = 원본·마스크2·depth2·pose · "
                          "**`pipeline`** = **인과 순서**(원본 → depth → mask_full → mask_flange → stage2 입력 → pose). "
