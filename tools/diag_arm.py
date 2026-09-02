@@ -58,6 +58,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--frames", type=int, default=6)
     ap.add_argument("--pick", default=None, help="프레임 직접 지정 (쉼표)")
     ap.add_argument("--all", action="store_true", help="개별 장을 전 프레임에")
+    ap.add_argument("--mesh", default="top_flange.ply",
+                    help="6번 pose 패널에 투영할 메쉬. **기본 `top_flange.ply`**(= pose 좌표계의 부품). "
+                         "FOUP 전체 윤곽을 보고 싶으면 `full.ply`")
+    ap.add_argument("--panel5", default="stage2", choices=["valid", "stage2"],
+                    help="5번 패널. **기본 `stage2`** = stage2 가 실제로 먹는 «flange 로 가린 depth». "
+                         "`valid` 는 범위 검사라 거의 항상 100%% 여서 정보가 없다")
+    ap.add_argument("--order", default="pipeline", choices=["default", "pipeline"],
+                    help="패널 배치. **기본 `pipeline`** = 인과 순서(원본 → depth → mask_full → "
+                         "mask_flange → stage2 입력 → pose). `mask_flange` 는 분할이 아니라 "
+                         "**stage1 pose 의 CAD 투영**이라 `mask_full` 옆에 두면 오해된다")
     ap.add_argument("--make-hybrid", action="store_true",
                     help="하이브리드 디렉토리가 없으면 기반 FP 에서 즉석 생성(추론 0)")
     ap.add_argument("--list", action="store_true", help="무엇이 있는지만 출력하고 끝낸다")
@@ -144,6 +154,9 @@ def main(argv: list[str] | None = None) -> int:
             break
     if fl_dir is None and (sdir / "frame_0000" / "mask_flange.png").exists():
         fl_dir = sdir
+    print(f"  ℹ️ 패널 배치       {a.order}" + ("  (인과 순서 — depth 가 mask 보다 앞)" if a.order=="pipeline" else "  (기존 배치)"))
+    print(f"  ℹ️ stage2 패널       {a.panel5}" + ("  (stage2 가 실제로 먹는 flange-가린 depth)" if a.panel5=="stage2" else "  (범위 검사 — 거의 항상 100%)"))
+    print(f"  ℹ️ pose 패널 메쉬  {a.mesh}  (기본은 top_flange.ply — FOUP 전체는 `--mesh full.ply`)")
     print(f"  {'✅' if fl_dir else '⚠️'} flange 마스크   "
           f"{fl_dir or '없음 → 3번 패널이 빈다 (RH1 은 정상: 분할로 flange 를 안 만든다)'}"
           + (f"  ({fl_name})" if fl_dir else ""))
@@ -152,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
     cmd = [PY_POSE, "-m", "spatial_vision.viz.diag_sheet",
            "--in", str(cap), "--out", str(out),
            "--seg-full", str(sdir), "--depth-dir", str(st),
-           "--pose-dir", str(pdir), "--pose-name", pname, "--obj", str(obj)]
+           "--pose-dir", str(pdir), "--pose-name", pname, "--obj", str(obj), "--mesh", a.mesh, "--panel5", a.panel5, "--order", a.order]
     if fl_dir:
         cmd += ["--seg-flange", str(fl_dir), "--flange-name", fl_name]
     if a.pick:

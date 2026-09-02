@@ -18,7 +18,9 @@
     3. `mask_flange`          — top flange. 면적비·등가지름 (목표 419px, §34-9)
     4. depth 컬러맵            — **물체 마스크 안에서** 구간을 잡는다. 무효(0)는 검정.
                                  ★ `flange plane rms` = 평면 적합 잔차 → **이 depth 로 pose 가 되는가**
-    5. `valid`                — 흰=유효 / 마젠타=무효. 전체·flange·**링**
+    5. `valid` 또는 **`stage2` 입력** — `--panel5` 로 고른다.
+       🔴 `valid` 는 **범위 검사일 뿐이라 거의 항상 100%** 다. `stage2` 는 **refiner 가 실제로 보는**
+       «flange 로 가린 depth» 를 그린다(flange 안 무효는 마젠타로 남겨 «뚫림» 을 계속 볼 수 있다)
     6. pose 오버레이           — 초록 윤곽 + 축 삼각대 (`--pose-dir` 를 준 경우)
 
 산출
@@ -215,15 +217,26 @@ def frame_metrics(f: Path, a, mesh, K, hw) -> tuple[dict, dict]:
 def render_frame(f: Path, a, met: dict, raw: dict, w: int, h: int) -> np.ndarray:
     img, fl, v = raw["img"], raw["fl"], raw["valid"]
     i = met["image"]
-    panels = [_panel(img, w, h, f"1 {f.name}",
-                     [(f"{i['w']}x{i['h']}  med {i['med']:.0f}  sat {i['sat_pct']:.1f}%  "
-                       f"dark {i['dark_pct']:.1f}%", (200, 200, 200))])]
+    # ★ 패널을 «역할» 로 담고 마지막에 순서대로 꺼낸다 — `--order` 로 배치를 바꾸기 위해서다.
+    #   🔴 `pipeline` 순서가 인과와 맞다: depth·mask_full 은 **서로 독립**이고 stage1 로 합쳐지며,
+    #      **`mask_flange` 는 분할 산출물이 아니라 stage1 pose 를 CAD 로 투영한 것**이다(§3.6).
+    #      기본(`default`)은 마스크 둘을 나란히 두는 옛 배치로, 러너 리포트 호환을 위해 남긴다.
+    SEQ = (["img", "full", "flange", "depth", "valid", "pose"] if a.order == "default"
+           else ["img", "depth", "full", "flange", "valid", "pose"])
+    NO = {r: k + 1 for k, r in enumerate(SEQ)}
+    P: dict = {}
+    P["img"] = _panel(img, w, h, f"{NO['img']} {f.name}",
+                      [(f"{i['w']}x{i['h']}  med {i['med']:.0f}  sat {i['sat_pct']:.1f}%  "
+                        f"dark {i['dark_pct']:.1f}%", (200, 200, 200))])
 
-    for key, mask, title, col in (("mask_full", raw["m_full"], "2 mask_full", (0, 220, 0)),
-                                  ("mask_flange", raw["m_fl"], "3 mask_flange", (0, 165, 255))):
+    _msuf = {"full": " (SAM3) -> stage1", "flange": " (stage1 pose -> CAD proj) -> stage2"} \
+        if a.order == "pipeline" else {"full": "", "flange": ""}
+    for key, role, mask, col in (("mask_full", "full", raw["m_full"], (0, 220, 0)),
+                                 ("mask_flange", "flange", raw["m_fl"], (0, 165, 255))):
+        title = f"{NO[role]} {key}{_msuf[role]}"
         s = met.get(key)
         if s is None:
-            panels.append(_blank(w, h, title, "분할 산출물 없음"))
+            P[role] = _blank(w, h, title, "분할 산출물 없음")
             continue
         m = mask > 127
         over = img.copy()
@@ -233,14 +246,14 @@ def render_frame(f: Path, a, met: dict, raw: dict, w: int, h: int) -> np.ndarray
         extra = ""
         if key == "mask_flange" and s["dia_px"]:
             extra = f"  ({s['dia_px']/TARGET_FLANGE_PX:.2f}x target)"
-        panels.append(_panel(over, w, h, title,
-                             [(f"area {s['area_pct']:5.2f}%  dia {s['dia_px']:.0f}px  "
-                               f"n={s['n_blobs']}{extra}",
-                               (200, 200, 200) if s["area_px"] else (0, 140, 255))]))
+        P[role] = _panel(over, w, h, title,
+                         [(f"area {s['area_pct']:5.2f}%  dia {s['dia_px']:.0f}px  "
+                           f"n={s['n_blobs']}{extra}",
+                           (200, 200, 200) if s["area_px"] else (0, 140, 255))])
 
     dep = met.get("depth")
     if raw["depth"] is None or not dep:
-        panels.append(_blank(w, h, "4 depth", "stereo 산출물 없음"))
+        P["depth"] = _blank(w, h, f"{NO['depth']} depth", "stereo 산출물 없음")
     else:
         d = raw["depth"].astype(np.float32)
         lo, hi = dep["scale_lo"], dep["scale_hi"]
@@ -250,30 +263,62 @@ def render_frame(f: Path, a, met: dict, raw: dict, w: int, h: int) -> np.ndarray
         if fl is not None and fl.any():        # 물체 위치를 알아야 색을 해석할 수 있다
             cs, _ = cv2.findContours(fl.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cv2.drawContours(cm, cs, -1, (255, 255, 255), 2)
-        lines = [(f"scale[{dep['scale_src']}] {lo:.0f}~{hi:.0f}  all med {dep['med_all']:.0f}",
+        # 🔴 이 패널은 **전 화면 raw depth** 다 — 데이터를 마스크로 자르지 않는다.
+        #    다만 **색 구간을 물체 마스크 안에서** 잡으므로 배경이 한쪽 끝으로 포화돼 «잘린» 것처럼 보인다
+        #    (배경 기준으로 잡으면 물체가 통째로 단색이 된다 — 그래서 이렇게 한다).
+        lines = [(f"FULL frame · colour range from {dep['scale_src']} mask "
+                  f"{lo:.0f}~{hi:.0f}mm (outside saturates)  all med {dep['med_all']:.0f}",
                   (200, 200, 200))]
         if "med_flange" in dep:
             s = f"flange med {dep['med_flange']:.0f}"
             if dep.get("plane"):
                 s += f"  plane rms {dep['plane']['rms_mm']:.2f}mm  p90 {dep['plane']['p90_mm']:.2f}"
             lines.append((s, (0, 255, 255)))
-        panels.append(_panel(cm, w, h, "4 depth (mm)", lines))
+        P["depth"] = _panel(cm, w, h, f"{NO['depth']} depth (mm) — raw, full frame"
+                            + (" (stereo)" if a.order == "pipeline" else ""), lines)
 
+    mv = met.get("valid", {})
+    vstat = "  ".join(f"{k} {100*mv[k]:.1f}%" for k in ("all", "flange", "ring")
+                      if mv.get(k) is not None)
     if v is None:
-        panels.append(_blank(w, h, "5 valid", "stereo 산출물 없음"))
-    else:
+        P["valid"] = _blank(w, h, f"{NO['valid']} valid", "stereo 산출물 없음")
+    elif a.panel5 == "valid":
         vi = np.zeros((*v.shape, 3), np.uint8)
         vi[v] = (235, 235, 235)
         vi[~v] = (200, 0, 200)                 # 마젠타 = 무효. 사진 어디에도 없는 색이라 눈에 띈다
-        mv = met.get("valid", {})
-        s = "  ".join(f"{k} {100*mv[k]:.1f}%" for k in ("all", "flange", "ring")
-                      if mv.get(k) is not None)
-        panels.append(_panel(vi, w, h, "5 valid (magenta=invalid)", [(s, (200, 200, 200))]))
+        P["valid"] = _panel(vi, w, h, f"{NO['valid']} valid (magenta=invalid)", [(vstat, (200, 200, 200))])
+    elif fl is None or not fl.any() or raw["depth"] is None or not met.get("depth"):
+        P["valid"] = _blank(w, h, f"{NO['valid']} stage2 input", "flange 마스크 또는 depth 없음")
+    else:
+        # ★★ stage2 가 «실제로 먹는» 것 — `pose_fp.py:411` 의 `np.where(mf>127, depth, 0)` 그대로.
+        #    🔴 `valid` 패널을 대체하되 **정보를 버리지 않는다**: flange 안의 무효 픽셀은 마젠타로 남긴다
+        #    (반투명 몸체에서 stereo 가 뚫리는지 = 열린 항목 #1 을 보는 유일한 단서라서).
+        dep = met["depth"]
+        d = raw["depth"].astype(np.float32)
+        din = fl & v                                       # flange ∧ 유효 = 네트워크에 들어가는 픽셀
+        if din.any():                                      # 색 구간은 **flange 안에서만** 잡는다
+            lo, hi = float(np.percentile(d[din], 2)), float(np.percentile(d[din], 98))
+        else:
+            lo, hi = dep["scale_lo"], dep["scale_hi"]
+        n = np.clip((d - lo) / max(hi - lo, 1e-6), 0, 1)
+        cm = cv2.applyColorMap((255 * (1 - n)).astype(np.uint8), cv2.COLORMAP_TURBO)
+        out = np.full((*fl.shape, 3), 24, np.uint8)        # flange 밖 = stage2 가 0 으로 지운 곳
+        out[din] = cm[din]
+        out[fl & ~v] = (200, 0, 200)                       # flange 안인데 무효 = 마젠타
+        cs, _ = cv2.findContours(fl.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(out, cs, -1, (255, 255, 255), 2)
+        lines = [(f"MASKED by flange · colour range from flange {lo:.0f}~{hi:.0f}mm  "
+                  f"n={int(din.sum()):,}px  (outside = zeroed by stage2)", (200, 200, 200))]
+        s2 = f"valid[flange] {100*mv.get('flange', float('nan')):.1f}%"
+        if dep.get("plane"):
+            s2 += f"   plane rms {dep['plane']['rms_mm']:.2f}mm  p90 {dep['plane']['p90_mm']:.2f}"
+        lines.append((s2, (0, 255, 255)))
+        P["valid"] = _panel(out, w, h, f"{NO['valid']} stage2 input depth (magenta=invalid)", lines)
 
     if a.pose_dir:
         T = load_pose(Path(a.pose_dir) / f.name / a.pose_name)
         if T is None or raw["mesh"] is None:
-            panels.append(_blank(w, h, "6 pose", "pose 없음"))
+            P["pose"] = _blank(w, h, f"{NO['pose']} pose", "pose 없음")
         else:
             ov = img.copy()
             cs, _ = cv2.findContours(silhouette(raw["mesh"], T, raw["K"], img.shape[:2]),
@@ -286,9 +331,9 @@ def render_frame(f: Path, a, met: dict, raw: dict, w: int, h: int) -> np.ndarray
                 s += f"  moved {p['moved_deg']:.2f}deg"
             if p["gated"]:
                 s += "  [GATED]"
-            panels.append(_panel(ov, w, h, f"6 pose · {Path(a.pose_dir).name}", [(s, (200, 200, 200))]))
+            P["pose"] = _panel(ov, w, h, f"{NO['pose']} pose · {Path(a.pose_dir).name}", [(s, (200, 200, 200))])
 
-    return np.concatenate(panels, 1)
+    return np.concatenate([P[r] for r in SEQ if r in P], 1)
 
 
 # ─────────────────────────────────────────────────────────── 추이
@@ -389,6 +434,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--pose-name", default="pose_refined.json")
     ap.add_argument("--obj", default=None, help="--pose-dir 를 쓸 때 필요")
     ap.add_argument("--mesh", default="top_flange.ply")
+    ap.add_argument("--order", default="default", choices=["default", "pipeline"],
+                    help="패널 배치. `default`(기존) = 원본·마스크2·depth2·pose · "
+                         "**`pipeline`** = **인과 순서**(원본 → depth → mask_full → mask_flange → stage2 입력 → pose). "
+                         "🔴 `mask_flange` 는 분할 산출물이 아니라 **stage1 pose 의 CAD 투영**이라 "
+                         "`mask_full` 옆에 두면 «둘 다 분할» 로 오해된다 — 보고서용은 `pipeline` 을 권한다")
+    ap.add_argument("--panel5", default="valid", choices=["valid", "stage2"],
+                    help="5번 패널. `valid`(기본) = 범위 검사 마스크 · "
+                         "**`stage2`** = **stage2 가 실제로 먹는 «flange 로 가린 depth»**"
+                         "(`pose_fp.py:411` 과 같은 연산). 🔴 `valid` 는 범위 검사라 거의 항상 100% 여서 "
+                         "정보가 없다 — 보고서용은 `stage2` 를 권한다(flange 안 무효는 마젠타로 남긴다)")
     ap.add_argument("--gate-deg", type=float, default=1.5, help="추이 그래프의 기준선")
     ap.add_argument("--frames", type=int, default=6, help="시트에 넣을 프레임 수")
     ap.add_argument("--pick", default=None, help="프레임 직접 지정 (쉼표 구분)")
