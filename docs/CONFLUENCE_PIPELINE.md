@@ -48,7 +48,7 @@
 |---|---|---|
 | §3 | 프롬프트 `f002` (텍스트 접지) | 🟢 **SAM3 논문 §1·§2·§3** + 3표본 실험 |
 | §4 | crop = 물체 지름 → 유효 해상도 | 🟢 **FP 논문 §3.3 + supplementary p14**(160×160) + `Utils.py:605`. 🔴 `crop_ratio` 값 1.2/1.1 은 설정 파일에만 |
-| §5(가) | 갱신 보폭 비대칭 | 🟡 **절반** — 회전 상수 20°는 **논문 p14**, 평행이동의 지름 정규화는 **코드만** |
+| §5(가) | 갱신 보폭 비대칭 | 🟢 **코드 + config 원문** — 회전 20.000000° · 평행이동 `mesh_diameter/2`. 🟡 **논문과의 관계**: 두 상수가 논문 p14 의 학습 교란과 **정확히 일치**하는데, 평행이동 쪽은 **배포 설정이 그 경로를 껐다**(`normalize_xyz: true`) |
 | §5(나) | R·t 접합 **가능성** (하이브리드) | 🟢 **FP 논문 §5.3** + `Utils.py:850`. 🔴 **«이득» 은 별개다** — 8거리에서 `refined` 단독이 근소하게 낫다(§8.1) |
 | §6 | 인스턴스 선택 규칙 | 🟢 **두 논문이 각자 «내 밖» 이라 명시**(SAM3 §2 «모든 인스턴스» 정의 · FP §5.4 Limitations «external 2D detection 이 병목») + 🔴 규칙 자체는 우리 것 |
 | §7.1 | 마스크는 «평행이동만» 초기화한다 | 🟢 **FP 논문 §3.3 원문** + `estimater.py:137·131` + 🔴 우리 반사실 측정 |
@@ -58,9 +58,32 @@
 | 부록 B | `--input-scale` | 🟡 `erode/bilateral radius=2` 는 코드만 + 🔴 우리 측정 |
 | 부록 D | stage2 입력 depth 처리 | 🟡 depth denoising **존재는 논문 p13**, `radius=2` 픽셀 단위는 코드만 + 🔴 우리 측정 |
 
-🔴 **«우리 것» 이라고 써야 하는 항목은 둘뿐이다** — 평행이동의 지름 정규화(§5(가))와 인스턴스 선택 규칙(§6).
+🔴 **«우리 것» 이라고 써야 하는 항목은 하나뿐이다** — **인스턴스 선택 규칙**(§6).
+(평행이동의 지름 정규화는 **upstream 배포 설정**이지 우리 선택이 아니다 — §5(가)④에서 정정됐다.)
 앞의 것은 *«공개 구현의 학습 설정»* 이라고만 쓸 수 있고, 뒤의 것은 **두 논문이 각자 «내 과제 밖» 이라고
 명시한 자리**다 — 즉 «근거 없는 자유 파라미터» 가 아니라 **시스템이 메워야 하는 정의된 빈칸**이다.
+
+### 0.2 📂 인용한 upstream 파일 위치
+
+본문·부록이 줄 번호로 인용하는 파일은 **전부 `third_party/` 안**이다(우리 코드가 아니다).
+경로를 안 적으면 찾기 어려워서 한곳에 모은다 — 기준 경로는 **`src/vision/`** 이다.
+
+| 문서에 쓰는 이름 | 실제 경로 |
+|---|---|
+| `estimater.py` | `third_party/FoundationPose/estimater.py` |
+| `Utils.py` | `third_party/FoundationPose/Utils.py` |
+| `run_demo.py` | `third_party/FoundationPose/run_demo.py` |
+| `datareader.py` | `third_party/FoundationPose/datareader.py` |
+| **`predict_pose_refine.py`** | **`third_party/FoundationPose/learning/training/predict_pose_refine.py`** |
+| `predict_score.py` | `third_party/FoundationPose/learning/training/predict_score.py` |
+| `core/foundation_stereo.py` | `third_party/FoundationStereo/core/foundation_stereo.py` |
+| `sam3_image_processor.py` | `third_party/sam3/sam3/model/sam3_image_processor.py` |
+| `README:51` (SAM3) | `third_party/sam3/README.md` |
+| 배포 가중치 설정 | `third_party/FoundationPose/weights/2023-10-28-18-33-37/config.yml`(refiner) · `…/2024-01-11-20-02-45/config.yml`(scorer) |
+
+★ **우리 코드**는 `spatial_vision/` 밑이다 — `stages/pose_fp.py` · `stages/segment_sam3.py` ·
+`stages/stereo_onnx.py` · `eval/hybrid_pose.py` · `contracts.py` (→ `IMPLEMENTATION_MAP.md`).
+🔴 **`third_party` 는 읽기 전용이다** — 파일 수정 0줄이 이 프로젝트의 불변식이다(§7.2).
 
 ---
 
@@ -231,11 +254,22 @@ FoundationStereo → SAM3 → FoundationPose
 > **문제**: FoundationPose 의 유효 해상도는 **거리에도 `fx` 에도 무관**하고 **메쉬 크기가 정한다.**
 > 그래서 `full` 메쉬로만 돌리면 t 오차에 천장이 생기고, **카메라를 가까이 가져가도 안 낮아진다.**
 
-**근거** — 🟢 **논문 §3.3 + 코드**
+**(가) 먼저 «무엇이 정밀도를 정하나»** — refiner 신경망은 입력이 **160×160 고정**이다(🟢 논문 p14).
+1920×1200 사진에서 **어디를 얼마나 확대해 그 160px 에 넣을지**를 정하는 것이 `crop` 이고,
+**160px 이 실제 몇 mm 를 담느냐가 곧 «네트워크가 볼 수 있는 최소 단위»** 다.
 
-> 논문 §3.3: *"We then project the object origin to the image space to determine the crop center.
+**(나) 🟢 논문은 «2D 검출 박스로 자르지 않는다» 고 명시한다** — §3.3 *Pose Refinement*:
+
+> *"For the input observation, **instead of cropping based on the 2D detection which is constant,
+> we perform a pose-conditioned cropping strategy so as to provide feedback to the translation
+> update.** Concretely, we project the object origin to the image space to determine the crop center.
 > We then project the **slightly enlarged object diameter (the maximum distance between any pair of
 > points on the object surface)** to determine the crop size…"*
+
+★ 이 문단에 셋이 다 있다 — **① 무엇으로 자르나**(2D 박스가 아니라 **물체 지름**) ·
+**② 중심은 어디**(물체 원점의 투영) · **③ 왜**(평행이동 갱신에 **피드백**을 주려고).
+🔴 **③이 핵심이다**: crop 이 pose 에 딸려 움직이므로 t 가 틀리면 crop 이 어긋나 보이고,
+네트워크가 그걸 보고 t 를 민다. 2D 박스로 고정하면 물체가 늘 crop 한가운데라 **그 신호가 안 생긴다.**
 
 코드가 그 문장 그대로다 — `Utils.py:605`:
 ```python
@@ -248,10 +282,22 @@ radius = mesh_diameter * crop_ratio / 2      # crop 을 3D 에서 정의한다
 네트워크 1px = mesh_diameter × crop_ratio / 160  [mm]     ← 거리에도 fx 에도 무관
 ```
 
-| 메쉬 | `mesh_diameter` | refiner 1px |
-|---|--:|--:|
-| `full.ply` | 579.0 mm | **4.34 mm** |
-| `top_flange.ply` | 183.5 mm | **1.38 mm** |
+| 메쉬 | `mesh_diameter` | crop 물리 폭 (`× 1.2`) | ÷160 | refiner 1px |
+|---|--:|--:|--:|--:|
+| `full.ply` | 579.0 mm | 694.8 mm | ÷160 | **4.34 mm** |
+| `top_flange.ply` | 183.5 mm | 220.2 mm | ÷160 | **1.38 mm** |
+
+**(다) 거리가 바뀌면 «자르는 픽셀 수» 는 변하는데 «1px 의 mm» 는 안 변한다** (`--input-scale 0.75`, 근사):
+
+| 메쉬 | 거리 | 원본에서 자르는 폭 | 160px 로 | 네트워크 1px |
+|---|--:|--:|--:|--:|
+| `full.ply` | 291mm | **1303 px** | 8.1배 축소 | **4.34 mm** |
+| `full.ply` | 613mm | 618 px | 3.9배 축소 | **4.34 mm** |
+| `full.ply` | 850mm | 446 px | 2.8배 축소 | **4.34 mm** |
+| `top_flange.ply` | 613mm | **196 px** | **1.2배**(거의 등배) | **1.38 mm** |
+
+★★ **같은 사진인데 `full` 은 618px 을 160px 로 3.9배 뭉개고, `flange` 는 196px 을 거의 그대로 본다.**
+이것이 «메쉬를 갈아타면 세밀해진다» 의 실체다. (단계별 풀이 → `CONFLUENCE_QNA.md §17`)
 
 **설계**: stage1 은 `full.ply` 로 전체를 잡고, **stage2 에서 메쉬를 `top_flange.ply` 로 갈아탄다.**
 → ★ **유효 해상도가 3.16배 좋아진다.** 거리를 당겨서가 아니라 **메쉬가 작아서**다.
@@ -262,6 +308,12 @@ radius = mesh_diameter * crop_ratio / 2      # crop 을 3D 에서 정의한다
 — 0.29m ↔ 0.85m 로 **2.9배** 멀어져도 t 변화폭이 **0.91mm** 뿐이다. 그래서 «천장» 보다 **«바닥»** 이
 정확한 말이고, 내리는 방법은 **눈금을 바꾸는 것**(= 메쉬 교체)뿐이다 → 0.291m 에서 **0.714mm**.
 풀이는 `CONFLUENCE_QNA.md §16`.
+
+**(라) ⚠️ «crop 용 pose 추정» 이 따로 있는 것이 아니다** — crop 은 **현재 pose 로 매 반복 다시**
+계산된다(`predict_pose_refine.py:182-183` 이 반복 안에서 `make_crop_data_batch` 를 부른다).
+🟢 논문도 *"feeding the latest updated pose as input to the next inference"* 라 적는다.
+**신경망 없이 만든 초기값 하나**(마스크 t + 회전 격자)에서 출발해 **crop 과 pose 가 같이 좋아진다.**
+→ 풀이 `CONFLUENCE_QNA.md §18`.
 
 ★ 코드에서 이 구성을 만드는 스위치가 **`--primary full`** 이다(`pose_fp.py:290`) — stage1 의 메쉬·마스크를
 고르고, **stage2 는 `--primary` 와 무관하게 항상 `top_flange.ply`** 다(`pose_fp.py:299`).
@@ -287,28 +339,66 @@ stage2 의 flange 마스크는 **`top_flange.ply` 를 stage1 pose 로 투영**�
 > **문제**: §4 의 메쉬 교체는 공짜가 아니다. `top_flange` 는 근사 4회 대칭이고
 > **방향 정보가 표면의 3.5%·전부 경계**에 있다. 즉 **stage2 는 «회전 증거» 를 «평행이동 해상도» 와 맞바꾼다.**
 
-**(가) 왜 비대칭인가 — 🟡 코드 (일부는 논문)**
+**(가) 왜 비대칭인가 — 🟢 코드 + 설정 파일 (그리고 논문과 정확히 맞물린다)**
 
-`predict_pose_refine.py` (배포 가중치 `trans_rep: tracknet` · `normalize_xyz: true` · `rot_rep: axis_angle`):
+> 📂 **파일 위치**: `third_party/FoundationPose/learning/training/predict_pose_refine.py`
+> (upstream 저장소 안이라 우리 `spatial_vision/` 밑에는 없다 → 전체 목록은 §0.2)
 
-```python
-199:  trans_delta   = output["trans"]                                   # 무차원
-221:  rot_mat_delta = torch.tanh(output["rot"]) * rot_normalizer        # ← 상수 20°
-229:  trans_delta  *= (mesh_diameter / 2)                               # ← 메쉬 크기에 비례
+**① 먼저 «어느 가중치인가»** — FoundationPose 는 **가중치를 둘** 쓰고, 코드에 이름이 박혀 있다:
+
+| 네트워크 | `run_name` | 파일 | `crop_ratio` | `rot_normalizer` |
+|---|---|---|---|:-:|
+| **refiner** (pose 를 고친다) | **`2023-10-28-18-33-37`** | `predict_pose_refine.py:97` | **1.2** | ✅ **있다** |
+| scorer (후보를 채점한다) | `2024-01-11-20-02-45` | `predict_score.py:120` | 1.1 | ❌ **없다** |
+
+🔴 **`rot_normalizer` 가 2024 설정에 없는 것이 맞다** — 그건 **scorer** 이고 pose 델타를 안 내므로
+정규화 상수가 필요 없다. **이 절은 전부 refiner(2023) 이야기**다.
+⚠️ 그리고 **stage2 는 scorer 를 아예 안 부른다**(§7.3) — stage2 에서는 2023 가중치만 관여한다.
+
+**② 배포 설정값** (`weights/2023-10-28-18-33-37/config.yml` 원문):
+
+```yaml
+rot_rep: axis_angle          trans_rep: tracknet         normalize_xyz: true
+crop_ratio: 1.2              input_resize: [160, 160]
+rot_normalizer:   0.3490658503988659          # = 20.000000°
+trans_normalizer: [0.02, 0.02, 0.05]          # 🔴 존재하지만 **안 쓰인다** (아래 ③)
 ```
 
-| | 곱해지는 것 | 메쉬 크기 의존 |
-|---|---|---|
-| 평행이동 | **`mesh_diameter/2`** (579→183.5mm 이면 3.16배 세밀) | ✅ |
-| 회전 | `rot_normalizer` = **20° 상수** | ❌ |
+**③ 코드가 그 설정으로 어느 분기를 타는가** (`predict_pose_refine.py:195-229`):
 
-🟢 **`rot_normalizer = 20°` 는 논문에 근거가 있다** — supplementary p14:
+```python
+if cfg['trans_rep']=='tracknet':          # ✅ tracknet 이다
+    if not cfg['normalize_xyz']:          # ❌ normalize_xyz 가 true → 이 줄은 건너뛴다
+        trans_delta = tanh(out["trans"]) * trans_normalizer     # 🔴 «꺼진» 경로
+    else:
+        trans_delta = out["trans"]        # ✅ 여기 — tanh 도 상수배도 없다
+if cfg['rot_rep']=='axis_angle':          # ✅
+    rot_mat_delta = tanh(out["rot"]) * cfg['rot_normalizer']    # ✅ ×20° 상수
+if cfg['normalize_xyz']:                  # ✅
+    trans_delta *= (mesh_diameter / 2)    # ✅ 여기 — 메쉬 크기에 비례
+```
+
+| | 실제로 곱해지는 것 | 값 | 메쉬 크기 의존 |
+|---|---|---|:-:|
+| **평행이동** | **`mesh_diameter / 2`** | `full` **289.5mm** · `flange` **91.75mm** | ✅ |
+| **회전** | `rot_normalizer` **상수** | **20.000000°** | ❌ |
+
+★ **이것이 §5 의 전부다** — 메쉬를 3.16배 작게 바꾸면 **평행이동 보폭만 3.16배 세밀해지고 회전 보폭은 그대로**다.
+
+**④ 🟢 논문과의 대조 — 두 상수가 «학습 교란 크기» 와 정확히 같다** (supplementary p14):
+
 > *"the pose is randomly perturbed by adding **translation noise under the magnitude of 0.02m, 0.02m,
 > 0.05m** for XYZ axis respectively and **rotation under the magnitude of 20°**"*
 
-★ **네트워크의 회전 출력 범위(±20°)가 학습 교란 크기와 정확히 일치한다** — `tanh(out) × 0.3490658 rad = ±20.0°`.
-🔴 **반면 평행이동 쪽은 논문이 «절대 미터»(0.02/0.02/0.05 m)로 적고 `mesh_diameter` 정규화를 언급하지 않는다.**
-출시된 설정은 `normalize_xyz: true` 로 **지름에 비례**시킨다 → **그 정규화는 여전히 코드 근거뿐**이다.
+| 논문의 학습 교란 | config 값 | 일치 | 실제 사용? |
+|---|---|:-:|:-:|
+| 회전 **20°** | `rot_normalizer` = 0.3490658503988659 rad = **20.000000°** | ✅ | ✅ **쓴다** |
+| 평행이동 **0.02 / 0.02 / 0.05 m** | `trans_normalizer` = **[0.02, 0.02, 0.05]** | ✅ | 🔴 **안 쓴다** |
+
+★★ **정정 (2026-09-03)** — 이전 판은 *"평행이동의 지름 정규화는 논문 근거가 없다"* 라고만 썼는데
+**더 정확히 말할 수 있다**: **논문이 말한 0.02/0.02/0.05 m 는 config 에 `trans_normalizer` 로 그대로 있고,
+배포 설정이 `normalize_xyz: true` 로 그 경로를 «껐다».** 즉 «논문에 없는 값» 이 아니라
+**«논문의 값을 쓰지 않기로 한 선택»** 이다. 그 선택 자체는 여전히 논문에 설명이 없다.
 
 **(나) 그래서 R 과 t 를 갈라 써도 되나 — 🟢 논문 §5.3 + 코드**
 
@@ -720,7 +810,37 @@ ADD   RH1    vs refined : 중앙 1.796  vs 1.677     refined 승 318/552 (58%)  
 
 > **pose 가 더 정확해서가 아니라 «분할 오선택이 절반 이하로 떨어져서»** 다
 > (18·16 → **6~7**/80). 그 대가인 t 2mm 대는 **예산의 41%** 라 여유가 남는다.
-> 🔴 **씬에 다른 FOUP 이 없으면 이 근거가 사라지고 «가까울수록 좋다» 로 뒤집힌다**(§6(다)).
+
+### 8.2b 🔴🔴 **그 권고는 «다중 FOUP 씬» 에서만 성립한다 — 단일 FOUP 사다리로 확인**
+
+같은 8거리를 **방해물 FOUP 만 2 → 0** 으로 바꿔 다시 찍었다(나머지 씬·seed·거리대·팔 전부 동일):
+
+| 거리(m) | **다중**(FOUP 2) 오선택 / KPI | **단일**(FOUP 0) 오선택 / KPI | ADD 다중 → 단일 |
+|---|---|---|---|
+| 0.29 / 0.30 | 18/80 · 80.0% | **7**/80 · **93.8%** | 1.135 → 1.124 |
+| 0.39 / 0.40 | 11/80 · 88.8% | **5**/80 · **98.8%** | 1.122 → 1.145 |
+| 0.44 / 0.45 | 16/80 · 82.5% | **4**/80 · **98.8%** | 1.358 → 1.244 |
+| 0.49 / 0.50 | 11/80 · 87.5% | **2**/80 · **100.0%** | 1.618 → 1.500 |
+| 0.55 | 12/80 · 86.2% | **5**/80 · **96.2%** | 1.811 → 1.883 |
+| 0.60 | 7/80 · 91.2% | **3**/80 · **98.8%** | 1.946 → 1.936 |
+| 0.70 | 6/80 · 92.5% | **4**/80 · **96.2%** | 2.229 → 2.265 |
+| 0.85 | 6/80 · 91.2% | **1**/80 · **98.8%** | 2.330 → 2.330 |
+| **합** | **87/640 · 87.5%** | **32/640 · 97.7%** | — |
+
+**①** ✅ **오선택 87 → 32(−63%) · KPI 87.5 → 97.7%** — §6(다)의 «오선택이 지배한다» 가 통제 실험으로 확정됐다.
+**②** ✅ **pose 는 씬에 완전히 무감각** — ADD 가 전 거리에서 사실상 같고(2.330 → 2.330),
+**오선택 뺀 KPI 가 609/609 = 100%**(다중은 551/553). **바뀐 것은 분할 한 단계뿐이다.**
+**③** 🔴🔴 **«거리 최적점» 이 사라졌다** — 다중은 80.0~92.5%(폭 12.5%p, 최고 **0.70m**)인데
+단일은 93.8~100%(폭 **6.2%p**, 최고 **0.50m**). → ★ **배포 거리를 정하기 전에 «현장에 FOUP 이 몇 대
+보이는가» 를 먼저 물어야 한다.**
+**④** 🔴 **오선택이 0 이 아니다** — 32건 중 **30건이 «전혀 다른 물체»**(IoU 0.000 · precision 0.000)다.
+FOUP 이 하나뿐인데도 **비FOUP 방해물(4) · 가림막(3)** 이 프롬프트에 걸린다.
+**⑤** 0.30m 만 뚜렷이 낮은데(93.8%) 그 **7건이 전부 «잘린» 프레임**이다(잘린 60중 7 ↔ 안잘린 20중 **0**).
+
+⚠️ **통제의 한계** — 방해물을 빼며 난수 스트림이 밀려 **프레임 짝지음이 깨졌다**(자세 차이 중앙 80.8°).
+**분포는 같으므로**(시선 경사 중앙 26.5~29.7 ↔ 25.3~29.7) **거리별 집계 비교는 유효하고 짝지은 검정은 불가**다.
+🔴 그리고 **«단일이면 가까울수록 좋다» 는 절반만 맞았다** — ADD 는 단조 개선인데 **KPI 는 평평**하다
+(ADD 가 예산의 절반 아래라 차이가 KPI 로 안 넘어온다). → `RESULTS.md` 교훈 #114.
 
 ⚠️ **28cm 를 배제한 근거는 이 표가 아니다** — sim 사다리는 0.291m 에서도 **오선택 뺀 KPI 62/62** 다.
 배제 근거는 **실물** 측정(§9.3, 대실패 19.4% · n=160)이고, **sim 이 그 실패를 재현하지 못했다.**
@@ -825,7 +945,9 @@ stereo(0.5) → SAM3 텍스트 full → pose_fp --primary full --input-scale 0.7
    실물 FOUP 은 제조사마다 다르고 그 차이가 cm 급이다.
 4. **KPI 를 지배하는 것은 팔 선택이 아니다** — 방해물 장면에서 **분할 오선택**이 지배한다(§6).
 5. **합격 기준(5mm·3°)은 주어진 값**이고 유도하지 않았다(§1.2).
-6. **평행이동의 «지름 정규화» 만 논문 근거가 없다** — 코드·설정 근거뿐이다(§5(가)).
+6. **평행이동의 «지름 정규화» 를 «왜» 골랐는지는 논문에 없다** — 논문의 값(0.02/0.02/0.05 m)은
+   config 에 `trans_normalizer` 로 있지만 `normalize_xyz: true` 가 그 경로를 끈다(§5(가)④). 값이
+   없는 게 아니라 **쓰지 않기로 한 선택의 이유**가 없는 것이다.
 7. 🔴🔴 **하이브리드의 «이득» 이 조건부다** — 8거리 552프레임에서 `refined` 단독이 오히려 낫고
    (ADD −0.119mm · p=4.0e-04), 방향이 **거리·씬에 따라 뒤집힌다**(§8.1). 크기가 KPI 의 2.4% 라
    배포는 안 바꾸지만, **«하이브리드가 최선» 을 주장하면 안 된다.** 언제 뒤집히는지는 **미규명**.
