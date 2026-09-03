@@ -22,19 +22,38 @@ camera frame"* 이라고만 쓰고 **지름 정규화를 언급하지 않는다.
 `spatial_vision/stages/pose_fp.py`
 
 ```python
-286:    est1 = FoundationPose(model_pts=mesh_primary.vertices, ..., mesh=mesh_primary, ...)
-291:        est2 = FoundationPose(model_pts=mesh_flange.vertices,  ..., mesh=mesh_flange,  ...)
+294:    est1 = FoundationPose(model_pts=mesh_primary.vertices, ..., mesh=mesh_primary, ...)
+299:        est2 = FoundationPose(model_pts=mesh_flange.vertices,  ..., mesh=mesh_flange,  ...)
 ...
-374:            coarse  = est1.register(K=K, rgb=rgb, depth=depth_m, ob_mask=(mask_full > 127), ...)
-416:                refined = est2.track_one(rgb=rgb, depth=depth_crop, K=K, iteration=args.refine_iter)
+382:            coarse  = est1.register(K=K, rgb=rgb, depth=depth_m, ob_mask=(mask_full > 127), ...)
+425:                c = np.asarray(est2.model_center, ...); T = np.eye(4); T[:3, 3] = c
+427:                est2.pose_last = torch.as_tensor(coarse @ T, ...)     # ← 씨앗 직접 주입
+428:                refined = est2.track_one(rgb=rgb, depth=depth_crop, K=K, iteration=args.refine_iter)
 ```
 
 ★ **stage2 는 «한 번 더 refine» 이 아니라 «다른 메쉬로 만든 별도의 `FoundationPose` 인스턴스»** 다.
 `est1` 은 `full.ply`, `est2` 는 `top_flange.ply` 를 갖고 있고, 두 메쉬는 **원점이 같다**
 (`assets/obj/<id>/meta.json` 의 `origin` = flange 주 상면 중심) — 이것이 접합의 전제다.
 
-⚠️ 두 인스턴스는 **같은 `scorer`·`refiner` 네트워크 객체를 공유**한다(`pose_fp.py:284`). 즉 **가중치는
-동일**하고 **바뀌는 것은 오직 `mesh` 와 그로부터 나오는 `mesh_diameter`** 다. 이것이 아래 두 기전의 유일한 입력이다.
+⚠️ 두 인스턴스는 **같은 `scorer`·`refiner` 네트워크 객체를 공유**한다(`pose_fp.py:292`) — **가중치는 동일**하다.
+
+🔴🔴 **단 «바뀌는 것이 메쉬뿐» 은 아니다 — 부르는 함수부터 다르다** (2026-09-03 명확화).
+`register()` ↔ `track_one()` 은 **다른 계산**이고, 아래 §2 의 두 기전은 그중 **`refiner` 경로에만**
+해당한다:
+
+| | stage1 `est1.register()` (`estimater.py:159`) | stage2 `est2.track_one()` (`:250`) |
+|---|---|---|
+| **회전 가설** | **240개 전역 격자**(구면 40 × 면내 6 → 30° 군집) | 🔴 **없다 — 씨앗 1개** (`pose_last.reshape(1,4,4)`) |
+| **scorer** | ✅ 가설을 채점해 1등 선택 (`:219`) | 🔴 **호출 없음** — refiner 만 (`:263`) |
+| **마스크** | `ob_mask` **인자** | 🔴 **인자 없음** — depth 0 으로 간접 전달(§3) |
+| 초기값 | `guess_translation()` (`:137`) | 🔴 **`pose_last` 직접 대입** (`pose_fp.py:427`) |
+| 메쉬 | `full.ply` | `top_flange.ply` |
+
+★★★ **결과: stage2 는 회전을 «탐색» 하지 않고 «국소 정련» 만 한다.** 1회 회전 보폭이 ±20°로 묶여 있고
+(§2.2) 대안을 비교할 scorer 도 없으니 **stage1 이 잘못된 대칭 가지에 빠지면 stage2 는 원리적으로 못 빠져나온다.**
+→ **이것이 하이브리드(R=stage1)가 성립하는 진짜 이유**이고, `--primary flange` 계열의 90°/180° 뒤집힘이
+refine 으로 안 고쳐지는 이유이며(`RESULTS.md §32-1`), `RESULTS.md §20` 의 *"refine 은 평행이동 편향을
+고치지 실패한 회전을 못 고친다"* 와 같은 사실이다.
 
 ### 1.1 ★ 그 `.ply` 는 무엇인가 — **점군이 아니라 «면이 있는» 메시다**
 
@@ -58,7 +77,7 @@ end_header
 
 🔴 **면이 없으면 이 파이프라인은 성립하지 않는다** — 면이 쓰이는 곳이 셋이다:
 
-1. **정점 법선** — `pose_fp.py:286·291` 이 `model_normals=mesh.vertex_normals` 를 넘기는데,
+1. **정점 법선** — `pose_fp.py:294·299` 이 `model_normals=mesh.vertex_normals` 를 넘기는데,
    trimesh 는 그것을 **면에서 계산**한다. 점군이면 값 자체가 없다.
 2. **render-and-compare** — refiner/scorer 는 nvdiffrast 로 메시를 **래스터화**한다
    (`Utils.py:135 nvdiffrast_render`, `mesh_tensors['faces']` 필수).
@@ -287,7 +306,7 @@ stage2(작은 메쉬)는 **평행이동이 세밀하고 회전 증거가 적다*
 | 우리 릴리스가 타는 분기 | `predict_pose_refine.py:194-199` (`trans_rep: tracknet`) |
 | R·t 갱신이 분리된다 | `Utils.py:850-857` |
 | `mesh_diameter` 계산(무작위 10,000점 쌍거리 최댓값) | `estimater.py:54` → `Utils.py:569-575` |
-| stage2 가 메쉬를 갈아탄다 | `spatial_vision/stages/pose_fp.py:286` · `:291` (`est1.register` `:374` · `est2.track_one` `:416`) |
+| stage2 가 메쉬를 갈아탄다 | `spatial_vision/stages/pose_fp.py:294` · `:299` (`est1.register` `:382` · `est2.track_one` `:428`) |
 | 두 메쉬의 원점이 같다 | `assets/obj/<id>/meta.json` 의 `origin` · `spatial_vision.cad.verify_obj` |
 
 ```bibtex

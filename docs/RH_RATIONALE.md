@@ -98,7 +98,7 @@ def egocentric_delta_pose_to_pose(A_in_cam, trans_delta, rot_mat_delta):
 
 ### 2.2 «왜 두 단계가 서로 다른 자유도에서 좋은가» — **stage2 는 메쉬를 갈아탄다** (코드)
 
-`pose_fp.py:286-293` — `est1 = FoundationPose(mesh=mesh_primary)` · `est2 = FoundationPose(mesh=mesh_flange)`.
+`pose_fp.py:294-301` — `est1 = FoundationPose(mesh=mesh_primary)` · `est2 = FoundationPose(mesh=mesh_flange)`.
 즉 **stage2 = «한 번 더 refine» 이 아니라 «`full` → `top_flange` 로 메쉬를 바꿔 다시 추정»** 이다.
 메쉬 교체가 두 가지를 **비대칭으로** 바꾼다:
 
@@ -373,6 +373,7 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 
 | # | 구성요소 | 결정 | **기전 근거** | 측정 | 등급 |
 |---|---|:-:|---|:-:|:-:|
+| **0** | 🔴 **stage1 이 «메쉬 + 마스크» 를 함께 받는 것** | **—** | 🟢 **upstream 표준이다, 우리 것이 아니다** — `register(K, rgb, depth, **ob_mask**)` 가 공개 시그니처(`estimater.py:159`)이고 **P 논문 §3.3** 이 *"the object is **detected** using an off-the-shelf method such as Mask R-CNN or CNOS. We **initialize the translation** using the 3D point located at the median depth within the detected 2D bounding box"* 라고 전제한다. ★ 우리가 바꾼 것은 **«그 검출을 무엇으로 만드나»**(→ #2·#3)와 **«몇 번 부르나»**(upstream 은 `run_demo.py:51` 첫 프레임 1회, 우리는 매 프레임) 둘이다 | M **§44-24m** — 마스크를 «전체 화면» 으로 바꾸면 **t 는 회수되는데(1.877→1.918mm) R 최대가 1.45°→89.69°** | ★ **보고서에서 이 항목을 «우리 설계» 로 세지 않는다** |
 | 1 | stereo = NGC ONNX | O | **L** 라이선스 문서 — GitHub 배포는 research-only, NGC 는 *"ready for commercial use"* | M | A ⚠️ **정확도로 고른 게 아니다** |
 | 2 | 텍스트 분할 | O | **P** 🟢 **논문 §2**(p3) *"restrict concepts to … **simple noun phrases (NPs) consisting of a noun and optional modifiers**"* · **§1**(p2) *"not designed for long referring expressions"* · (보조) `README:49·351` · **T** `agent_core.py:238·273·423` 실패 시 *"simple noun phrase"* 로 재시도 | M §38-1 | **A** |
 | 3 | 프롬프트 `f002` | O | **P/T** 위와 같음 + 🟢 **논문 §3**(p4) **presence token** — `final score = own score × presence score` | M 3표본 | **A** |
@@ -381,13 +382,13 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 | 6 | `--primary full` | O | **T** `Utils.py:605` crop = `diameter × crop_ratio`(3D) → 유효 해상도 | M §37-9b | **A** |
 | 7 | `--input-scale 0.75` | O | **T** `estimater.py:173-174` `erode_depth(radius=2)`·`bilateral_filter_depth` 가 **픽셀 단위** → 배율이 전처리 반경을 바꾼다 | 🔴 **구분 안 됨** | **B** |
 | 8 | stage2(메쉬 교체) | **O** | **T** `Utils.py:605`(crop) · `predict_pose_refine.py:229`(`trans_delta *= mesh_diameter/2`) · `:221`(`rot_normalizer` **상수**) | M §27-7·§38-7 | **A** |
-| 9 | ★ 하이브리드 R·t 접합 | **O** | **T** `Utils.py:850-857` `t ← t+Δt` · `R ← ΔR·R` — **egocentric 이라 분리된다** | M §38-7 · **§2.5 예측 검증** | **A+** |
+| 9 | ★ 하이브리드 R·t 접합 | **O** | **T** `Utils.py:850-857` `t ← t+Δt` · `R ← ΔR·R` — **egocentric 이라 분리된다** ★ **곁들여 «왜 R 은 stage1 이 나은가» 의 구조적 이유**: `track_one`(`estimater.py:250`)은 **회전 가설을 탐색하지 않고**(씨앗 1개) **scorer 도 안 부른다**(refiner 만, `:263`) → stage2 는 틀린 대칭 가지에서 **원리적으로 못 빠져나온다** | M §38-7 · **§2.5 예측 검증** | **A+** |
 | 10 | 정합 없음 | O | — (경험) | M §35-2i·§38 | **B** |
 | 11 | CAD `foup_300_semi_r2` | O | **S** SEMI E47.1-1101 원문(`z49`·`d63` 정의) | M §31·§36 실측 | **A** |
 | 12 | pose 원점 = flange 상면 | **O** | **T** `estimater.py:137-150` `guess_translation` 이 `zc = median(depth[mask])` — **원점이 관측 표면 근처여야** 초기값이 맞는다 | M `verify_obj` | **A** |
 | 13 | 카메라 ZED X 2.2mm | O | 기본 기하(`σ_Z ∝ Z²/(fx·B)`) | M §34 | **A** |
-| 14 | ★ `--est-iter 5` | — | 🟢 **P 논문 supplementary**(p14): *"The refinement iteration is set to 1 for training efficiency, **At test time, it is set to 5 for pose estimation** and 1 for tracking"* · **T** `run_demo.py:20` `est_refine_iter` **기본 5** + `estimater.py:159` `def register(…, iteration=5)`. RH1 의 stage1 은 init 이 없어 `register` 경로(`pose_fp.py:374`)라 **정확히 그 경로**다 | — | **A** ★ *"저자 기본값을 그대로 썼다"* 로 쓸 수 있다 |
-| 15 | `--refine-iter 5` | **O** | **upstream 과 어긋난다** — stage2 는 `est2.track_one(…)`(`pose_fp.py:416`)인데 `run_demo.py:21` 의 `track_refine_iter` 기본은 **2**, 🟢 **논문(p14)은 «tracking 에 1»** 이다. ★ **다만 우리 stage2 는 시간축 추적이 아니라 «메쉬를 바꾼 재추정»** 이라 논문의 «pose estimation → 5» 쪽이 더 가까운 유비다 | ✅ **M §44-12 — 2·5·10 이 구분 안 됨**(차이가 재실행 잡음 바닥 아래) | **A−** ★ *"어긋남을 확인했고 무해함을 측정했다"* |
+| 14 | ★ `--est-iter 5` | — | 🟢 **P 논문 supplementary**(p14): *"The refinement iteration is set to 1 for training efficiency, **At test time, it is set to 5 for pose estimation** and 1 for tracking"* · **T** `run_demo.py:20` `est_refine_iter` **기본 5** + `estimater.py:159` `def register(…, iteration=5)`. RH1 의 stage1 은 init 이 없어 `register` 경로(`pose_fp.py:382`)라 **정확히 그 경로**다 | — | **A** ★ *"저자 기본값을 그대로 썼다"* 로 쓸 수 있다 |
+| 15 | `--refine-iter 5` | **O** | **upstream 과 어긋난다** — stage2 는 `est2.track_one(…)`(`pose_fp.py:428`)인데 `run_demo.py:21` 의 `track_refine_iter` 기본은 **2**, 🟢 **논문(p14)은 «tracking 에 1»** 이다. ★ **다만 우리 stage2 는 시간축 추적이 아니라 «메쉬를 바꾼 재추정»** 이라 논문의 «pose estimation → 5» 쪽이 더 가까운 유비다 | ✅ **M §44-12 — 2·5·10 이 구분 안 됨**(차이가 재실행 잡음 바닥 아래) | **A−** ★ *"어긋남을 확인했고 무해함을 측정했다"* |
 | 16 | `--stereo-scale 0.5` | O | ✅ **T/M — 제약과 비용이 정한다.** 1920×1200 에서 **0.625·0.75 가 CUDA EP 로 실행 불가**(31GB 유휴 GPU 에서 재현 · ORT 세션 옵션 5조합 전부 실패 — `arena_extend_strategy` 는 Softmax OOM 을 넘기지만 ConvTranspose cuDNN 워크스페이스에서 다시 막힌다), 상한은 **0.5625**. ⚠️ `PYTORCH_CUDA_ALLOC_CONF` 는 **다른 프레임워크**라 무관하다(그건 `--input-scale` 용). 남은 여유의 값어치를 **정량화했다** — 0.5→0.5625 는 t **0.147mm**(KPI 의 2.9%) 이득에 **+36% 비용**(예산의 5.4%)이고 **회전은 불변**(p=1.000) | M §44-13 (n=60·3반복) | **A** ⚠️ 정확도 최적은 0.5625 다 |
 | 17 | `--flange-mask-proj faces` | O | **M** 교훈 #20 — `convexHull` 은 오목 노치를 메워 GT 대비 **평균 1.55% 부푼다**. 기전 근거는 없고 **측정으로 선다** | M | **B** |
 | 18 | `--flange-mask-from pose` | — | 기본값. **T** stage2 의 flange 마스크를 coarse pose 투영으로 만든다 = SAM3 flange 의존을 없앤다 | M §38-12 동등 | **A** ⚠️ 정확도 근거 아님(의존성 축소) |
@@ -405,7 +406,7 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 
 | | 항목 | 상태 |
 |---|---|---|
-| 🟡 **①** | **`--select center` + `score_frac 0.9`** | 🟡 **정정(2026-09-02, 논문 확인)** — ~~기전 근거가 끝까지 없다~~ → **과제 정의상 «모델 밖» 의 문제**임이 논문에 있다(§2 *"detect … **all instances**"*). 규칙 «자체» 는 여전히 우리 것이지만, **«근거 없는 자유 파라미터» 가 아니라 «PCS 가 답하지 않는 질문에 대한 시스템 측 해법»** 으로 서술한다. §6.4 참조. ★★ **그러나 «배포 조건에서 무영향» 임이 측정됐다**(§44-17) — 단일 물체 씬 **304케이스에서 `score`·`center0.9`·`center0.3` 이 0% 불일치**. → **논문에서 «근거 없는 자유 파라미터» 가 아니라 «검증 조건에서 결과를 바꾸지 않는 구성요소» 로 쓸 수 있다.** 🔴 **동종 방해물 씬에서만** 문제가 된다 — 오선택 **13.6%**(씬 고정 8거리 640프레임, §44-24j) ~ **15~36%**(zx 세트, §44-15). ★ **처방이 정량화됐다**: `score_frac` 0.9 → **0.3** 이면 오선택 **87/640 → 9/640**, KPI **87.5% → 98.1%**(8/8 거리에서 개선, McNemar p=3.9e-18). 🔴 **기본값은 0.9 로 유지 중**(사용자 결정 — 현행 파이프라인으로 보고서 작성). 바른 설계는 **박스 프롬프트**(§6.5) — upstream 이 지원하나 **위치 정보 필요** |
+| 🟡 **①** | **`--select center` + `score_frac 0.9`** | 🟡 **정정(2026-09-02, 논문 확인)** — ~~기전 근거가 끝까지 없다~~ → **과제 정의상 «모델 밖» 의 문제**임이 논문에 있다(§2 *"detect … **all instances**"*). 규칙 «자체» 는 여전히 우리 것이지만, **«근거 없는 자유 파라미터» 가 아니라 «PCS 가 답하지 않는 질문에 대한 시스템 측 해법»** 으로 서술한다. §6.4 참조. ★★ **그러나 «배포 조건에서 무영향» 임이 측정됐다**(§44-17) — 단일 물체 씬 **304케이스에서 `score`·`center0.9`·`center0.3` 이 0% 불일치**. → **논문에서 «근거 없는 자유 파라미터» 가 아니라 «검증 조건에서 결과를 바꾸지 않는 구성요소» 로 쓸 수 있다.** 🔴 **동종 방해물 씬에서만** 문제가 된다 — 오선택 **13.6%**(씬 고정 8거리 640프레임, §44-24j) ~ **15~36%**(zx 세트, §44-15). ★ **처방이 정량화됐다**: `score_frac` 0.9 → **0.3** 이면 오선택 **87/640 → 9/640**, KPI **87.5% → 98.1%**(8/8 거리에서 개선, McNemar p=3.9e-18). 🔴 **기본값은 0.9 로 유지 중**(사용자 결정 — 현행 파이프라인으로 보고서 작성). 바른 설계는 **PVS 경로(단일 객체 프롬프트)**(§6.5) — 🔴 ~~박스 프롬프트~~ 는 정정됐다(PCS 의 exemplar 박스도 «모든 인스턴스» 를 낸다). upstream 이 지원하나 **위치 정보 필요** |
 | 🟡 ② | `--text-conf 0.05` | **①에 딸린다**(§42-9 — 문턱과 선택 규칙이 얽혀 있다). ①이 배포 조건에서 무영향이므로 **이것도 그 조건에서는 검출 여부만 정한다** — 그 축은 `score_min`(§43-7·§44-5)으로 근거가 있다 |
 | ⚠️ ③ | `--input-scale 0.75` | 🔴 **«못 채움» 이 결론이다** — 4회 재실행·n=120 에서 0.75↔0.5 가 **p=1.000**(§38-9). 논문에는 *"구분되지 않으므로 비용·OOM 위험으로 골랐다"* 로 쓴다 |
 | ✅ ④ | `--stereo-scale 0.5` | **닫혔다**(§44-13) — 상한이 0.5625 이고, 남은 여유의 값어치가 **t 0.147mm ↔ 비용 +36%** 로 정량화됐다 |
@@ -417,7 +418,7 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 
 ### 6.3a-2 ★★★ **논문·보고서용 한 문단** (2026-09-02 갱신)
 
-> *"파이프라인 구성요소 20개 중 **16개는 상위 문헌·코드 또는 표준 문서에서 기전 근거를 세웠고**,
+> *"파이프라인 구성요소 22개 중 **16개는 상위 문헌·코드 또는 표준 문서에서 기전 근거를 세웠고**,
 > 둘은 **측정으로 선다**(윤곽 정합 비사용 · flange 마스크 투영 방식),
 > 하나는 **관측은 확고하나 기전이 미규명**이다(배포 거리 하한).
 > upstream 에 대응물이 **아예 없는** 것은 **인스턴스 선택 규칙 하나**인데, 그 한계는
@@ -427,8 +428,16 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 > 이미지 단위라 상대 문턱에서 상쇄되고 앞 항은 «이 개체가 그 개념의 인스턴스인가» 에 답한다.
 > 즉 **동종 물체의 구분은 모델의 성능 한계가 아니라 과제 범위 밖**이다. 다만 **본 연구의 평가 조건(단일 대상 장면)에서는 이 규칙이
 > 결과를 바꾸지 않음을 확인했다** — 세 가지 선택 규칙이 304개 사례에서 동일한 마스크를 냈다.
-> 동종 방해물이 존재하는 장면으로 확장할 때의 처방은 **위치 사전정보를 이용한 박스 프롬프트**이며,
-> 이는 상위 구현이 지원한다.
+> 동종 방해물이 존재하는 장면으로 확장할 때의 처방은 둘이다 — **(a) 점수 게이트 완화**
+> (`score_frac` 0.9 → 0.3: 오선택 87/640 → 9/640, 8/8 거리에서 개선, McNemar p=3.9e-18) 와
+> **(b) 위치 사전정보를 이용한 단일 객체 프롬프트(SAM 3 의 PVS 경로)** 다.
+> ⚠️ **PCS 의 exemplar 박스는 처방이 아니다** — 같은 논문이 *"given a positive bounding box on a dog,
+> the model will detect **all** dogs"* 라고 명시한다.
+> 그리고 이 병목은 하류 논문이 이미 예고한 것이기도 하다 — FoundationPose 는 §5.4 Limitations 에서
+> *"relies on **external 2D detection** … **false or missing detection frequently bottlenecks** the
+> 6D pose estimation"* 이라고 적었다. **두 상위 모델이 각자 «내 과제 밖» 이라고 명시한 자리를
+> 시스템이 메운 것**이며, 본 연구의 기여는 그 빈칸의 **정량화**(거리별 KPI 곡선이 오선택 곡선의
+> 거울상임을 보인 것)와 **처방의 측정**이다.
 > 끝으로 **합격 기준(t ≤ 5mm · R ≤ 3°) 자체는 과제 요건으로 주어진 값이고 본 연구가 유도한 것이 아니다.**
 > 다만 그 쌍이 **채택한 좌표계(flange 상면 중심)에서 자기정합적**임을 보인다 — 회전 3°가 flange
 > 표면을 최대 4.81mm 움직여 평행이동 예산 5mm 와 같은 크기로 기여하는 반면, 동일한 3°를 물체
@@ -444,8 +453,8 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 
 | | 우리 값 | upstream 기본 | 어느 함수 | 판정 |
 |---|---|---|---|---|
-| `--est-iter` | 5 | **5** (`run_demo.py:20` · `estimater.py:159`) | `est1.register` (`pose_fp.py:374`) | ✅ **A — 저자 기본값** |
-| `--refine-iter` | **5** | **2** (`run_demo.py:21` `track_refine_iter`) | `est2.track_one` (`pose_fp.py:416`) | 🔴 **B — 어긋나고 미측정** |
+| `--est-iter` | 5 | **5** (`run_demo.py:20` · `estimater.py:159`) | `est1.register` (`pose_fp.py:382`) | ✅ **A — 저자 기본값** |
+| `--refine-iter` | **5** | **2** (`run_demo.py:21` `track_refine_iter`) | `est2.track_one` (`pose_fp.py:428`) | 🔴 **B — 어긋나고 미측정** |
 
 ★ **왜 어긋났나(가설)** — upstream 의 `track_refine_iter=2` 는 **프레임 간 추적**을 상정한다
 (직전 프레임 대비 자세가 거의 안 움직였으므로 2회면 족하다). 우리 stage2 는 같은 함수를 쓰지만
@@ -469,6 +478,18 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 > *"detect, segment and track **all instances** of a visual concept…"*
 → 🔴 **«여럿 중 어느 것인가» 는 PCS 의 출력이 아니다.** 우리 선택 규칙이 «근거 없는 휴리스틱» 인 것이
 아니라, **과제 정의상 모델 밖에서 풀어야 하는 문제**다. 이 서술이 훨씬 정확하고 방어된다.
+
+★★★ **①-b. 하류 논문도 «내 밖» 이라고 적었다 — 두 논문의 빈칸이 정확히 겹친다** (2026-09-03 추가).
+FoundationPose 논문 **§5.4 *Limitations*** (supplementary p15):
+> *"our approach focuses on 6D pose estimation and tracking, and **relies on external 2D detection**,
+> which is obtained from methods such as CNOS, or Mask-RCNN. **We observe false or missing detection
+> frequently bottlenecks the 6D pose estimation.** In future work, an end-to-end framework for novel
+> object detection, 6D pose estimation and tracking would be of interest."*
+
+→ ★ **SAM3 는 «어느 것인가는 내 출력이 아니다» 라 하고, FoundationPose 는 «그 검출이 내 병목이다» 라 한다.**
+그 사이의 빈칸을 메우는 것이 `select_index()` 이고, **§44-24c 의 «오선택이 KPI 를 지배한다» 는
+저자가 예고한 병목의 실측**이다. 보고서에서 이 구성요소는 **«우리 휴리스틱»** 이 아니라
+**«두 upstream 이 각자 범위 밖이라 명시한 자리를 시스템이 메운 것»** 으로 서술한다.
 
 **② 점수 분해식이 논문에 있다** — 논문 §3 Presence Token (p4):
 > *"…predicting whether the target concept … is present in the image/frame, i.e. **p(NP is present in input)**.
@@ -545,7 +566,10 @@ keep = out_probs > self.confidence_threshold              # ← --confidence (�
 이는 상위 모델이 제공하지 않는 부분으로, 단일 인스턴스 장면에서 파편·배경 선택을 막기 위해 도입됐고
 그 조건에서는 오선택 0/40 이었다. **동종 방해물이 있는 장면에서는 이 규칙이 실패한다**(§6.4) —
 SAM3 의 점수는 «이 개체가 그 개념인가» 에 답하므로 동종 물체를 구분하지 못하며, 90% 문턱은
-정답을 배제할 수 있다. 원리적 해법은 위치 사전정보를 이용한 박스 프롬프트다(§6.5)."*
+정답을 배제할 수 있다. **처방은 둘이다** — (a) 점수 게이트 완화(`score_frac` 0.9 → 0.3: 오선택
+87/640 → 9/640, 8/8 거리에서 개선, McNemar p=3.9e-18) · (b) 위치 사전정보를 이용한 **단일 객체
+프롬프트(PVS 경로)**(§6.5). ⚠️ **PCS 의 exemplar 박스는 처방이 아니다** — 같은 논문이 그 박스도
+«모든 인스턴스» 를 낸다고 명시한다."*
 ★ **«튜닝했는데 부족했다» 가 아니라 «설계 가정이 장면 종류에 묶여 있었다» 가 정확한 서술**이다.
 
 ### 6.5 ★★★ 바른 설계도 upstream 에 있다 — **기하 프롬프트** (P/T)
@@ -584,7 +608,7 @@ SAM3 의 점수는 «이 개체가 그 개념인가» 에 답하므로 동종 �
 | R·t 갱신이 분리된다 | `Utils.py:850-857` `egocentric_delta_pose_to_pose` |
 | crop 이 3D 에서 `diameter × crop_ratio` | `Utils.py:605` · `weights/*/config.yml`(`crop_ratio` 1.2/1.1, `input_resize` 160) |
 | 평행이동 보폭만 메쉬 크기에 비례 | `predict_pose_refine.py:221`(`rot_normalizer` 0.3490658…=20°) · `:229`(`trans_delta *= mesh_diameter/2`) |
-| stage2 가 메쉬를 갈아탄다 | `spatial_vision/stages/pose_fp.py:286-293` |
+| stage2 가 메쉬를 갈아탄다 | `spatial_vision/stages/pose_fp.py:294-301` |
 | 마스크는 초기화에만 쓰인다 | `estimater.py:137-150` `guess_translation`(**bbox 중심 + depth 중앙값**) · `:184-206`(`rgb`/`depth` 는 **마스킹되지 않는다**) |
 | 하이브리드 구현 | `spatial_vision/eval/hybrid_pose.py` (`--r-dir`/`--t-dir`) |
 
@@ -693,7 +717,7 @@ t_err  +  r_max · 2·sin(R_err / 2)  ≤  c        (r_max = 91.8mm, flange 최�
 
 ### 9.3 ⚠️ **`pose_last` 를 직접 씨앗으로 넣는다** — «전후» 가 아니라 «내부 상태를 통한 구동»
 
-`pose_fp.py:370`(`--init-from` 경로) · **`:415`(stage2)**:
+`pose_fp.py:378`(`--init-from` 경로) · **`:427`(stage2)**:
 
 ```python
 c = np.asarray(est2.model_center, dtype=np.float64).reshape(3); T = np.eye(4); T[:3,3] = c
@@ -709,7 +733,7 @@ upstream 은 `pose_last` 를 **`register()` 안에서만** 세팅한다(`estimat
 
 ### 9.4 🔴 **진짜 런타임 교체가 하나 있다 — 다만 기본 OFF 이고 배포에 쓰지 않는다**
 
-`pose_fp.py:262-270`, 옵션 **`--preproc-radius-px`** (기본 **`0.0` = 끄기**):
+`pose_fp.py:269-277`, 옵션 **`--preproc-radius-px`** (기본 **`0.0` = 끄기**):
 
 ```python
 if args.preproc_radius_px > 0:
@@ -730,7 +754,7 @@ if args.preproc_radius_px > 0:
 ### 9.5 ⚠️ **입력이 upstream 과 다른 곳 하나** — stage2 의 depth 마스킹
 
 ```python
-depth_crop = np.where(mf > 127, depth_m, 0.0)     # pose_fp.py:411  (flange 밖 depth 를 0 으로)
+depth_crop = np.where(mf > 127, depth_m, 0.0)     # pose_fp.py:422  (flange 밖 depth 를 0 으로)
 ```
 
 🔴 **upstream `run_demo.py` 는 depth 를 마스킹하지 않는다** — `estimater.py:184-206` 에서

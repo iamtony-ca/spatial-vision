@@ -105,6 +105,12 @@ coarse = est1.register(K=K, rgb=rgb, depth=depth_m, ob_mask=(mask_full > 127), i
 - 메시 `full.ply`, 마스크 = **SAM3 결과**
 - 🔴 그 마스크는 **초기값 계산에만** 쓰인다(`estimater.py:184·203·206`). 네트워크에 들어가는
   `rgb`/`depth` 는 **마스킹되지 않는다** — upstream 그대로다.
+- 🔴🔴 **«stage1 = SAM3 · stage2 = CAD» 로 읽으면 틀린다 — stage1 도 CAD 메쉬가 주역이다.**
+  마스크가 주는 것은 **초기 «평행이동» 하나뿐**이고(`guess_translation`, `estimater.py:137` =
+  bbox 중심 + 마스크 안 depth 중앙값), **회전 가설은 마스크와 무관한 고정 격자**(구면 40시점 ×
+  면내 60° = 240개 → 30° 군집, `estimater.py:27·106·120`)이며, **정련·채점은 전부 `full.ply` 렌더**
+  ↔ 관측 비교다(`estimater.py:215·219`, `mesh=self.mesh`).
+  → 두 스테이지의 차이는 «SAM3 냐 CAD 냐» 가 아니라 **«어느 메쉬냐»** 다.
 
 **stage2** (upstream 에 대응물 없음 — 우리 조립)
 ```python
@@ -114,6 +120,11 @@ est2.pose_last = torch.as_tensor(coarse @ T, ...)             # ③ 씨앗 주�
 refined    = est2.track_one(rgb=rgb, depth=depth_crop, K=K, iteration=5)
 ```
 - 메시가 `top_flange.ply` 로 **바뀐다** — 그것이 이득의 원천이다(`STAGE2_TRANSLATION.md`).
+- 🔴🔴 **«stage1 과 같은 계산인데 메쉬만 바뀐 것» 이 아니다 — 부르는 함수부터 다르다.**
+  `register()`(전역 회전 격자 240개 + **scorer 채점** + `ob_mask` 인자) ↔ `track_one()`
+  (**씨앗 1개 국소 정련** · **scorer 호출 없음** · **마스크 인자 없음**).
+  → ★ **stage2 는 회전을 «탐색» 하지 않으므로 stage1 이 틀린 대칭 가지에 빠지면 못 빠져나온다.**
+  하이브리드가 `R` 을 stage1 에서 받는 진짜 이유이고, 90°/180° 뒤집힘이 refine 으로 안 고쳐지는 이유다.
 - ★ **마스크 출처가 stage1 과 다르다**: stage1 = SAM3, stage2 = **메시 투영**.
   → **`RH1` 은 SAM3 의 flange 검출에 전혀 의존하지 않는다.** flange 프롬프트는 실물에서
   20개 중 **2개**만 살아남았으므로(§41) 이 설계가 그 취약축을 아예 안 밟는다.
