@@ -336,89 +336,135 @@ stage2 의 flange 마스크는 **`top_flange.ply` 를 stage1 pose 로 투영**�
 
 ## 5. 핵심 설계 ③ — 회전과 평행이동을 **각각 최적인 단계에서** 받는다
 
-> **문제**: §4 의 메쉬 교체는 공짜가 아니다. `top_flange` 는 근사 4회 대칭이고
-> **방향 정보가 표면의 3.5%·전부 경계**에 있다. 즉 **stage2 는 «회전 증거» 를 «평행이동 해상도» 와 맞바꾼다.**
+### 5.0 한 문단 요약
 
-**(가) 왜 비대칭인가 — 🟢 코드 + 설정 파일 (그리고 논문과 정확히 맞물린다)**
+> §4 에서 stage2 가 메쉬를 `top_flange` 로 갈아타 **평행이동을 세밀하게** 만들었다.
+> 그런데 **회전은 오히려 나빠진다.** 그래서 «둘 중 하나를 고르는» 대신
+> **`R` 은 stage1 에서, `t` 는 stage2 에서 가져와 합친다.** 그게 되는 이유는
+> FoundationPose 의 pose 갱신식이 **R 과 t 를 서로 안 섞는 형태**이기 때문이다.
 
-> 📂 **파일 위치**: `third_party/FoundationPose/learning/training/predict_pose_refine.py`
-> (upstream 저장소 안이라 우리 `spatial_vision/` 밑에는 없다 → 전체 목록은 §0.2)
-
-**① 먼저 «어느 가중치인가»** — FoundationPose 는 **가중치를 둘** 쓰고, 코드에 이름이 박혀 있다:
-
-| 네트워크 | `run_name` | 파일 | `crop_ratio` | `rot_normalizer` |
-|---|---|---|---|:-:|
-| **refiner** (pose 를 고친다) | **`2023-10-28-18-33-37`** | `predict_pose_refine.py:97` | **1.2** | ✅ **있다** |
-| scorer (후보를 채점한다) | `2024-01-11-20-02-45` | `predict_score.py:120` | 1.1 | ❌ **없다** |
-
-🔴 **`rot_normalizer` 가 2024 설정에 없는 것이 맞다** — 그건 **scorer** 이고 pose 델타를 안 내므로
-정규화 상수가 필요 없다. **이 절은 전부 refiner(2023) 이야기**다.
-⚠️ 그리고 **stage2 는 scorer 를 아예 안 부른다**(§7.3) — stage2 에서는 2023 가중치만 관여한다.
-
-**② 배포 설정값** (`weights/2023-10-28-18-33-37/config.yml` 원문):
-
-```yaml
-rot_rep: axis_angle          trans_rep: tracknet         normalize_xyz: true
-crop_ratio: 1.2              input_resize: [160, 160]
-rot_normalizer:   0.3490658503988659          # = 20.000000°
-trans_normalizer: [0.02, 0.02, 0.05]          # 🔴 존재하지만 **안 쓰인다** (아래 ③)
 ```
-
-**③ 코드가 그 설정으로 어느 분기를 타는가** (`predict_pose_refine.py:195-229`):
-
-```python
-if cfg['trans_rep']=='tracknet':          # ✅ tracknet 이다
-    if not cfg['normalize_xyz']:          # ❌ normalize_xyz 가 true → 이 줄은 건너뛴다
-        trans_delta = tanh(out["trans"]) * trans_normalizer     # 🔴 «꺼진» 경로
-    else:
-        trans_delta = out["trans"]        # ✅ 여기 — tanh 도 상수배도 없다
-if cfg['rot_rep']=='axis_angle':          # ✅
-    rot_mat_delta = tanh(out["rot"]) * cfg['rot_normalizer']    # ✅ ×20° 상수
-if cfg['normalize_xyz']:                  # ✅
-    trans_delta *= (mesh_diameter / 2)    # ✅ 여기 — 메쉬 크기에 비례
+stage1 (full.ply)   →  R 좋음 ✅   t 나쁨 ❌
+stage2 (flange.ply) →  R 나쁨 ❌   t 좋음 ✅
+                              ↓  각각에서 좋은 것만
+RH1 최종            =  R(stage1)  +  t(stage2)
 ```
-
-| | 실제로 곱해지는 것 | 값 | 메쉬 크기 의존 |
-|---|---|---|:-:|
-| **평행이동** | **`mesh_diameter / 2`** | `full` **289.5mm** · `flange` **91.75mm** | ✅ |
-| **회전** | `rot_normalizer` **상수** | **20.000000°** | ❌ |
-
-★ **이것이 §5 의 전부다** — 메쉬를 3.16배 작게 바꾸면 **평행이동 보폭만 3.16배 세밀해지고 회전 보폭은 그대로**다.
-
-**④ 🟢 논문과의 대조 — 두 상수가 «학습 교란 크기» 와 정확히 같다** (supplementary p14):
-
-> *"the pose is randomly perturbed by adding **translation noise under the magnitude of 0.02m, 0.02m,
-> 0.05m** for XYZ axis respectively and **rotation under the magnitude of 20°**"*
-
-| 논문의 학습 교란 | config 값 | 일치 | 실제 사용? |
-|---|---|:-:|:-:|
-| 회전 **20°** | `rot_normalizer` = 0.3490658503988659 rad = **20.000000°** | ✅ | ✅ **쓴다** |
-| 평행이동 **0.02 / 0.02 / 0.05 m** | `trans_normalizer` = **[0.02, 0.02, 0.05]** | ✅ | 🔴 **안 쓴다** |
-
-★★ **정정 (2026-09-03)** — 이전 판은 *"평행이동의 지름 정규화는 논문 근거가 없다"* 라고만 썼는데
-**더 정확히 말할 수 있다**: **논문이 말한 0.02/0.02/0.05 m 는 config 에 `trans_normalizer` 로 그대로 있고,
-배포 설정이 `normalize_xyz: true` 로 그 경로를 «껐다».** 즉 «논문에 없는 값» 이 아니라
-**«논문의 값을 쓰지 않기로 한 선택»** 이다. 그 선택 자체는 여전히 논문에 설명이 없다.
-
-**(나) 그래서 R 과 t 를 갈라 써도 되나 — 🟢 논문 §5.3 + 코드**
-
-> 논문 §5.3 (supplementary): *"this **disentangled representation removes the dependency on the
-> updated orientation when applying the translation update**."*
-
-`Utils.py:850-856`:
-```python
-B_in_cam[:,:3,3]  = A_in_cam[:,:3,3] + trans_delta       # t ← t + Δt   (R 이 안 낀다)
-B_in_cam[:,:3,:3] = rot_mat_delta @ A_in_cam[:,:3,:3]    # R ← ΔR · R   (t 가 안 낀다)
-```
-→ ★ **한 단계의 `R` 과 다른 단계의 `t` 를 접합해도 각각이 그 단계에서 최적화된 값 그대로 유지된다.**
-🔴 물체 좌표계 갱신(`t ← R·Δt + t`)이었다면 접합이 의미를 잃는다 — **이 파라미터화가 전제 조건**이다.
-
-**설계**: `hybrid_pose.py`(85줄, 추론 0)가 **`R` 은 `pose_coarse.json`(stage1)에서, `t` 는
-`pose_refined.json`(stage2)에서** 가져와 합친다. 이것이 `RH1` 의 최종 출력이다.
-
-**검증** → §8.1.
 
 ---
+
+### 5.1 왜 stage2 는 «t 는 좋아지고 R 은 나빠지나» — 이유가 셋이다
+
+**이유 ① 메쉬에 방향 정보가 적다**
+
+`top_flange` 는 **근사 4회 대칭**(90° 돌려도 거의 같아 보인다)이고, 방향을 알려 주는 비대칭 특징이
+**표면의 3.5% · 전부 경계**에 몰려 있다. 반면 `full` 은 몸체·문·손잡이가 다 있어 방향이 명확하다.
+→ **작은 메쉬로 갈아탄 순간 «회전 증거» 를 잃는다.**
+
+**이유 ② 네트워크의 «보폭» 이 R·t 에서 다르게 정해진다** — 🟢 코드 + config
+
+> 📂 `third_party/FoundationPose/learning/training/predict_pose_refine.py` (→ 전체 경로표 §0.2)
+> 🔴 **가중치가 둘이다** — 이 절은 전부 **refiner(`2023-10-28-18-33-37`)** 이야기다.
+> scorer(`2024-01-11-20-02-45`)는 점수만 내므로 `rot_normalizer` 가 **없는 게 정상**이고,
+> **stage2 는 scorer 를 아예 안 부른다**(§7.3).
+
+네트워크는 «얼마나 틀렸나» 를 **무차원 숫자**로 내놓는다. 그걸 **실제 mm·도로 바꾸는 배율**이 다르다:
+
+```python
+# 배포 설정: trans_rep=tracknet · normalize_xyz=true · rot_rep=axis_angle
+trans_delta   = out["trans"]                    # 무차원 그대로
+rot_mat_delta = tanh(out["rot"]) * 0.3490658…   # ← ×20.000000° (상수)
+trans_delta  *= (mesh_diameter / 2)             # ← ×메쉬 반지름
+```
+
+| | 무차원 출력에 곱하는 것 | `full` | `top_flange` | 메쉬가 작아지면 |
+|---|---|--:|--:|---|
+| **평행이동** | **`mesh_diameter / 2`** | 289.5 mm | **91.75 mm** | ✅ **3.16배 세밀해진다** |
+| **회전** | **`rot_normalizer` 상수** | 20.000000° | 20.000000° | ❌ **그대로** |
+
+★ **이것이 «비대칭» 의 뜻이다** — 메쉬를 줄이면 **t 의 눈금만 촘촘해지고 R 의 눈금은 안 변한다.**
+그런데 이유 ①로 **R 이 참고할 증거는 줄었다** → **R 은 손해만 본다.**
+
+**이유 ③ stage2 는 회전을 «고치기» 는 해도 «찾지» 는 못한다** — 🟢 코드
+
+🔴 **먼저 오해를 막자 — stage2 도 회전을 «출력한다».** `pose_refined.json` 에 `R` 이 있고
+비하이브리드 팔(`RP1`·`RP2`)은 실제로 그 값을 쓴다. **실측**: stage2 가 stage1 의 `R` 을
+**중앙 0.439° · 최대 1.293°** 움직이고 **12/12 프레임 전부**에서 움직인다.
+→ ★ **«회전을 안 낸다» 가 아니라 «회전을 탐색하지 않는다»** 이고, 그 둘은 다르다:
+
+| | stage1 `register()` | stage2 `track_one()` |
+|---|:-:|:-:|
+| 회전을 **출력**하나 | ✅ | ✅ **한다** (실측 ΔR 중앙 0.439°) |
+| 회전 후보를 **여러 개 만들어 보나** | ✅ **240개** 전역 격자 | ❌ **씨앗 1개**뿐 |
+| 후보들을 **채점해 고르나** | ✅ scorer (`estimater.py:219`) | ❌ **scorer 호출 없음** (`:263` refiner 만) |
+| 그래서 할 수 있는 것 | **어느 자세인지 «찾기»** | 이미 정해진 자세를 **«다듬기»** |
+
+★ **결과**: 1회 회전 보폭이 **±20°**(이유 ②)로 묶인 국소 정련이라 **작은 오차는 고치지만**,
+90°/180° 떨어진 **대칭 짝으로는 건너갈 수 없다** — 비교할 대안이 없기 때문이다.
+→ 🔴 **stage1 이 잘못된 대칭 가지에 빠지면 stage2 는 원리적으로 못 빠져나온다.**
+
+---
+
+### 5.2 그래서 «갈라 쓰기» 를 떠올린다 — 그런데 그게 되는 건가?
+
+**되려면 조건이 하나 필요하다**: pose 갱신식에서 **`t` 계산에 `R` 이 안 들어가야 한다.**
+안 그러면 «다른 단계의 R» 을 가져오는 순간 **t 의 의미가 달라진다.**
+
+두 방식을 비교하면 분명하다:
+
+| | 갱신식 | 섞어 쓸 수 있나 |
+|---|---|---|
+| **카메라 기준 (egocentric)** ← FoundationPose | `t ← t + Δt`<br>`R ← ΔR · R` | ✅ **된다** — 두 줄이 서로를 안 쓴다 |
+| 물체 기준 (object-centric) | `t ← t + **R**·Δt`<br>`R ← R·ΔR` | 🔴 **안 된다** — `t` 계산에 `R` 이 들어간다 |
+
+> **비유** — 두 사람이 «어디로 몇 mm» 와 «어느 쪽으로 몇 도» 를 따로 적어 낸다고 하자.
+> **카메라 기준**이면 «오른쪽으로 3mm» 가 물체 자세와 무관하게 같은 뜻이라 **둘을 섞어도 된다.**
+> **물체 기준**이면 «앞으로 3mm» 가 *물체가 어느 쪽을 보느냐*에 따라 달라져서,
+> 회전을 남의 것으로 바꾸는 순간 **그 3mm 가 엉뚱한 방향이 된다.**
+
+**🟢 FoundationPose 는 앞쪽이다 — 논문과 코드 양쪽에 있다**
+
+논문 §5.3 (supplementary):
+> *"this **disentangled representation removes the dependency on the updated orientation when applying
+> the translation update**."*
+
+코드 `Utils.py:850-857` (`egocentric_delta_pose_to_pose`):
+```python
+855:  B_in_cam[:,:3,3]  = A_in_cam[:,:3,3] + trans_delta      # t ← t + Δt      (R 이 안 낀다)
+856:  B_in_cam[:,:3,:3] = rot_mat_delta @ A_in_cam[:,:3,:3]   # R ← ΔR · R      (t 가 안 낀다)
+```
+
+★ **`t` 는 «카메라 좌표계의 절대 위치» 이고 `R` 과 독립적으로 갱신된다.**
+→ stage1 의 `R` 과 stage2 의 `t` 를 **그대로 합쳐도 각각이 그 단계에서 최적화된 값 그대로**다.
+
+---
+
+### 5.3 구현 — 85줄, GPU 안 씀
+
+`eval/hybrid_pose.py` 가 JSON 두 개를 읽어 합친다:
+
+```
+pose_coarse.json  (stage1) ──→ R  ┐
+                                  ├──→ pose_coarse.json  (= RH1 최종)
+pose_refined.json (stage2) ──→ t  ┘
+```
+
+⚠️ 출력 파일 이름이 `pose_coarse.json` 인 것은 **하류 도구가 그 이름을 찾기 때문**이지 coarse 라서가 아니다.
+✅ **배선은 GT 로 검증됐다** — `RH1.R ≡ stage1.R`(16/16 프레임 중앙차 **+0.000°**) ·
+`RH1.t ≡ stage2.t`(**+0.000mm**).
+
+---
+
+### 5.4 🔴 그런데 «이득» 은 조건부다 — §8.1 을 반드시 같이 읽을 것
+
+위 5.1 은 **기전**이고, *"그래서 하이브리드가 항상 낫다"* 는 **따라 나오지 않는다.**
+8거리 552프레임에서는 **`refined` 단독이 오히려 근소하게 낫다**(ADD −0.119mm · p=4.0e-04).
+방향이 **거리·씬에 따라 뒤집힌다.** → **§8.1**
+
+★ **그래서 §5 가 주장할 수 있는 것은 «구조» 까지다**:
+> *"두 단계의 R·t 강점이 다르고, 그 둘을 **갈라 받을 수 있는 구조**를 만들었다.
+> 접합이 성립하는 근거는 논문 §5.3 의 egocentric 파라미터화다."*
+🔴 *"하이브리드가 최선이다"* 는 **쓸 수 없다.**
+
 
 ## 6. 핵심 설계 ④ — «어느 것이 타깃인가» 는 **모델 밖의 문제**다
 

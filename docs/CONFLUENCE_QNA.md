@@ -6,27 +6,38 @@
 >
 > 🔴 **근거 표시**: 🟢 **논문·코드 원문에 그대로 있다** / 🟡 **원문 사실 + 우리 해석** / 🔴 **우리 측정·추론뿐**.
 
-| # | 질문 | 절 |
+### 🔤 A. SAM3 · 프롬프트 용어
+
+| # | 질문 | 한 줄 답 |
 |:-:|---|---|
-| 1 | NP = «명사 + **선택적 수식어**» — 선택적 수식어가 뭐야? | [§1](#1) |
-| 2 | «형상어는 **수식어 자리에서만 접지된다**» 가 무슨 말이야? | [§2](#2) |
-| 3 | **SA-Co** 는 뭐야? | [§3](#3) |
-| 4 | SAM3 표의 «**설계로부터의 설명**» 은 논문에 근거한 설명인가? | [§4](#4) |
-| 5 | «**head** 가 개념을 정하고 **modifier** 는 좁힐 뿐» 이 무슨 말이야? | [§5](#5) |
-| 6 | «phrase 를 통째로 **임베딩**한다» — 임베딩이 뭐야? | [§6](#6) |
-| 7 | **presence token** 이 뭐야? | [§7](#7) |
-| 8 | **spurious correlation** 이 뭐야? | [§8](#8) |
-| 9 | 코드는 `crop_ratio / 2` 인데 왜 1px 계산은 `/ 160` 이야? | [§9](#9) |
-| 10 | «**거리에도 `fx` 에도 무관**» 은 어떤 의미야? | [§10](#10) |
-| 11 | `mesh_diameter` 579.0 / 183.5mm 는 CAD 메시에서 최대 직경을 잰 건가? | [§11](#11) |
-| 12 | «**refiner** 1px» — refiner 가 뭐야? | [§12](#12) |
-| **13** | **형상어**가 뭐야? (§2 가 아직 이해가 안 된다) | [§13](#13) |
-| **14** | **head / modifier** 는 논문에 나오는 개념인가? | [§14](#14) |
-| **15** | «상표는 특정 외관과 결합한 spurious correlation» 이 무슨 뜻이야? | [§15](#15) |
-| **16** | 🔴 `full` 만 쓰면 정확도가 **절대 4.34mm 보다 작게 못 나오나**? | [§16](#16) |
-| **17** | ★ **§4(핵심 설계 ②)의 논문 근거를 처음부터** 설명해 줘 | [§17](#17) |
-| **18** | crop 을 위해 **stage1 이전에 pose estimation 을 따로** 하나? | [§18](#18) |
-| **19** | ★★ `1px = D×r/160` **식을 처음부터 유도**해 줘 · «`fx`·거리 무관» 의 정확한 뜻 · 160 은 픽셀인가? | [§19](#19) |
+| [1](#1) | NP = «명사 + **선택적 수식어**» — 선택적 수식어가 뭐야? | 명사를 **좁히는** 말. 문법상 없어도 되지만 성능은 크게 달라진다 |
+| [2](#2) · [13](#13) | «**형상어**는 **수식어 자리**에서만 **접지**된다» 가 무슨 말이야? | 모양 낱말(`cube shaped`)은 **명사 자리에 놓으면 안 된다**. FOUP 은 «정육면체» 가 아니라 «정육면체처럼 생긴 통» |
+| [3](#3) | **SA-Co** 는 뭐야? | SAM3 의 데이터셋 + 벤치마크(*Segment Anything with Concepts*) |
+| [5](#5) · [14](#14) | **head / modifier** 가 뭐고, 논문 용어인가? | head = 후보 **집합**을 정함 · modifier = **좁힘**. 🔴 `modifier` 는 논문 낱말, **`head` 는 우리가 붙인 이름** |
+| [6](#6) | «phrase 를 통째로 **임베딩**» — 임베딩이 뭐야? | 문장을 **벡터 하나**로 바꾼 것 → 낱말별 점수의 합으로 **분해 불가** |
+| [7](#7) | **presence token** 이 뭐야? | «이 개념이 사진에 있나» 를 따로 판단해 최종 점수에 **곱한다** → 색어가 틀리면 **조용히 0** |
+| [8](#8) · [15](#15) | **spurious correlation** 이 뭐야? | 우연히 같이 나타나 배운 «가짜 상관». 제조사명이 9장 1위 → 237장 51위로 무너진 이유 |
+| [4](#4) | 규칙 표의 «**설계로부터의 설명**» 이 논문 근거인가? | 🔴 **절반만.** 논문에 있는 건 «설계» 이고 «그게 이 관측을 설명한다» 는 우리 논증 |
+
+### 📐 B. FoundationPose · crop 과 해상도 (설계 ②)
+
+| # | 질문 | 한 줄 답 |
+|:-:|---|---|
+| [17](#17) | ★ **§4 의 논문 근거를 처음부터** 설명해 줘 | 네트워크 입력이 **160×160 고정**이라 «어디를 얼마나 확대해 넣나» 가 정밀도를 정한다. 논문은 **2D 박스가 아니라 물체 지름**으로 자른다 |
+| [9](#9) | 코드는 `crop_ratio / 2` 인데 왜 1px 은 `/ 160` 이야? | `/2` 는 **반지름**, 창은 그 양쪽이라 **×2 로 상쇄**된다 |
+| [19](#19) | ★★ `1px = D×r/160` **전체 유도** · «`fx`·거리 무관» 의 뜻 · 160 은 픽셀? | `fx`·`Z` 가 **투영에서 곱해지고 환산에서 나뉘어** 상쇄. 160 은 **픽셀 맞다** |
+| [10](#10) | «거리에도 `fx` 에도 **무관**» 은 어떤 의미야? | **눈금(mm/px)이 안 변한다**는 뜻. 🔴 «정확도가 거리와 무관» 이 **아니다** |
+| [11](#11) | `mesh_diameter` 579.0 / 183.5mm 는 어떻게 나온 값? | 메시 정점 중 **가장 먼 두 점 거리**. 🔴 난수 표본이라 `n_sample` 에 따라 값이 다르다 |
+| [16](#16) | 🔴 `full` 만 쓰면 **절대 4.34mm 보다 작게 못 나오나?** | **아니다** — 실측 2.34~3.25mm(**0.54~0.75px**). 4.34mm 는 «하한» 이 아니라 **«눈금»** |
+| [12](#12) | «**refiner** 1px» — refiner 가 뭐야? | pose 를 **고치는** 망(`crop_ratio` 1.2). 짝인 **scorer** 는 **채점**만 하고 stage2 에선 안 쓴다 |
+
+### ⚙️ C. FoundationPose 를 어떻게 쓰나 (설계 ③ · 파이프라인)
+
+| # | 질문 | 한 줄 답 |
+|:-:|---|---|
+| [18](#18) | crop 을 위해 stage1 **이전에 pose estimation 을 따로** 하나? | **없다.** crop 은 **현재 pose 로 매 반복 다시** 잘린다(되먹임 고리) |
+| [20](#20) | ★ 가중치는 **2024 버전**을 쓰나? `rot_normalizer` 가 거기 없는데? | **둘 다 쓴다** — 2023=**refiner**(있다) · 2024=**scorer**(없는 게 정상). 설계 ③은 전부 refiner 이야기 |
+| [21](#21) | ★★ **`estimater.py` · refiner · scorer** 를 더 자세히. stage1 은 원본과 비슷하고 stage2 만 변형인가? | ✅ **맞다.** stage1 = **upstream 기본 호출 그대로**(다른 건 «매 프레임» 뿐) · stage2 = **개입 넷** |
 
 ---
 
@@ -876,6 +887,190 @@ input_resize:
 
 ⚠️ **scorer 는 `crop_ratio` 가 1.1** 이라 눈금이 다르다(`579.0 × 1.1 / 160 = ` **3.98mm**).
 정밀도를 말할 때는 pose 를 실제로 **고치는** refiner(1.2 → 4.34mm) 기준으로 인용한다(→ §12).
+
+---
+
+<a id="20"></a>
+## 20. ★ 가중치는 2024 버전을 쓰나? — `rot_normalizer` 가 거기 없는데
+
+**둘 다 쓴다.** FoundationPose 는 신경망이 **둘**이고 각각 다른 가중치를 로드한다.
+코드에 이름이 **하드코딩**돼 있다:
+
+| 네트워크 | 하는 일 | `run_name` | 어디서 | `crop_ratio` | `rot_normalizer` |
+|---|---|---|---|--:|:-:|
+| **refiner** | pose 를 **고친다**(Δt·ΔR 출력) | **`2023-10-28-18-33-37`** | `predict_pose_refine.py:97` | **1.2** | ✅ **있다** |
+| **scorer** | 후보를 **채점한다**(점수 하나) | `2024-01-11-20-02-45` | `predict_score.py:120` | 1.1 | ❌ **없다** |
+
+★ **2024 에 `rot_normalizer` 가 없는 것이 정상이다** — scorer 는 **pose 델타를 안 내므로**
+회전 정규화 상수가 필요 없다. 있는 게 오히려 이상하다.
+
+⚠️ **그리고 stage2 는 scorer 를 아예 안 부른다**(§7.3) — stage2 에서 도는 것은 **2023 가중치뿐**이다.
+설계 ③(`CONFLUENCE_PIPELINE §5`)은 **전부 refiner = 2023 이야기**다.
+
+### 20-1. refiner config 원문 (`weights/2023-10-28-18-33-37/config.yml`)
+
+```yaml
+rot_rep: axis_angle          trans_rep: tracknet         normalize_xyz: true
+crop_ratio: 1.2              input_resize: [160, 160]
+rot_normalizer:   0.3490658503988659      # = 20.000000°   ← 검산했다
+trans_normalizer: [0.02, 0.02, 0.05]      # 🔴 있는데 «안 쓰인다» (아래 20-2)
+```
+
+### 20-2. 🔴 `trans_normalizer` 는 «있는데 꺼져 있다»
+
+`predict_pose_refine.py:195-229` 의 분기를 배포 설정으로 따라가면:
+
+```python
+if cfg['trans_rep']=='tracknet':        # ✅ tracknet 이다
+    if not cfg['normalize_xyz']:        # ❌ true 라 이 줄은 건너뛴다
+        trans_delta = tanh(out) * trans_normalizer   # 🔴 «꺼진» 경로
+    else:
+        trans_delta = out["trans"]      # ✅ 여기 — tanh 도 상수배도 없다
+if cfg['rot_rep']=='axis_angle':
+    rot_mat_delta = tanh(out["rot"]) * cfg['rot_normalizer']   # ✅ ×20° 상수
+if cfg['normalize_xyz']:
+    trans_delta *= (mesh_diameter / 2)  # ✅ 여기 — 메쉬 크기에 비례
+```
+
+### 20-3. ★ 두 상수가 «논문의 학습 교란 크기» 와 정확히 같다
+
+논문 supplementary p14:
+> *"the pose is randomly perturbed by adding **translation noise under the magnitude of 0.02m, 0.02m,
+> 0.05m** for XYZ axis respectively and **rotation under the magnitude of 20°**"*
+
+| 논문의 학습 교란 | config 값 | 일치 | **실제 사용?** |
+|---|---|:-:|:-:|
+| 회전 **20°** | `rot_normalizer` = 0.3490658503988659 rad = **20.000000°** | ✅ | ✅ **쓴다** |
+| 평행이동 **0.02 / 0.02 / 0.05 m** | `trans_normalizer` = **[0.02, 0.02, 0.05]** | ✅ | 🔴 **안 쓴다** |
+
+★★ **그래서 «논문에 없는 값을 썼다» 가 아니다.** 정확한 서술은
+***"논문의 값이 config 에 그대로 있는데, 배포 설정(`normalize_xyz: true`)이 그 경로를 껐다.
+그 «끄기로 한 선택» 의 이유가 논문에 없다"*** 다.
+
+🔴 이 확인으로 문서가 하나 정정됐다 — 이전에 *"평행이동의 지름 정규화는 **우리 것**"* 처럼 읽히게
+분류돼 있었는데, **그건 upstream 의 배포 설정**이지 우리 선택이 아니다.
+그 결과 **«우리 것» 은 인스턴스 선택 규칙 하나**만 남았다(`CONFLUENCE_PIPELINE §0.1`).
+
+### 20-4. 확인 명령
+
+```bash
+cd /isaac-sim/volume/spatial_manipulation_ws/src/vision/third_party/FoundationPose
+grep -n "run_name" learning/training/predict_pose_refine.py learning/training/predict_score.py
+grep -nE "rot_normalizer|trans_normalizer|normalize_xyz|crop_ratio" weights/*/config.yml
+sed -n '195,232p' learning/training/predict_pose_refine.py
+```
+
+---
+
+<a id="21"></a>
+## 21. ★★ `estimater.py` · refiner · scorer — 그리고 stage1 ↔ stage2 의 «개입 정도»
+
+**결론부터**: 보신 대로다. **stage1 은 upstream 기본 사용법과 거의 같고, stage2 가 우리 조립이다.**
+아래에서 하나씩 확인한다.
+
+### 21-1. `estimater.py` 는 무엇인가 — **클래스 하나**
+
+📂 `third_party/FoundationPose/estimater.py` · 핵심은 **`class FoundationPose`** 하나다.
+«모델» 이 아니라 **«두 신경망 + CAD 메쉬 + 회전 격자» 를 들고 파이프라인을 돌리는 껍데기**다.
+
+**들고 있는 것** (`__init__` · `reset_object`)
+
+| 필드 | 무엇 | 만들어지는 곳 |
+|---|---|---|
+| `self.mesh` · `mesh_tensors` | **CAD 메쉬** (중심을 원점으로 옮긴 사본) · 래스터화용 텐서 | `reset_object` (`:43-77`) |
+| `self.model_center` | 옮긴 양 — 나중에 **되돌릴 때** 쓴다 | `:45-46` |
+| **`self.diameter`** | `compute_mesh_diameter(n_sample=10000)` → **crop 눈금과 보폭을 정한다**(§19) | `:54` |
+| `self.vox_size` · `self.pts` · `self.normals` | 메쉬를 복셀 다운샘플한 점·법선 | `:55-63` |
+| **`self.rot_grid`** | **회전 가설 격자** — 구면 40시점 × 면내 60°씩 6 = 240 → 30° 군집 | `make_rotation_grid` (`:27·106-123`) |
+| `self.refiner` · `self.scorer` | **신경망 둘** (아래 21-2) | `__init__` 인자 |
+| `self.pose_last` | **직전 pose** — `track_one` 이 여기서 출발한다 | `register` 가 채운다 (`:234`) |
+| `self.symmetry_tfs` | 대칭 변환. 안 주면 항등 하나 | `:73-76` |
+
+**메서드 여섯**
+
+| 메서드 | 줄 | 하는 일 |
+|---|--:|---|
+| `reset_object` | 43 | 메쉬 등록 · 중심 이동 · 지름/복셀 계산 |
+| `make_rotation_grid` | 106 | 240개 회전 격자 생성 → 군집 |
+| `guess_translation` | 137 | **마스크 → 초기 t** (bbox 중심 + depth 중앙값). **마스크가 쓰이는 유일한 곳** |
+| `generate_random_pose_hypo` | 127 | `rot_grid` 복사 + 위 t 를 전부에 대입 |
+| **`register`** | **159** | **첫 pose 추정 전체** (아래 21-3) |
+| **`track_one`** | **250** | **국소 정련만** (아래 21-4) |
+
+### 21-2. 신경망이 **둘**이다 — 역할이 완전히 다르다
+
+| | **refiner** | **scorer** |
+|---|---|---|
+| 논문 | **§3.3 Pose Refinement** | **§3.4 Pose Selection** |
+| 클래스 | `PoseRefinePredictor` | `ScorePredictor` |
+| 가중치 | **`2023-10-28-18-33-37`** | `2024-01-11-20-02-45` |
+| **하는 일** | pose 를 **고친다** | 후보를 **줄 세운다** |
+| 출력 | **`Δt` (3) + `ΔR` (3)** | **점수 1개** |
+| `crop_ratio` | **1.2** | 1.1 |
+| 입력 크기 | 160×160 | 160×160 |
+| `rot_normalizer` | ✅ 20.000000° | ❌ 없다(필요 없다 → §20) |
+| stage1 에서 | ✅ 240개를 **각각 5회** 정련 | ✅ 정련된 240개를 **채점** |
+| **stage2 에서** | ✅ 씨앗 1개를 5회 정련 | 🔴 **아예 안 부른다** |
+
+★ **둘 다 «렌더(A) ↔ 관측 crop(B)» 을 입력으로 받는다** — 같은 그림을 보고 한쪽은 *"얼마나 어긋났나"*,
+다른 쪽은 *"얼마나 잘 맞나"* 를 낸다.
+
+🟢 **scorer 는 «2단 비교» 다** — 논문 §3.4:
+> *"The network uses a **two-level comparison strategy**. First, for each pose hypothesis, the rendered
+> image is compared against the cropped input observation … However, this would ignore the other pose
+> hypotheses, forcing the network to output an **absolute score** assignment which can be difficult to
+> learn. To leverage the **global context of all pose hypotheses** …"*
+
+코드에도 그 2단이 있다 — `predict_score.py:194`(개별 A↔B) · **`:207 find_best_among_pairs`**(후보끼리).
+★ 즉 **절대 점수가 아니라 «후보들 사이의 상대 순위»** 다. **후보가 하나면 비교할 게 없다** —
+이것이 stage2 에서 scorer 를 안 부르는 구조적 이유이기도 하다.
+
+### 21-3. `register()` 안에서 벌어지는 일 — 7단계
+
+```
+① depth 전처리        erode_depth(r=2) → bilateral_filter_depth(r=2)      :173-174
+② 유효성 검사         (depth≥1mm) & (mask>0) 가 4픽셀 미만이면 조기 반환   :184-189
+③ 회전 가설 240개     rot_grid 복사                                       :203
+④ 초기 t 1개          guess_translation(마스크 bbox 중심 + depth 중앙값)   :206
+   └ 240개 «전부» 에 같은 t 를 넣는다                                     :210
+⑤ refiner ×5회        각 가설마다 crop→렌더→비교→Δ 적용 (crop 은 매회 재계산) :215
+⑥ scorer              240개를 채점                                        :219
+⑦ 정렬 → 1등          argsort(descending) → poses[0]                      :226-234
+   └ self.pose_last 에 저장 (track_one 이 이걸 쓴다)                      :234
+```
+
+🔴 **마스크가 관여하는 것은 ②와 ④뿐**이다(§7.1). 네트워크에 들어가는 `rgb`·`depth` 는 **안 가린다.**
+
+### 21-4. `track_one()` 안에서 벌어지는 일 — 4단계
+
+```
+① pose_last 없으면 즉시 에러      "Please init pose by register first"    :251-253
+② depth 전처리                    register 와 동일 (erode + bilateral)     :257-258
+③ refiner ×N회                    ob_in_cams = pose_last **1개**           :263
+④ pose_last 갱신 후 반환                                                   :267-268
+```
+
+🔴 **③에서 `ob_in_cams` 가 `self.pose_last.reshape(1,4,4)` — 후보가 «1개» 다.** 그래서
+scorer 를 부를 이유가 없고(비교할 대상이 없다), 실제로 코드에 호출이 없다.
+⚠️ **마스크 인자 자체가 시그니처에 없다** — `track_one(rgb, depth, K, iteration, extra={})`.
+
+### 21-5. ★ 그래서 «우리 개입» 은 어디에 있나 — 사용자 판단대로다
+
+| | **stage1** | **stage2** |
+|---|---|---|
+| 부르는 함수 | `est1.register(...)` | `est2.track_one(...)` |
+| **upstream 사용법과 같나** | ✅ **거의 같다** | 🔴 **다르게 쓴다** |
+| 우리가 한 것 | **① 매 프레임 호출**(upstream 은 0번 프레임 1회) <br> ② 마스크 공급자를 SAM3 텍스트로 | **① 두 번째 인스턴스를 «다른 메쉬»로 생성** <br> ② flange 마스크를 **CAD 투영으로 직접 제작** <br> ③ 그 밖 **depth 를 0 으로** <br> ④ **`pose_last` 직접 대입**해 `register` 건너뛰기 |
+| 인자 | 전부 upstream 기본값(`iteration=5` 포함) | `iteration=5` (upstream 추적 기본은 **2**) |
+| 🔴 «규약 밖» | **없음** | **④ 하나** — upstream 은 `pose_last` 를 `register` **안에서만** 세팅한다 |
+
+★★ **한 줄 요약**:
+> **stage1 = «FoundationPose 를 설명서대로 쓴 것».
+> stage2 = «FoundationPose 의 부품(`track_one`)을 원래 용도(다음 프레임 추적)와 다른 목적
+> (같은 프레임·다른 메쉬 재추정)으로 재사용한 것».**
+
+🟢 **다만 둘 다 upstream 소스는 0줄 수정이다** — ①~④ 전부 **공개 API 호출 순서와 입력 가공**이다.
+④의 `pose_last` 대입만 «공개 API 라기보다 내부 상태» 라 `RH_RATIONALE §9` 에 예외로 명시해 두었다.
 
 ## 부록. 한 장 요약 — 용어만
 
