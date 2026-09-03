@@ -259,7 +259,7 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 | 근거 | 원문 |
 |---|---|
 | **입력 단위** | `README:49` — *"exhaustively segment all instances of an open-vocabulary concept specified by a **short text phrase** or exemplars"* |
-| **학습·평가 단위** | `README:351` — SA-Co 는 *"images … with annotated **noun phrases**. Each image/video and **noun phrase** pair is annotated with instance masks"* (270K concepts) |
+| **학습·평가 단위** | `README:351` — SA-Co 는 *"images … with annotated **noun phrases**. Each image/video and **noun phrase** pair is annotated with instance masks"* (270K concepts) ⚠️ **논문 v2 는 같은 벤치마크를 «207K unique concepts» 로 적는다** — 출처가 어긋나므로 인용 시 어느 쪽인지 밝힌다 |
 | **복잡한 프롬프트는 분해 대상** | `sam3/agent/agent_core.py:238·273·423` — 실패 시 재시도 지시가 *"a different, perhaps more general, or more creative **simple noun phrase** prompt"* 다. 🔴 **Agent 가 존재하는 이유 자체가 «SAM3 본체는 단순 NP 를 받는다»** 는 것이다 |
 | **수식어 구분 기전** | `README:49` + `sam3/model/decoder.py:104-137` — **presence token** 이 *"closely related text prompts (e.g., 'a player in white' vs 'a player in red')"* 를 구분하도록 도입됐다 |
 
@@ -274,7 +274,7 @@ sim 방해물 씬에서 f002↔f005↔f007 이 **McNemar p = 0.078~0.289**(§42-
 | **⑩ 색어는 «조건부» 다 — 맞는 색에서만 걸리고 아니면 조용히 검출 0** (§37-16-2) | 🔴 **버그가 아니라 설계된 동작**이다. presence token 이 색 수식어로 구분하도록 만들어졌다 |
 | **⑨ 영어 전용** — 한/일/독 전부 0/9 (§37-13) | SA-Co 가 **영어 NP** 데이터셋이다 |
 | **⑧ 대소문자는 «완전히 같다» · 마침표는 마스크를 바꾼다** (§39-13d) | 토크나이저 정규화가 대소문자를 지운다. 마침표는 **토큰을 추가**해 임베딩을 바꾼다 |
-| **⑭ 제조사명은 해롭다** — 그 제조사 사진에만 붙는다 (§39-5) | 270K 개념이라도 **상표는 특정 외관과 강하게 결합**한 spurious correlation 이다 |
+| **⑭ 제조사명은 해롭다** — 그 제조사 사진에만 붙는다 (§39-5) | 학습 개념이 **4M NP**(`README:51` · 논문 §1)로 많아도 **상표는 특정 외관과 강하게 결합**한 spurious correlation 이다 |
 
 ### 5.3 그래서 `f002` 는 **설계 요건의 교집합**이다
 

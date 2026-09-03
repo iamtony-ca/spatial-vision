@@ -451,7 +451,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--panel5", default="valid", choices=["valid", "stage2"],
                     help="5번 패널. `valid`(기본) = 범위 검사 마스크 · "
                          "**`stage2`** = **stage2 가 실제로 먹는 «flange 로 가린 depth»**"
-                         "(`pose_fp.py:411` 과 같은 연산). 🔴 `valid` 는 범위 검사라 거의 항상 100% 여서 "
+                         "(`pose_fp.py:422` 와 같은 연산). 🔴 `valid` 는 범위 검사라 거의 항상 100%% 여서 "
                          "정보가 없다 — 보고서용은 `stage2` 를 권한다(flange 안 무효는 마젠타로 남긴다)")
     ap.add_argument("--gate-deg", type=float, default=1.5, help="추이 그래프의 기준선")
     ap.add_argument("--frames", type=int, default=6, help="시트에 넣을 프레임 수")

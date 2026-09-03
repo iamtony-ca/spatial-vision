@@ -214,6 +214,13 @@ def main(argv: list[str] | None = None) -> int:
                     help="[--flange-mask-from pose] 투영 마스크 만드는 법. "
                          "faces=삼각형 합집합(**올바름**, 노치를 살린다) / hull=볼록껍질(옛 동작, 대조군). "
                          "볼록껍질은 GT 대비 평균 1.55%% 부푼다 — 그만큼 배경 depth 가 refine 에 들어간다")
+    ap.add_argument("--mask-largest-cc", action="store_true",
+                    help="stage-1 마스크에서 **가장 큰 연결성분만** 남긴다 (기본 끔). "
+                         "🔴 `guess_translation`(`estimater.py:137`)이 마스크의 **bbox 극값**을 쓰기 때문에 "
+                         "화면 반대쪽의 몇 픽셀짜리 파편 하나가 초기 t 를 수백 mm 밀 수 있다. "
+                         "실측(RESULTS §44-24b-3): 640프레임 중 **1건**에서 4px 파편이 bbox 중심을 355px 밀어 "
+                         "**R 133.7° · t 699mm** 실패를 만들었고, 이 옵션이 **R 0.30° · t 1.8mm** 로 되살렸다. "
+                         "나머지 639프레임의 초기 t 중앙값은 거의 안 변한다(±2.4mm).")
     ap.add_argument("--mask-band-mm", type=float, default=0.0,
                     help="flange 마스크를 **바깥 테두리 밴드**로 줄인다(rim 밴드 정합, CATALOG §2.2 S⑤). "
                          "⚠️ 반드시 `cad.build_rim_obj --band-mm` 로 같은 폭의 밴드 메쉬를 만든 obj 와 "
@@ -319,6 +326,17 @@ def main(argv: list[str] | None = None) -> int:
 
         md = mask_root / f.name if mask_root != in_dir or (mask_root / f.name).exists() else f
         mask_full = cv2.imread(str(md / mask_primary), cv2.IMREAD_GRAYSCALE)
+        if args.mask_largest_cc and mask_full is not None and (mask_full > 127).any():
+            # 🔴 `guess_translation` 은 마스크의 **bbox 극값**(us.min/max)으로 중심을 잡는다.
+            #    → 화면 구석의 파편 몇 px 이 bbox 를 통째로 늘려 초기 t 를 수백 mm 민다(§44-24b-3).
+            #    면적 필터가 아니라 **연결성분**으로 잘라야 한다 — 파편은 면적이 아주 작아
+            #    `select_index` 의 `min_area_frac` 은 «후보 사이» 필터라 여기에 닿지 않는다.
+            ncc, lab, st, _ = cv2.connectedComponentsWithStats((mask_full > 127).astype(np.uint8), 8)
+            if ncc > 2:
+                keep = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))
+                dropped = int((mask_full > 127).sum() - st[keep, cv2.CC_STAT_AREA])
+                mask_full = ((lab == keep) * 255).astype(np.uint8)
+                print(f"  {f.name}: 연결성분 {ncc - 1}개 → 최대 1개 ({dropped}px 제거)")
 
         orig_hw = depth_m.shape[:2]
         if args.input_scale != 1.0:
@@ -444,7 +462,7 @@ def main(argv: list[str] | None = None) -> int:
         "stage": "pose", "backend": "foundationpose_2stage",
         "license": "NVIDIA Source Code License — research/evaluation only (docs/LICENSES.md §1)",
         "obj": str(obj_dir), "masks": str(mask_root), "depth_source": args.depth,
-        "primary": args.primary, "init_from": args.init_from, "rel_from_gt": args.rel_from_gt,
+        "primary": args.primary, "mask_largest_cc": args.mask_largest_cc, "init_from": args.init_from, "rel_from_gt": args.rel_from_gt,
         "flange_mask_from": args.flange_mask_from,
         "mask_band_mm": args.mask_band_mm, "mask_hub_r_mm": args.mask_hub_r_mm,
         "flange_mask_proj": args.flange_mask_proj,
